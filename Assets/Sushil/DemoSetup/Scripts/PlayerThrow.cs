@@ -1,4 +1,7 @@
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Sushil.Demo
 {
@@ -16,11 +19,23 @@ namespace Sushil.Demo
         {
             if (Time.time - lastThrowTime < cooldown) return;
 
-            if (Input.GetKeyDown(KeyCode.G))
+            if (WasThrowPressed())
             {
                 Throw();
                 lastThrowTime = Time.time;
             }
+        }
+
+        bool WasThrowPressed()
+        {
+            bool pressed = Input.GetKeyDown(KeyCode.G);
+
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null)
+                pressed |= Keyboard.current.gKey.wasPressedThisFrame;
+#endif
+
+            return pressed;
         }
 
         void Throw()

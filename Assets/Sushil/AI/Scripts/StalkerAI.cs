@@ -50,6 +50,7 @@ namespace Sushil.AI
 
         // ===== NEW (one-shot kill) =====
         private PlayerDeath playerDeath;
+        private PlayerHide playerHide;
         private bool killTriggered;
 
         void Reset() { agent = GetComponent<NavMeshAgent>(); }
@@ -71,7 +72,11 @@ namespace Sushil.AI
             }
 
             if (player != null)
+            {
                 playerDeath = player.GetComponent<PlayerDeath>(); // NEW
+                playerHide = player.GetComponent<PlayerHide>();
+                if (playerHide == null) playerHide = player.gameObject.AddComponent<PlayerHide>();
+            }
 
             ChangeState(State.Patrol);
         }
@@ -92,6 +97,7 @@ namespace Sushil.AI
 
             // ===== NEW: One-shot kill =====
             if (state == State.Chase && !killTriggered &&
+                !IsPlayerHidden() &&
                 Vector3.Distance(transform.position, player.position) <= killDistance)
             {
                 killTriggered = true;
@@ -279,6 +285,7 @@ namespace Sushil.AI
         bool CanSeePlayer()
         {
             if (player == null) return false;
+            if (IsPlayerHidden()) return false;
 
             Vector3 toPlayer = player.position - transform.position;
             float dist = toPlayer.magnitude;
@@ -294,6 +301,11 @@ namespace Sushil.AI
                 return hit.collider.CompareTag("Player");
 
             return false;
+        }
+
+        bool IsPlayerHidden()
+        {
+            return playerHide != null && playerHide.IsHidden;
         }
 
         void OnDrawGizmosSelected()
