@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 3114158476364192099}
   - component: {fileID: 3211573663175135224}
   - component: {fileID: 3862381546001811164}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Head
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -123,7 +123,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1237021878466648382}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: KeyRectangle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -157,7 +157,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8145939934668835181}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: InteractionPoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -191,7 +191,7 @@ GameObject:
   - component: {fileID: 4235789778836392263}
   - component: {fileID: 2773339382938964782}
   - component: {fileID: 7456067809682122674}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Shaft
   m_TagString: Untagged
   m_Icon: {fileID: 0}

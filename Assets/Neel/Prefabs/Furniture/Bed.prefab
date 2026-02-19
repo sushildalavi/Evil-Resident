@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 781057569812992278}
   - component: {fileID: 8472854362787041312}
   - component: {fileID: 7142004730948997090}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Leg_FR
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -121,7 +121,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2095385325160971}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: InteractionPoint1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -137,7 +137,7 @@ Transform:
   m_GameObject: {fileID: 1336156975219430733}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -0.751}
+  m_LocalPosition: {x: 0, y: 0, z: -0.936}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -152,7 +152,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 8227026278754544650}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Points
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -187,7 +187,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 740147783480810543}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: InteractionPoint3
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -203,7 +203,7 @@ Transform:
   m_GameObject: {fileID: 1892193255377471572}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.588, y: 0.97, z: -0.026}
+  m_LocalPosition: {x: -0.647, y: 0.97, z: -0.026}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -221,7 +221,7 @@ GameObject:
   - component: {fileID: 4834425311123831235}
   - component: {fileID: 4978260690214032809}
   - component: {fileID: 4481309805128373986}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Leg_BL
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -333,7 +333,7 @@ GameObject:
   - component: {fileID: 3822363941137741258}
   - component: {fileID: 2910116150049214263}
   - component: {fileID: 4121166862708869412}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Leg_BR
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -433,6 +433,38 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &2449938370855069781
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 461707970850037886}
+  m_Layer: 7
+  m_Name: Colliders
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &461707970850037886
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2449938370855069781}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 6606362573216341465}
+  m_Father: {fileID: 38018123008643417}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2635666671835388733
 GameObject:
   m_ObjectHideFlags: 0
@@ -445,7 +477,7 @@ GameObject:
   - component: {fileID: 1861887891158826328}
   - component: {fileID: 6964165820669785014}
   - component: {fileID: 2774248181508231216}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Blanket
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -557,7 +589,7 @@ GameObject:
   - component: {fileID: 2963123572137994126}
   - component: {fileID: 6482989123239448807}
   - component: {fileID: 985774691613575607}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Frame
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -666,7 +698,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 7897042098713348953}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: HideOutPoints
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -700,7 +732,7 @@ GameObject:
   - component: {fileID: 7263015676986984108}
   - component: {fileID: 7103135411367763567}
   - component: {fileID: 8445379812900388445}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Pillow
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -809,7 +841,8 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 38018123008643417}
-  m_Layer: 0
+  - component: {fileID: 127047797638476243}
+  m_Layer: 7
   m_Name: Bed
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -839,8 +872,22 @@ Transform:
   - {fileID: 2591620769021102593}
   - {fileID: 2052391755108492143}
   - {fileID: 2412706359542373556}
+  - {fileID: 461707970850037886}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &127047797638476243
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4396955555464838929}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ee78c7fc383946bfa7107ff6b184d8a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BedInteractable
+  hidePoint: {fileID: 7897042098713348953}
 --- !u!1 &4937135677482034660
 GameObject:
   m_ObjectHideFlags: 0
@@ -853,7 +900,7 @@ GameObject:
   - component: {fileID: 6942860917409095826}
   - component: {fileID: 3539049411373537861}
   - component: {fileID: 8103680716341524481}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Pillow2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -953,6 +1000,59 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!1 &5107714437109219603
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 6606362573216341465}
+  - component: {fileID: 2585344955870175280}
+  m_Layer: 7
+  m_Name: MainCollider
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &6606362573216341465
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5107714437109219603}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 2.2030945, y: 1, z: 2.23}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 461707970850037886}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!65 &2585344955870175280
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5107714437109219603}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1, y: 1, z: 1}
+  m_Center: {x: 0, y: 0, z: 0}
 --- !u!1 &6538129776288580047
 GameObject:
   m_ObjectHideFlags: 0
@@ -962,7 +1062,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4410621323785077972}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: InteractionPoint2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -978,7 +1078,7 @@ Transform:
   m_GameObject: {fileID: 6538129776288580047}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.577, y: 1.04, z: -0.046}
+  m_LocalPosition: {x: 0.614, y: 1.04, z: -0.046}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -996,7 +1096,7 @@ GameObject:
   - component: {fileID: 358808348623546176}
   - component: {fileID: 6449535185177811339}
   - component: {fileID: 4553687820666560243}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Leg_FL
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1108,7 +1208,7 @@ GameObject:
   - component: {fileID: 8551918114602120484}
   - component: {fileID: 3275587633349690806}
   - component: {fileID: 501366524798360733}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Mattress
   m_TagString: Untagged
   m_Icon: {fileID: 0}

@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 5855949286405043579}
   - component: {fileID: 6610102163289035653}
   - component: {fileID: 4487065630255615220}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Head
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -126,7 +126,7 @@ GameObject:
   - component: {fileID: 2001346172559447245}
   - component: {fileID: 2207779535652252843}
   - component: {fileID: 9127758875263581042}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Shaft
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -235,7 +235,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 575448923642330136}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: InteractionPoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -266,7 +266,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1128403747284329294}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: KeyCircle
   m_TagString: Untagged
   m_Icon: {fileID: 0}

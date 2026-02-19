@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 5205703545728627004}
   - component: {fileID: 3488240048332406612}
   - component: {fileID: 1647804114167399018}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Latch
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -121,7 +121,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 758080015133128278}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Colliders
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -156,7 +156,7 @@ GameObject:
   - component: {fileID: 6731355193998695068}
   - component: {fileID: 2944324128710022566}
   - component: {fileID: 730466789961996622}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Base
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -266,7 +266,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 5197069603068084836}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Visuals
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -299,7 +299,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6792047733921897930}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: HideContainer
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -334,7 +334,7 @@ GameObject:
   m_Component:
   - component: {fileID: 7437382482846812758}
   - component: {fileID: 667147029234963901}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: LidCollider
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -386,7 +386,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4945509127739911574}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: HidePoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -420,7 +420,7 @@ GameObject:
   - component: {fileID: 2103408163568458000}
   - component: {fileID: 8767765687331536815}
   - component: {fileID: 8691412082062192679}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Lid
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -529,7 +529,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 2109690747282260510}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Points
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -562,7 +562,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 665061922947513514}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: LidPivot
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -595,7 +595,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1899587608290652538}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: InteractionPoint
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -627,7 +627,7 @@ GameObject:
   m_Component:
   - component: {fileID: 435734518685461293}
   - component: {fileID: 2320485665792628317}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: BaseCollider
   m_TagString: Untagged
   m_Icon: {fileID: 0}
