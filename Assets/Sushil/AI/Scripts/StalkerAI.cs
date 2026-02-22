@@ -25,12 +25,18 @@ namespace Sushil.AI
         [Header("Vision")]
         public float sightRange = 12f;
         public float fovDegrees = 110f;
+        public bool requireNoiseToChase = true;
+        public float noiseChaseWindow = 12f;
+        public float proximityChaseDistance = 2.2f;
 
         [Header("Noise Hearing")]
         public float minNoiseIntensity = 1f;
+        public float hearingScale = 2.2f;
+        public float minHearingRadius = 6f;
         private Vector3 lastNoisePos;
         private float lastNoiseIntensity;
         private bool hasNoise;
+        private float lastHeardNoiseTime = -999f;
 
         [Header("Search Behavior")]
         public float searchDuration = 8f;
@@ -64,26 +70,18 @@ namespace Sushil.AI
 
             // Avoid floating weirdness
             agent.baseOffset = 0f;
-
-            if (player == null)
-            {
-                var p = GameObject.FindGameObjectWithTag("Player");
-                if (p != null) player = p.transform;
-            }
-
-            if (player != null)
-            {
-                playerDeath = player.GetComponent<PlayerDeath>(); // NEW
-                playerHide = player.GetComponent<PlayerHide>();
-                if (playerHide == null) playerHide = player.gameObject.AddComponent<PlayerHide>();
-            }
+            ResolvePlayerReference();
 
             ChangeState(State.Patrol);
         }
 
         void Update()
         {
-            if (player == null) return;
+            if (player == null)
+            {
+                ResolvePlayerReference();
+                if (player == null) return;
+            }
 
             // If player is dead/disabled, stop AI cleanly
             if (!player.gameObject.activeInHierarchy)
@@ -92,7 +90,22 @@ namespace Sushil.AI
                 return;
             }
 
-            if (CanSeePlayer() && state != State.Chase)
+            // If player hides during chase, immediately lose them and switch to search.
+            if (state == State.Chase && IsPlayerHidden())
+            {
+                lastNoisePos = player.position;
+                lastNoiseIntensity = Mathf.Max(lastNoiseIntensity, 6f);
+                hasNoise = true;
+                ChangeState(State.Search);
+                return;
+            }
+
+            bool canSee = CanSeePlayer();
+            bool chaseUnlocked = !requireNoiseToChase ||
+                                 (Time.time - lastHeardNoiseTime <= noiseChaseWindow) ||
+                                 Vector3.Distance(transform.position, player.position) <= proximityChaseDistance;
+
+            if (canSee && chaseUnlocked && state != State.Chase)
                 ChangeState(State.Chase);
 
             // ===== NEW: One-shot kill =====
@@ -107,7 +120,7 @@ namespace Sushil.AI
                 if (playerDeath != null)
                     playerDeath.Kill("Stalker one-shot");
                 else
-                    player.gameObject.SetActive(false); // fallback if you forgot to add PlayerDeath
+                    Debug.LogWarning("[StalkerAI] PlayerDeath missing; kill skipped to avoid disabling player object.");
             }
         }
 
@@ -134,14 +147,48 @@ namespace Sushil.AI
             if (intensity < minNoiseIntensity) return;
 
             float dist = Vector3.Distance(transform.position, pos);
-            if (dist > intensity) return;
+            float hearingRadius = Mathf.Max(minHearingRadius, intensity * hearingScale);
+            if (dist > hearingRadius) return;
 
-            lastNoisePos = pos;
+            Vector3 targetPos = pos;
+            if (NavMesh.SamplePosition(pos, out var navHit, 3f, NavMesh.AllAreas))
+                targetPos = navHit.position;
+
+            lastNoisePos = targetPos;
             lastNoiseIntensity = intensity;
             hasNoise = true;
+            lastHeardNoiseTime = Time.time;
 
             if (state != State.Chase)
                 ChangeState(State.Investigate);
+        }
+
+        void ResolvePlayerReference()
+        {
+            if (player == null)
+            {
+                var fps = FindObjectOfType<Sushil.Demo.SushilFPSController>();
+                if (fps != null) player = fps.transform;
+            }
+
+            if (player == null)
+            {
+                var death = FindObjectOfType<PlayerDeath>();
+                if (death != null) player = death.transform;
+            }
+
+            if (player == null)
+            {
+                var tagged = GameObject.FindGameObjectWithTag("Player");
+                if (tagged != null) player = tagged.transform;
+            }
+
+            if (player != null)
+            {
+                playerDeath = player.GetComponent<PlayerDeath>();
+                playerHide = player.GetComponent<PlayerHide>();
+                if (playerHide == null) playerHide = player.gameObject.AddComponent<PlayerHide>();
+            }
         }
 
         IEnumerator Patrol()
@@ -298,7 +345,11 @@ namespace Sushil.AI
             Vector3 target = player.position + Vector3.up * 1.2f;
 
             if (Physics.Raycast(eye, (target - eye).normalized, out var hit, sightRange, losMask))
-                return hit.collider.CompareTag("Player");
+            {
+                if (hit.collider.transform == player) return true;
+                if (hit.collider.transform.IsChildOf(player)) return true;
+                if (hit.collider.GetComponentInParent<PlayerDeath>() != null) return true;
+            }
 
             return false;
         }
