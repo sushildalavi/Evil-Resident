@@ -299,6 +299,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6792047733921897930}
+  - component: {fileID: 455879236327192176}
   m_Layer: 7
   m_Name: HideContainer
   m_TagString: Untagged
@@ -324,6 +325,19 @@ Transform:
   - {fileID: 2109690747282260510}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &455879236327192176
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5397930183762748577}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec69a16fd735d4db69a29a95a30038a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HideableObject
+  hidePoint: {fileID: 0}
 --- !u!1 &5961065349643334191
 GameObject:
   m_ObjectHideFlags: 0

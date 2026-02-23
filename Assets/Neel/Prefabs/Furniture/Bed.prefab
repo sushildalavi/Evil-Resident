@@ -841,7 +841,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 38018123008643417}
-  - component: {fileID: 127047797638476243}
+  - component: {fileID: 618962081090933992}
   m_Layer: 7
   m_Name: Bed
   m_TagString: Untagged
@@ -875,7 +875,7 @@ Transform:
   - {fileID: 461707970850037886}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &127047797638476243
+--- !u!114 &618962081090933992
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -884,10 +884,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 4396955555464838929}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8ee78c7fc383946bfa7107ff6b184d8a, type: 3}
+  m_Script: {fileID: 11500000, guid: ec69a16fd735d4db69a29a95a30038a2, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::BedInteractable
+  m_EditorClassIdentifier: Assembly-CSharp::HideableObject
   hidePoint: {fileID: 7897042098713348953}
+  interactionPoint: {fileID: 2095385325160971}
 --- !u!1 &4937135677482034660
 GameObject:
   m_ObjectHideFlags: 0
