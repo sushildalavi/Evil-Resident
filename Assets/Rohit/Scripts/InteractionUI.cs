@@ -7,13 +7,22 @@ public class InteractionUI : MonoBehaviour
     Canvas canvas;
     Text promptText;
     Text keyHudText;
+    Font builtInFont;
 
     void Awake()
     {
+        LoadFont();
         CreateCanvas();
         CreatePromptText();
         CreateKeyHud();
         AssignToController();
+    }
+
+    void LoadFont()
+    {
+        builtInFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        if (builtInFont == null)
+            builtInFont = Resources.GetBuiltinResource<Font>("Arial.ttf");
     }
 
     void CreateCanvas()
@@ -43,7 +52,7 @@ public class InteractionUI : MonoBehaviour
         promptText.color = Color.white;
         promptText.alignment = TextAnchor.MiddleCenter;
         promptText.horizontalOverflow = HorizontalWrapMode.Overflow;
-        promptText.font = Font.CreateDynamicFontFromOSFont("Arial", 28);
+        if (builtInFont != null) promptText.font = builtInFont;
 
         GameObject bgObj = new GameObject("PromptBackground");
         bgObj.transform.SetParent(promptObj.transform, false);
@@ -74,13 +83,13 @@ public class InteractionUI : MonoBehaviour
         hudObj.transform.SetParent(canvas.transform, false);
 
         keyHudText = hudObj.AddComponent<Text>();
-        keyHudText.text = "Keys:  O  ▭  □";
+        keyHudText.text = "Keys:  O  R  S";
         keyHudText.fontSize = 24;
         keyHudText.color = Color.white;
         keyHudText.alignment = TextAnchor.UpperLeft;
         keyHudText.horizontalOverflow = HorizontalWrapMode.Overflow;
         keyHudText.supportRichText = true;
-        keyHudText.font = Font.CreateDynamicFontFromOSFont("Arial", 24);
+        if (builtInFont != null) keyHudText.font = builtInFont;
 
         RectTransform hudRect = keyHudText.rectTransform;
         hudRect.anchorMin = new Vector2(0f, 1f);
