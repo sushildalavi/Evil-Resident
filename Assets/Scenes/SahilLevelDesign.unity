@@ -3778,6 +3778,15 @@ MonoBehaviour:
   rotateSpeed: 50
   bobSpeed: 2
   bobHeight: 0.25
+  enableAura: 1
+  auraColor: {r: 0.25, g: 0.9, b: 1, a: 1}
+  auraOrbCount: 6
+  auraRadius: 0.45
+  auraOrbitSpeed: 1.8
+  auraBobAmplitude: 0.12
+  auraPulseSpeed: 2.2
+  auraLightRange: 2.4
+  auraLightIntensity: 1.35
 --- !u!1 &1280321031
 GameObject:
   m_ObjectHideFlags: 0
@@ -4285,7 +4294,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3102677308717066457, guid: ec5d287a73b5144d18c1a9f310d5768d, type: 3}
       propertyPath: m_LocalScale.x
-      value: 3.9446557
+      value: 5.585719
       objectReference: {fileID: 0}
     - target: {fileID: 3102677308717066457, guid: ec5d287a73b5144d18c1a9f310d5768d, type: 3}
       propertyPath: m_LocalScale.y
@@ -4293,7 +4302,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3102677308717066457, guid: ec5d287a73b5144d18c1a9f310d5768d, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -1.41
+      value: -20.27
       objectReference: {fileID: 0}
     - target: {fileID: 3102677308717066457, guid: ec5d287a73b5144d18c1a9f310d5768d, type: 3}
       propertyPath: m_LocalPosition.y
@@ -4301,7 +4310,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3102677308717066457, guid: ec5d287a73b5144d18c1a9f310d5768d, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 8.94
+      value: 9.06
       objectReference: {fileID: 0}
     - target: {fileID: 3102677308717066457, guid: ec5d287a73b5144d18c1a9f310d5768d, type: 3}
       propertyPath: m_LocalRotation.w
@@ -4593,6 +4602,15 @@ MonoBehaviour:
   rotateSpeed: 50
   bobSpeed: 2
   bobHeight: 0.25
+  enableAura: 1
+  auraColor: {r: 0.25, g: 0.9, b: 1, a: 1}
+  auraOrbCount: 6
+  auraRadius: 0.45
+  auraOrbitSpeed: 1.8
+  auraBobAmplitude: 0.12
+  auraPulseSpeed: 2.2
+  auraLightRange: 2.4
+  auraLightIntensity: 1.35
 --- !u!1 &1661542366
 GameObject:
   m_ObjectHideFlags: 0
@@ -5350,6 +5368,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MainDoor
   openAngle: 90
   openSpeed: 2
+  openClockwise: 1
+  hingeLocalOffset: {x: -0.5, y: 0, z: 0}
   unlockSound: {fileID: 0}
   lockedSound: {fileID: 0}
   winUI: {fileID: 0}
@@ -6231,6 +6251,15 @@ MonoBehaviour:
   rotateSpeed: 50
   bobSpeed: 2
   bobHeight: 0.25
+  enableAura: 1
+  auraColor: {r: 0.25, g: 0.9, b: 1, a: 1}
+  auraOrbCount: 6
+  auraRadius: 0.45
+  auraOrbitSpeed: 1.8
+  auraBobAmplitude: 0.12
+  auraPulseSpeed: 2.2
+  auraLightRange: 2.4
+  auraLightIntensity: 1.35
 --- !u!1001 &7668826344385707374
 PrefabInstance:
   m_ObjectHideFlags: 0
