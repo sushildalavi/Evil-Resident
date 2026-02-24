@@ -635,6 +635,46 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7897042098713348953, guid: eb61641da1e95494580d89b5d2e2f194, type: 3}
   m_PrefabInstance: {fileID: 322228128}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &244209040 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 8212839126718544149, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+  m_PrefabInstance: {fileID: 746719326}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &244209049
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 244209040}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f2b6d5673d064218ba0d779839d7d2ba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.StalkerRohitNoiseBridge
+  playerController: {fileID: 0}
+  throwRock: {fileID: 0}
+  playerCharacterController: {fileID: 0}
+  autoFindPlayer: 1
+  minMoveSpeed: 0.15
+  walkStepInterval: 0.55
+  sprintStepInterval: 0.35
+  walkNoiseIntensity: 4
+  sprintNoiseIntensity: 8
+  footstepNoiseType: footstep
+  jumpNoiseIntensity: 10
+  landingNoiseIntensity: 12
+  jumpNoiseType: jump
+  landingNoiseType: land
+  throwKey: 103
+  throwReleaseNoiseIntensity: 6
+  throwNoiseType: throw
+  autoConfigureThrownRockImpactNoise: 1
+  impactNoiseIntensity: 18
+  impactMinSpeed: 0.75
+  projectileLifeSeconds: 6
+  impactNoiseType: throwImpact
+  projectileTrackWindow: 0.45
 --- !u!1 &249086756
 GameObject:
   m_ObjectHideFlags: 0
@@ -1456,6 +1496,66 @@ MeshFilter:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 711296835}
   m_Mesh: {fileID: 10209, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!1001 &746719326
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 4035933029255443913, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -40.39
+      objectReference: {fileID: 0}
+    - target: {fileID: 4035933029255443913, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 1.11
+      objectReference: {fileID: 0}
+    - target: {fileID: 4035933029255443913, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: -23.41
+      objectReference: {fileID: 0}
+    - target: {fileID: 4035933029255443913, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4035933029255443913, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4035933029255443913, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4035933029255443913, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4035933029255443913, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4035933029255443913, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4035933029255443913, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8212839126718544149, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      propertyPath: m_Name
+      value: Stalker
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 8212839126718544149, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 244209049}
+  m_SourcePrefab: {fileID: 100100000, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
 --- !u!1 &761958122
 GameObject:
   m_ObjectHideFlags: 0
@@ -5142,12 +5242,16 @@ PrefabInstance:
       value: Player
       objectReference: {fileID: 0}
     - target: {fileID: 6139336056483013976, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.03
+      objectReference: {fileID: 0}
+    - target: {fileID: 6139336056483013976, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
       propertyPath: m_LocalScale.y
-      value: 1.0293579
+      value: 1.0602386
       objectReference: {fileID: 0}
     - target: {fileID: 6139336056483013976, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
       propertyPath: m_LocalScale.z
-      value: 1.5211
+      value: 1.566733
       objectReference: {fileID: 0}
     - target: {fileID: 6139336056483013976, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
       propertyPath: m_LocalPosition.x
@@ -5189,6 +5293,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6139336056483013976, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
+      propertyPath: m_ConstrainProportionsScale
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7618547184439195312, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
       propertyPath: m_LocalPosition.y
       value: 1.1
@@ -5203,6 +5311,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 5566487683917300211, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
       insertIndex: -1
       addedObject: {fileID: 7668826344385707383}
+    - targetCorrespondingSourceObject: {fileID: 5566487683917300211, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 7668826344385707390}
   m_SourcePrefab: {fileID: 100100000, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
 --- !u!1 &7668826344385707375 stripped
 GameObject:
@@ -5233,6 +5344,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bd9292837d4f344deb9b60669b500356, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InteractionUI
+--- !u!114 &7668826344385707390
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7668826344385707375}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1235a4aa0b8984a578959350fbe78a6e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Sushil.Demo.NoiseTester
+  noiseKey: 110
+  intensity: 20
+  emitFromThrowPoint: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -5260,3 +5386,4 @@ SceneRoots:
   - {fileID: 1151770319}
   - {fileID: 1356645484}
   - {fileID: 1004444116}
+  - {fileID: 746719326}

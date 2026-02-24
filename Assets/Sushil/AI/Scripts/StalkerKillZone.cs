@@ -24,18 +24,28 @@ namespace Sushil.AI
             if (killed) return;
             if (Time.time < armedAt) return;
 
-            var death = other.GetComponentInParent<PlayerDeath>();
-            if (death == null) return;
-            if (death.isDead) return;
-
             if (onlyKillDuringChase && stalkerAI != null && stalkerAI.state != StalkerAI.State.Chase)
                 return;
 
-            var hide = death.GetComponent<PlayerHide>();
-            if (hide != null && hide.IsHidden) return;
+            var death = other.GetComponentInParent<PlayerDeath>();
+            if (death != null)
+            {
+                if (death.isDead) return;
+
+                var hide = death.GetComponent<PlayerHide>();
+                if (hide != null && hide.IsHidden) return;
+
+                killed = true;
+                death.Kill("Stalker one-shot (trigger)");
+                return;
+            }
+
+            var rohit = other.GetComponentInParent<RohitFPSController>();
+            if (rohit == null) return;
+            if (rohit.isHidden) return;
 
             killed = true;
-            death.Kill("Stalker one-shot (trigger)");
+            StalkerAI.KillRohitController(rohit, "Stalker one-shot (trigger)");
         }
     }
 }

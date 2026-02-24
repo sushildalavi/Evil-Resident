@@ -198,7 +198,7 @@ MonoBehaviour:
   sprintSpeed: 8
   jumpHeight: 1.5
   gravity: -9.81
-  mouseSensitivity: 200
+  mouseSensitivity: 450
   cameraTransform: {fileID: 7618547184439195312}
   groundCheck: {fileID: 7532794428714078508}
   groundDistance: 0.6
