@@ -8,6 +8,10 @@ public class RohitFPSController : MonoBehaviour
     public float sprintSpeed = 8f;
     public float jumpHeight = 1.5f;
     public float gravity = -9.81f;
+    public float acceleration = 26f;
+    public float deceleration = 20f;
+    [Range(0f, 1f)] public float airControl = 0.45f;
+    public float groundStickForce = 2f;
 
     [Header("Mouse")]
     public float mouseSensitivity = 450f;
@@ -15,6 +19,8 @@ public class RohitFPSController : MonoBehaviour
 
     [Header("Interaction")]
     public float interactDistance = 5f;
+    public float keyInteractDistance = 10f;
+    public float keyProximityRadius = 2.5f;
     public LayerMask interactableLayer;
     public Text promptText;
 
@@ -22,6 +28,7 @@ public class RohitFPSController : MonoBehaviour
     public Text keyHudText;
 
     float yVelocity;
+    Vector3 horizontalVelocity;
     float xRotation = 0f;
     CharacterController controller;
     PlayerInventory inventory;
@@ -73,22 +80,28 @@ public class RohitFPSController : MonoBehaviour
         bool isGrounded = controller.isGrounded;
 
         if (isGrounded && yVelocity < 0)
-            yVelocity = -2f;
+            yVelocity = -Mathf.Abs(groundStickForce);
 
-        float x = Input.GetAxis("Horizontal");
-        float z = Input.GetAxis("Vertical");
+        float x = Input.GetAxisRaw("Horizontal");
+        float z = Input.GetAxisRaw("Vertical");
 
-        Vector3 move = transform.right * x + transform.forward * z;
+        Vector3 input = new Vector3(x, 0f, z);
+        input = Vector3.ClampMagnitude(input, 1f);
 
-        float speed = Input.GetKey(KeyCode.LeftShift) ? sprintSpeed : walkSpeed;
+        float targetSpeed = Input.GetKey(KeyCode.LeftShift) ? sprintSpeed : walkSpeed;
+        Vector3 desiredHorizontal = transform.TransformDirection(input) * targetSpeed;
 
-        controller.Move(move * speed * Time.deltaTime);
+        float moveRate = input.sqrMagnitude > 0.0001f ? acceleration : deceleration;
+        if (!isGrounded) moveRate *= Mathf.Clamp01(airControl);
+        horizontalVelocity = Vector3.MoveTowards(horizontalVelocity, desiredHorizontal, moveRate * Time.deltaTime);
 
         if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
             yVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
 
         yVelocity += gravity * Time.deltaTime;
-        controller.Move(Vector3.up * yVelocity * Time.deltaTime);
+
+        Vector3 finalVelocity = horizontalVelocity + Vector3.up * yVelocity;
+        controller.Move(finalVelocity * Time.deltaTime);
     }
 
     void Look()
@@ -117,26 +130,124 @@ public class RohitFPSController : MonoBehaviour
 
         Ray ray = new Ray(cameraTransform.position, cameraTransform.forward);
         Debug.DrawRay(ray.origin, ray.direction * interactDistance, Color.red);
-        RaycastHit hit;
 
-        if (Physics.Raycast(ray, out hit, interactDistance, interactableLayer))
+        // Proximity-based key pickup so prompt is consistent regardless of key height/look angle.
+        if (TryFindNearbyKey(out KeyItem nearbyKey))
         {
-            IInteractable interactable = hit.collider.GetComponentInParent<IInteractable>();
+            string prompt = nearbyKey.GetPrompt(this);
+            ShowPrompt(prompt);
 
-            if (interactable != null)
-            {
-                string prompt = interactable.GetPrompt(this);
-                ShowPrompt(prompt);
+            if (Input.GetKeyDown(nearbyKey.GetInteractKey()))
+                nearbyKey.Interact(this);
 
-                KeyCode interactKey = interactable.GetInteractKey();
-                if (Input.GetKeyDown(interactKey))
-                    interactable.Interact(this);
+            return;
+        }
 
-                return;
-            }
+        if (TryFindInteractable(ray, out IInteractable interactable))
+        {
+            string prompt = interactable.GetPrompt(this);
+            ShowPrompt(prompt);
+
+            KeyCode interactKey = interactable.GetInteractKey();
+            if (Input.GetKeyDown(interactKey))
+                interactable.Interact(this);
+
+            return;
         }
 
         HidePrompt();
+    }
+
+    bool TryFindInteractable(Ray ray, out IInteractable interactable)
+    {
+        interactable = null;
+
+        float maxDistance = Mathf.Max(interactDistance, keyInteractDistance);
+        RaycastHit[] hits = Physics.RaycastAll(ray, maxDistance, ~0, QueryTriggerInteraction.Collide);
+        if (hits == null || hits.Length == 0) return false;
+
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        IInteractable fallbackInteractable = null;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider col = hits[i].collider;
+            if (col == null) continue;
+
+            IInteractable candidate = col.GetComponentInParent<IInteractable>();
+            if (candidate != null)
+            {
+                float allowedDistance = interactDistance;
+                if (candidate is KeyItem)
+                    allowedDistance = Mathf.Max(interactDistance, keyInteractDistance);
+
+                if (hits[i].distance > allowedDistance)
+                    continue;
+
+                bool inMask = interactableLayer.value != 0 && IsLayerInMask(col.gameObject.layer, interactableLayer);
+                if (inMask)
+                {
+                    interactable = candidate;
+                    return true;
+                }
+
+                // Fallback when layer setup is imperfect in scene objects.
+                if (fallbackInteractable == null) fallbackInteractable = candidate;
+                continue;
+            }
+
+            // A solid non-interactable object blocks interaction behind it.
+            if (!col.isTrigger) break;
+        }
+
+        if (fallbackInteractable != null)
+        {
+            interactable = fallbackInteractable;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool TryFindNearbyKey(out KeyItem keyItem)
+    {
+        keyItem = null;
+
+        KeyItem[] allKeys = FindObjectsByType<KeyItem>(FindObjectsSortMode.None);
+        if (allKeys == null || allKeys.Length == 0) return false;
+
+        float bestSqr = float.MaxValue;
+        Vector3 playerPos = transform.position;
+        float radius = Mathf.Max(0.1f, keyProximityRadius);
+        float radiusSqr = radius * radius;
+
+        for (int i = 0; i < allKeys.Length; i++)
+        {
+            KeyItem candidate = allKeys[i];
+            if (candidate == null || !candidate.gameObject.activeInHierarchy) continue;
+
+            Vector3 keyPos = candidate.transform.position;
+
+            // Ignore height difference to keep pickup prompt uniform for bobbing/floating keys.
+            Vector2 playerXZ = new Vector2(playerPos.x, playerPos.z);
+            Vector2 keyXZ = new Vector2(keyPos.x, keyPos.z);
+            float sqr = (playerXZ - keyXZ).sqrMagnitude;
+            if (sqr > radiusSqr) continue;
+
+            if (sqr < bestSqr)
+            {
+                bestSqr = sqr;
+                keyItem = candidate;
+            }
+        }
+
+        return keyItem != null;
+    }
+
+    bool IsLayerInMask(int layer, LayerMask mask)
+    {
+        return (mask.value & (1 << layer)) != 0;
     }
 
     void ShowPrompt(string text)
@@ -171,6 +282,8 @@ public class RohitFPSController : MonoBehaviour
         transform.position = hidePoint.position;
         controller.enabled = true;
 
+        horizontalVelocity = Vector3.zero;
+        yVelocity = 0f;
         isHidden = true;
         currentHideObject = hideObject;
     }
@@ -181,6 +294,8 @@ public class RohitFPSController : MonoBehaviour
         transform.position = exitPosition;
         controller.enabled = true;
 
+        horizontalVelocity = Vector3.zero;
+        yVelocity = 0f;
         isHidden = false;
         currentHideObject = null;
     }

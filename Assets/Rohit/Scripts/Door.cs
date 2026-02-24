@@ -9,6 +9,8 @@ public class Door : MonoBehaviour, IInteractable
     [Header("Open Animation")]
     public float openAngle = 90f;
     public float openSpeed = 2f;
+    public bool openClockwise = true;
+    public Vector3 hingeLocalOffset = new Vector3(-0.5f, 0f, 0f);
 
     [Header("Audio (Optional)")]
     public AudioClip unlockSound;
@@ -16,20 +18,25 @@ public class Door : MonoBehaviour, IInteractable
 
     private bool isOpen = false;
     private Quaternion closedRotation;
-    private Quaternion openRotation;
+    private Vector3 closedPosition;
+    private float currentOpenAngle;
     private AudioSource audioSource;
 
     void Start()
     {
+        closedPosition = transform.position;
         closedRotation = transform.rotation;
-        openRotation = closedRotation * Quaternion.Euler(0, openAngle, 0);
         audioSource = GetComponent<AudioSource>();
+        currentOpenAngle = 0f;
     }
 
     void Update()
     {
-        Quaternion target = isOpen ? openRotation : closedRotation;
-        transform.rotation = Quaternion.Slerp(transform.rotation, target, Time.deltaTime * openSpeed);
+        float direction = openClockwise ? 1f : -1f;
+        float targetAngle = isOpen ? (openAngle * direction) : 0f;
+        currentOpenAngle = Mathf.MoveTowards(currentOpenAngle, targetAngle, openSpeed * 100f * Time.deltaTime);
+
+        ApplyHingePose(currentOpenAngle);
     }
 
     public KeyCode GetInteractKey() => KeyCode.E;
@@ -75,6 +82,14 @@ public class Door : MonoBehaviour, IInteractable
     private void OpenDoor()
     {
         isOpen = true;
+    }
+
+    void ApplyHingePose(float angleY)
+    {
+        Quaternion q = closedRotation * Quaternion.Euler(0f, angleY, 0f);
+        Vector3 hingeWorld = closedPosition + closedRotation * hingeLocalOffset;
+        Vector3 pos = hingeWorld - (q * hingeLocalOffset);
+        transform.SetPositionAndRotation(pos, q);
     }
 
     private void PlaySound(AudioClip clip)

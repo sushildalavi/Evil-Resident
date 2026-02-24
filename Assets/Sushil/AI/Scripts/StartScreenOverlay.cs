@@ -1,0 +1,238 @@
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+namespace Sushil.Systems
+{
+    public class StartScreenOverlay : MonoBehaviour
+    {
+        static StartScreenOverlay instance;
+        public static bool IsShowing => instance != null && instance.showing;
+
+        Canvas canvas;
+        GameObject root;
+        bool showing;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        static void Bootstrap()
+        {
+            if (instance == null)
+            {
+                var go = new GameObject("StartScreenOverlay");
+                instance = go.AddComponent<StartScreenOverlay>();
+            }
+            else
+            {
+                instance.Show();
+            }
+        }
+
+        void Awake()
+        {
+            if (instance != null && instance != this)
+            {
+                Destroy(gameObject);
+                return;
+            }
+
+            instance = this;
+            DontDestroyOnLoad(gameObject);
+            BuildUI();
+            SceneManager.sceneLoaded += OnSceneLoaded;
+            Show();
+        }
+
+        void OnDestroy()
+        {
+            if (instance == this) instance = null;
+            SceneManager.sceneLoaded -= OnSceneLoaded;
+        }
+
+        void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            Show();
+        }
+
+        void Update()
+        {
+            if (!showing) return;
+            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space))
+                HideAndStart();
+        }
+
+        void Show()
+        {
+            if (root == null) BuildUI();
+            showing = true;
+            if (root != null) root.SetActive(true);
+            Time.timeScale = 0f;
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+        }
+
+        void HideAndStart()
+        {
+            showing = false;
+            if (root != null) root.SetActive(false);
+            Time.timeScale = 1f;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
+
+        void BuildUI()
+        {
+            if (canvas != null && root != null) return;
+
+            canvas = gameObject.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvas.sortingOrder = short.MaxValue - 1;
+
+            var scaler = gameObject.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920f, 1080f);
+            gameObject.AddComponent<GraphicRaycaster>();
+
+            root = new GameObject("StartRoot", typeof(RectTransform));
+            root.transform.SetParent(transform, false);
+            RectTransform rootRect = root.GetComponent<RectTransform>();
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = Vector2.zero;
+            rootRect.offsetMax = Vector2.zero;
+            rootRect.localScale = Vector3.one;
+
+            CreateBackground(root.transform);
+            Transform content = CreateContentContainer(root.transform);
+
+            Text title = CreateText(content, "Title",
+                "5 GUYS AT FREDDY'S", 88, FontStyle.Bold, TextAnchor.MiddleCenter,
+                new Color(1f, 0.2f, 0.2f, 1f), new Vector2(0.04f, 0.86f), new Vector2(0.96f, 0.98f));
+            AddTextEffects(title.gameObject, new Color(0.18f, 0f, 0f, 1f));
+
+            CreateText(content, "ObjectiveHeader",
+                "OBJECTIVE", 50, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white,
+                new Vector2(0.10f, 0.72f), new Vector2(0.90f, 0.79f));
+
+            CreateText(content, "ObjectiveBody",
+                "Collect all 3 keys and unlock the Main Door to escape.\nUse hiding spots and distractions to survive.",
+                36, FontStyle.Normal, TextAnchor.UpperCenter, Color.white,
+                new Vector2(0.10f, 0.63f), new Vector2(0.90f, 0.72f), 1.08f);
+
+            CreateText(content, "WarningHeader",
+                "WARNING", 46, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.42f, 0.42f, 1f),
+                new Vector2(0.10f, 0.54f), new Vector2(0.90f, 0.60f));
+
+            Text warning = CreateText(content, "WarningBody",
+                "The Watcher kills in one strike.\nIf he sees you, or hears noise near him, he will hunt you down.",
+                34, FontStyle.Bold, TextAnchor.UpperCenter, new Color(1f, 0.42f, 0.42f, 1f),
+                new Vector2(0.08f, 0.44f), new Vector2(0.92f, 0.54f), 1.08f);
+            AddTextEffects(warning.gameObject, new Color(0.2f, 0f, 0f, 1f));
+
+            CreateControlsPanel(content);
+
+            CreateText(content, "ControlsTitle",
+                "CONTROLS", 46, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(0.95f, 0.95f, 1f, 1f),
+                new Vector2(0.32f, 0.34f), new Vector2(0.68f, 0.40f));
+
+            CreateText(content, "ControlsLeft",
+                "WASD   - Move\nMouse - Look Around\nShift  - Sprint\nSpace - Jump",
+                28, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.9f, 0.92f, 1f, 1f),
+                new Vector2(0.16f, 0.12f), new Vector2(0.45f, 0.30f), 1.08f);
+
+            CreateText(content, "ControlsRight",
+                "P   - Pick Up Key\nE   - Interact / Hide\nG   - Throw Rock\nN   - Make Noise\nEsc - Pause / Resume",
+                28, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.9f, 0.92f, 1f, 1f),
+                new Vector2(0.55f, 0.12f), new Vector2(0.86f, 0.30f), 1.08f);
+
+            CreateText(content, "StartHint",
+                "Press ENTER or SPACE to begin",
+                48, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f, 1f),
+                new Vector2(0.10f, 0.01f), new Vector2(0.90f, 0.065f));
+        }
+
+        void CreateBackground(Transform parent)
+        {
+            GameObject bgObj = new GameObject("Background");
+            bgObj.transform.SetParent(parent, false);
+            var bg = bgObj.AddComponent<Image>();
+            bg.color = new Color(0.01f, 0.01f, 0.03f, 0.92f);
+            var bgRect = bg.rectTransform;
+            bgRect.anchorMin = Vector2.zero;
+            bgRect.anchorMax = Vector2.one;
+            bgRect.offsetMin = Vector2.zero;
+            bgRect.offsetMax = Vector2.zero;
+        }
+
+        Transform CreateContentContainer(Transform parent)
+        {
+            var obj = new GameObject("ContentContainer");
+            obj.transform.SetParent(parent, false);
+            var image = obj.AddComponent<Image>();
+            image.color = new Color(0.02f, 0.03f, 0.06f, 0.45f);
+
+            var rect = image.rectTransform;
+            rect.anchorMin = new Vector2(0.06f, 0.03f);
+            rect.anchorMax = new Vector2(0.94f, 0.97f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            return obj.transform;
+        }
+
+        void CreateControlsPanel(Transform parent)
+        {
+            GameObject panelObj = new GameObject("ControlsPanel");
+            panelObj.transform.SetParent(parent, false);
+            var panel = panelObj.AddComponent<Image>();
+            panel.color = new Color(0.01f, 0.01f, 0.02f, 0.72f);
+            var rect = panel.rectTransform;
+            rect.anchorMin = new Vector2(0.12f, 0.10f);
+            rect.anchorMax = new Vector2(0.88f, 0.32f);
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+        }
+
+        Text CreateText(
+            Transform parent,
+            string name,
+            string content,
+            int fontSize,
+            FontStyle style,
+            TextAnchor anchor,
+            Color color,
+            Vector2 anchorMin,
+            Vector2 anchorMax,
+            float lineSpacing = 1f)
+        {
+            GameObject obj = new GameObject(name);
+            obj.transform.SetParent(parent, false);
+            Text text = obj.AddComponent<Text>();
+            text.font = OverlayTypography.GetFont(fontSize);
+            text.fontSize = fontSize;
+            text.fontStyle = style;
+            text.alignment = anchor;
+            text.color = color;
+            text.text = content;
+            text.lineSpacing = lineSpacing;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+
+            RectTransform rect = text.rectTransform;
+            rect.anchorMin = anchorMin;
+            rect.anchorMax = anchorMax;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            return text;
+        }
+
+        void AddTextEffects(GameObject textObj, Color outlineColor)
+        {
+            var shadow = textObj.AddComponent<Shadow>();
+            shadow.effectColor = new Color(0f, 0f, 0f, 0.85f);
+            shadow.effectDistance = new Vector2(3f, -3f);
+
+            var outline = textObj.AddComponent<Outline>();
+            outline.effectColor = outlineColor;
+            outline.effectDistance = new Vector2(2f, -2f);
+        }
+    }
+}

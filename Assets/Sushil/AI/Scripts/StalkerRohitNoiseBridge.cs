@@ -74,7 +74,7 @@ namespace Sushil.AI
         bool ResolveReferences()
         {
             if (playerController == null && autoFindPlayer)
-                playerController = FindObjectOfType<RohitFPSController>();
+                playerController = FindFirstObjectByType<RohitFPSController>();
 
             if (playerController == null) return false;
 
@@ -163,7 +163,7 @@ namespace Sushil.AI
 
             while (elapsed < windowSeconds)
             {
-                Rigidbody[] allRigidbodies = FindObjectsOfType<Rigidbody>();
+                Rigidbody[] allRigidbodies = FindObjectsByType<Rigidbody>(FindObjectsSortMode.None);
                 foreach (Rigidbody rb in allRigidbodies)
                 {
                     if (rb == null) continue;
@@ -191,7 +191,7 @@ namespace Sushil.AI
 
         void EnsureThrowableNoiseOnRocks()
         {
-            Rigidbody[] allRigidbodies = FindObjectsOfType<Rigidbody>();
+            Rigidbody[] allRigidbodies = FindObjectsByType<Rigidbody>(FindObjectsSortMode.None);
             for (int i = 0; i < allRigidbodies.Length; i++)
             {
                 Rigidbody rb = allRigidbodies[i];

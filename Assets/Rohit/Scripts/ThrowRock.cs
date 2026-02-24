@@ -31,15 +31,14 @@ public class ThrowRock : MonoBehaviour
         Rigidbody rb = rock.GetComponent<Rigidbody>();
         if (rb == null) return;
 
-        if (configureImpactNoise)
-        {
-            ThrowableNoise.ConfigureOnObject(
-                rock,
-                impactNoiseIntensity,
-                impactMinSpeed,
-                projectileLifeSeconds,
-                impactNoiseType);
-        }
+        // Always configure thrown rock impact noise so stalker distraction stays reliable,
+        // even if prefab instances have stale inspector values.
+        ThrowableNoise.ConfigureOnObject(
+            rock,
+            impactNoiseIntensity,
+            impactMinSpeed,
+            projectileLifeSeconds,
+            impactNoiseType);
 
         rb.AddForce(throwPoint.forward * throwForce, ForceMode.Impulse);
     }

@@ -35,6 +35,10 @@ namespace Sushil.Systems
 
             var cc = GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
+
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            GameOverOverlay.Show(reason);
         }
 
         void EnsurePlayerSetup()

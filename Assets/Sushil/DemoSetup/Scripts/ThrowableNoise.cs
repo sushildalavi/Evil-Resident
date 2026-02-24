@@ -14,6 +14,10 @@ namespace Sushil.Demo
         [Header("Lifetime")]
         public float lifeSeconds = 6f;
 
+        [Header("Fallback")]
+        public bool emitFallbackIfNoImpact = true;
+        public float fallbackDelay = 0.7f;
+
         bool hasMadeNoise;
         bool validProjectile;
 
@@ -35,6 +39,7 @@ namespace Sushil.Demo
         {
             if (!validProjectile) return;
             if (lifeSeconds > 0f) Destroy(gameObject, lifeSeconds);
+            if (emitFallbackIfNoImpact) StartCoroutine(FallbackNoise());
         }
 
         void OnCollisionEnter(Collision col)
@@ -62,6 +67,14 @@ namespace Sushil.Demo
             emitter.lifeSeconds = lifeSeconds;
             emitter.noiseType = string.IsNullOrEmpty(noiseType) ? "throwImpact" : noiseType;
             return emitter;
+        }
+
+        System.Collections.IEnumerator FallbackNoise()
+        {
+            yield return new WaitForSeconds(fallbackDelay);
+            if (!validProjectile || hasMadeNoise) yield break;
+            hasMadeNoise = true;
+            NoiseSystem.Emit(transform.position, impactNoise, noiseType);
         }
     }
 }
