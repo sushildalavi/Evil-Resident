@@ -47,6 +47,8 @@ namespace Sushil.Systems
             var scaler = canvasObj.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
             canvasObj.AddComponent<GraphicRaycaster>();
 
             GameObject dimObj = new GameObject("Dim");
@@ -77,8 +79,11 @@ namespace Sushil.Systems
             titleText.fontStyle = FontStyle.Bold;
             titleText.alignment = TextAnchor.MiddleCenter;
             titleText.color = new Color(1f, 0.08f, 0.08f, 1f);
+            titleText.resizeTextForBestFit = true;
+            titleText.resizeTextMinSize = 54;
+            titleText.resizeTextMaxSize = 180;
             titleText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            titleText.verticalOverflow = VerticalWrapMode.Overflow;
+            titleText.verticalOverflow = VerticalWrapMode.Truncate;
             var titleRect = titleText.rectTransform;
             titleRect.anchorMin = new Vector2(0f, 0.5f);
             titleRect.anchorMax = new Vector2(1f, 1f);
@@ -98,8 +103,11 @@ namespace Sushil.Systems
             reasonText.font = CreateSpookyFont(70);
             reasonText.alignment = TextAnchor.MiddleCenter;
             reasonText.color = new Color(1f, 0.9f, 0.9f, 1f);
+            reasonText.resizeTextForBestFit = true;
+            reasonText.resizeTextMinSize = 24;
+            reasonText.resizeTextMaxSize = 70;
             reasonText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            reasonText.verticalOverflow = VerticalWrapMode.Overflow;
+            reasonText.verticalOverflow = VerticalWrapMode.Truncate;
             var reasonRect = reasonText.rectTransform;
             reasonRect.anchorMin = new Vector2(0f, 0.2f);
             reasonRect.anchorMax = new Vector2(1f, 0.5f);
@@ -116,8 +124,11 @@ namespace Sushil.Systems
             hintText.font = CreateSpookyFont(44);
             hintText.alignment = TextAnchor.LowerCenter;
             hintText.color = new Color(1f, 0.85f, 0.55f, 1f);
+            hintText.resizeTextForBestFit = true;
+            hintText.resizeTextMinSize = 18;
+            hintText.resizeTextMaxSize = 44;
             hintText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            hintText.verticalOverflow = VerticalWrapMode.Overflow;
+            hintText.verticalOverflow = VerticalWrapMode.Truncate;
             var hintRect = hintText.rectTransform;
             hintRect.anchorMin = new Vector2(0f, 0f);
             hintRect.anchorMax = new Vector2(1f, 0.2f);

@@ -58,6 +58,8 @@ namespace Sushil.Systems
             var scaler = canvasObj.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
             canvasObj.AddComponent<GraphicRaycaster>();
 
             var dimObj = new GameObject("Dim");
@@ -114,8 +116,11 @@ namespace Sushil.Systems
             t.fontStyle = style;
             t.color = color;
             t.alignment = anchor;
+            t.resizeTextForBestFit = true;
+            t.resizeTextMinSize = Mathf.Max(16, Mathf.RoundToInt(size * 0.4f));
+            t.resizeTextMaxSize = size;
             t.horizontalOverflow = HorizontalWrapMode.Wrap;
-            t.verticalOverflow = VerticalWrapMode.Overflow;
+            t.verticalOverflow = VerticalWrapMode.Truncate;
             t.text = string.Empty;
 
             var rect = t.rectTransform;

@@ -4,6 +4,8 @@ using UnityEngine.UI;
 [RequireComponent(typeof(RohitFPSController))]
 public class InteractionUI : MonoBehaviour
 {
+    static InteractionUI instance;
+
     Canvas canvas;
     Text promptText;
     Text keyHudText;
@@ -11,11 +13,23 @@ public class InteractionUI : MonoBehaviour
 
     void Awake()
     {
+        if (instance != null && instance != this)
+        {
+            enabled = false;
+            return;
+        }
+
+        instance = this;
         LoadFont();
         CreateCanvas();
         CreatePromptText();
         CreateKeyHud();
         AssignToController();
+    }
+
+    void OnDestroy()
+    {
+        if (instance == this) instance = null;
     }
 
     void LoadFont()
@@ -37,6 +51,8 @@ public class InteractionUI : MonoBehaviour
         CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
 
         canvasObj.AddComponent<GraphicRaycaster>();
     }
@@ -51,7 +67,11 @@ public class InteractionUI : MonoBehaviour
         promptText.fontSize = 28;
         promptText.color = Color.white;
         promptText.alignment = TextAnchor.MiddleCenter;
-        promptText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        promptText.resizeTextForBestFit = true;
+        promptText.resizeTextMinSize = 16;
+        promptText.resizeTextMaxSize = 30;
+        promptText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        promptText.verticalOverflow = VerticalWrapMode.Truncate;
         if (builtInFont != null) promptText.font = builtInFont;
 
         GameObject bgObj = new GameObject("PromptBackground");
@@ -71,8 +91,8 @@ public class InteractionUI : MonoBehaviour
         promptRect.anchorMin = new Vector2(0.5f, 0f);
         promptRect.anchorMax = new Vector2(0.5f, 0f);
         promptRect.pivot = new Vector2(0.5f, 0f);
-        promptRect.anchoredPosition = new Vector2(0f, 120f);
-        promptRect.sizeDelta = new Vector2(500f, 50f);
+        promptRect.anchoredPosition = new Vector2(0f, 90f);
+        promptRect.sizeDelta = new Vector2(760f, 80f);
 
         promptObj.SetActive(false);
     }
@@ -87,7 +107,11 @@ public class InteractionUI : MonoBehaviour
         keyHudText.fontSize = 24;
         keyHudText.color = Color.white;
         keyHudText.alignment = TextAnchor.UpperLeft;
-        keyHudText.horizontalOverflow = HorizontalWrapMode.Overflow;
+        keyHudText.resizeTextForBestFit = true;
+        keyHudText.resizeTextMinSize = 14;
+        keyHudText.resizeTextMaxSize = 28;
+        keyHudText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        keyHudText.verticalOverflow = VerticalWrapMode.Truncate;
         keyHudText.supportRichText = true;
         if (builtInFont != null) keyHudText.font = builtInFont;
 
