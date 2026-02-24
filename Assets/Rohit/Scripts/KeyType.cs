@@ -1,6 +1,6 @@
 public enum KeyType
 {
     Circle,
-    Triangle,
+    Rectangle,
     Square
 }

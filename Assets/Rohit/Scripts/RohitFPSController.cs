@@ -159,10 +159,10 @@ public class RohitFPSController : MonoBehaviour
         if (keyHudText == null || inventory == null) return;
 
         string circle = inventory.HasCircle ? "<color=green>O</color>" : "<color=red>O</color>";
-        string triangle = inventory.HasTriangle ? "<color=green>△</color>" : "<color=red>△</color>";
+        string rectangle = inventory.HasRectangle ? "<color=green>▭</color>" : "<color=red>▭</color>";
         string square = inventory.HasSquare ? "<color=green>□</color>" : "<color=red>□</color>";
 
-        keyHudText.text = $"Keys: {circle} {triangle} {square}";
+        keyHudText.text = $"Keys: {circle} {rectangle} {square}";
     }
 
     public void HideAt(Transform hidePoint, HideableObject hideObject)

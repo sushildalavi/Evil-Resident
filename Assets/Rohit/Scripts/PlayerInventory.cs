@@ -9,7 +9,7 @@ public class PlayerInventory : MonoBehaviour
 
     public bool HasAllKeys() =>
         collectedKeys.Contains(KeyType.Circle) &&
-        collectedKeys.Contains(KeyType.Triangle) &&
+        collectedKeys.Contains(KeyType.Rectangle) &&
         collectedKeys.Contains(KeyType.Square);
 
     public void AddKey(KeyType keyType)
@@ -21,6 +21,6 @@ public class PlayerInventory : MonoBehaviour
     public int KeyCount => collectedKeys.Count;
 
     public bool HasCircle => collectedKeys.Contains(KeyType.Circle);
-    public bool HasTriangle => collectedKeys.Contains(KeyType.Triangle);
+    public bool HasRectangle => collectedKeys.Contains(KeyType.Rectangle);
     public bool HasSquare => collectedKeys.Contains(KeyType.Square);
 }

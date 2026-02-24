@@ -74,7 +74,7 @@ public class InteractionUI : MonoBehaviour
         hudObj.transform.SetParent(canvas.transform, false);
 
         keyHudText = hudObj.AddComponent<Text>();
-        keyHudText.text = "Keys:  O  △  □";
+        keyHudText.text = "Keys:  O  ▭  □";
         keyHudText.fontSize = 24;
         keyHudText.color = Color.white;
         keyHudText.alignment = TextAnchor.UpperLeft;
