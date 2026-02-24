@@ -241,6 +241,8 @@ namespace Sushil.Systems
             var scaler = gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
             scaler.referenceResolution = new Vector2(1920f, 1080f);
+            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+            scaler.matchWidthOrHeight = 0.5f;
             gameObject.AddComponent<GraphicRaycaster>();
 
             GameObject pulseObj = new GameObject("Pulse");
@@ -263,6 +265,11 @@ namespace Sushil.Systems
             heartbeatText.fontStyle = FontStyle.Bold;
             heartbeatText.alignment = TextAnchor.LowerCenter;
             heartbeatText.text = heartbeatLabel;
+            heartbeatText.resizeTextForBestFit = true;
+            heartbeatText.resizeTextMinSize = 20;
+            heartbeatText.resizeTextMaxSize = 46;
+            heartbeatText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            heartbeatText.verticalOverflow = VerticalWrapMode.Truncate;
             heartbeatText.color = new Color(1f, 0.2f, 0.2f, 0f);
 
             var shadow = textObj.AddComponent<Shadow>();
@@ -283,6 +290,11 @@ namespace Sushil.Systems
             subText.fontStyle = FontStyle.Bold;
             subText.alignment = TextAnchor.LowerCenter;
             subText.text = string.Empty;
+            subText.resizeTextForBestFit = true;
+            subText.resizeTextMinSize = 14;
+            subText.resizeTextMaxSize = 26;
+            subText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            subText.verticalOverflow = VerticalWrapMode.Truncate;
             subText.color = new Color(1f, 0.75f, 0.75f, 0f);
 
             RectTransform subRect = subText.rectTransform;

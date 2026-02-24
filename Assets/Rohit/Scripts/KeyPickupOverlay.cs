@@ -58,6 +58,8 @@ public class KeyPickupOverlay : MonoBehaviour
         var scaler = gameObject.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
+        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        scaler.matchWidthOrHeight = 0.5f;
         gameObject.AddComponent<GraphicRaycaster>();
 
         var textObj = new GameObject("PickupMessage");
@@ -68,6 +70,11 @@ public class KeyPickupOverlay : MonoBehaviour
         messageText.fontSize = 56;
         messageText.fontStyle = FontStyle.Bold;
         messageText.alignment = TextAnchor.MiddleCenter;
+        messageText.resizeTextForBestFit = true;
+        messageText.resizeTextMinSize = 24;
+        messageText.resizeTextMaxSize = 56;
+        messageText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        messageText.verticalOverflow = VerticalWrapMode.Truncate;
         messageText.color = new Color(1f, 0.94f, 0.5f, 0f);
         messageText.text = string.Empty;
 
@@ -83,8 +90,8 @@ public class KeyPickupOverlay : MonoBehaviour
         rect.anchorMin = new Vector2(0.5f, 0.5f);
         rect.anchorMax = new Vector2(0.5f, 0.5f);
         rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.anchoredPosition = new Vector2(0f, 120f);
-        rect.sizeDelta = new Vector2(1200f, 160f);
+        rect.anchoredPosition = new Vector2(0f, 220f);
+        rect.sizeDelta = new Vector2(1400f, 220f);
     }
 
     void Play(string message)
@@ -102,7 +109,7 @@ public class KeyPickupOverlay : MonoBehaviour
         float holdTime = 1.2f;
         float outTime = 0.4f;
 
-        Vector2 basePos = new Vector2(0f, 120f);
+        Vector2 basePos = new Vector2(0f, 220f);
 
         float t = 0f;
         while (t < inTime)
