@@ -122,7 +122,7 @@ namespace Sushil.Systems
             cardRect.anchorMin = new Vector2(0.5f, 0.5f);
             cardRect.anchorMax = new Vector2(0.5f, 0.5f);
             cardRect.pivot = new Vector2(0.5f, 0.5f);
-            cardRect.sizeDelta = new Vector2(760f, 380f);
+            cardRect.sizeDelta = new Vector2(760f, 420f);
 
             titleText = CreateText(card.transform, "Title", "PAUSED", 82, FontStyle.Bold,
                 TextAnchor.UpperCenter, new Color(1f, 0.25f, 0.25f, 1f),
@@ -130,10 +130,12 @@ namespace Sushil.Systems
                 new Vector2(20f, -130f), new Vector2(-20f, -20f));
 
             bodyText = CreateText(card.transform, "Body",
-                "Esc  Resume\nR  Restart Level\n(You can also use Esc to stop Play mode in editor)",
-                30, FontStyle.Normal, TextAnchor.MiddleCenter, Color.white,
+                "Esc  Resume   |   R  Restart\n\n" +
+                "WASD Move   Shift Sprint   Space Jump   Mouse Look\n" +
+                "F Pick Key   E Interact / Hide   G Throw Rock   N Make Noise",
+                26, FontStyle.Normal, TextAnchor.MiddleCenter, Color.white,
                 new Vector2(0f, 0f), new Vector2(1f, 1f),
-                new Vector2(30f, 40f), new Vector2(-30f, -100f));
+                new Vector2(30f, 30f), new Vector2(-30f, -120f));
         }
 
         static Text CreateText(

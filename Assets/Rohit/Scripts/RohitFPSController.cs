@@ -14,7 +14,8 @@ public class RohitFPSController : MonoBehaviour
     public float groundStickForce = 2f;
 
     [Header("Mouse")]
-    public float mouseSensitivity = 450f;
+    [Range(50f, 400f)]
+    public float mouseSensitivity = 200f;
     public Transform cameraTransform;
 
     [Header("Interaction")]

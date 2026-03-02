@@ -108,48 +108,18 @@ namespace Sushil.Systems
 
             Text title = CreateText(content, "Title",
                 "THE WATCHER WITHIN", 88, FontStyle.Bold, TextAnchor.MiddleCenter,
-                new Color(1f, 0.2f, 0.2f, 1f), new Vector2(0.04f, 0.86f), new Vector2(0.96f, 0.98f));
+                new Color(1f, 0.2f, 0.2f, 1f), new Vector2(0.04f, 0.72f), new Vector2(0.96f, 0.92f));
             AddTextEffects(title.gameObject, new Color(0.18f, 0f, 0f, 1f));
 
-            CreateText(content, "ObjectiveHeader",
-                "OBJECTIVE", 50, FontStyle.Bold, TextAnchor.MiddleCenter, Color.white,
-                new Vector2(0.10f, 0.72f), new Vector2(0.90f, 0.79f));
-
-            CreateText(content, "ObjectiveBody",
-                "Collect all 3 keys and unlock the Main Door to escape.\nUse hiding spots and distractions to survive.",
-                36, FontStyle.Normal, TextAnchor.UpperCenter, Color.white,
-                new Vector2(0.10f, 0.63f), new Vector2(0.90f, 0.72f), 1.08f);
-
-            CreateText(content, "WarningHeader",
-                "WARNING", 46, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.42f, 0.42f, 1f),
-                new Vector2(0.10f, 0.54f), new Vector2(0.90f, 0.60f));
-
-            Text warning = CreateText(content, "WarningBody",
-                "The Watcher kills in one strike.\nIf he sees you, or hears noise near him, he will hunt you down.",
-                34, FontStyle.Bold, TextAnchor.UpperCenter, new Color(1f, 0.42f, 0.42f, 1f),
-                new Vector2(0.08f, 0.44f), new Vector2(0.92f, 0.54f), 1.08f);
-            AddTextEffects(warning.gameObject, new Color(0.2f, 0f, 0f, 1f));
-
-            CreateControlsPanel(content);
-
-            CreateText(content, "ControlsTitle",
-                "CONTROLS", 46, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(0.95f, 0.95f, 1f, 1f),
-                new Vector2(0.32f, 0.34f), new Vector2(0.68f, 0.40f));
-
-            CreateText(content, "ControlsLeft",
-                "WASD   - Move\nMouse - Look Around\nShift  - Sprint\nSpace - Jump",
-                28, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.9f, 0.92f, 1f, 1f),
-                new Vector2(0.16f, 0.12f), new Vector2(0.45f, 0.30f), 1.08f);
-
-            CreateText(content, "ControlsRight",
-                "P   - Pick Up Key\nE   - Interact / Hide\nG   - Throw Rock\nN   - Make Noise\nEsc - Pause / Resume",
-                28, FontStyle.Normal, TextAnchor.UpperLeft, new Color(0.9f, 0.92f, 1f, 1f),
-                new Vector2(0.55f, 0.12f), new Vector2(0.86f, 0.30f), 1.08f);
+            CreateText(content, "Tagline",
+                "Collect 3 keys. Escape. Don't be seen.",
+                38, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.92f, 0.92f, 0.95f, 1f),
+                new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.64f));
 
             CreateText(content, "StartHint",
                 "Press ENTER or SPACE to begin",
                 48, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f, 1f),
-                new Vector2(0.10f, 0.01f), new Vector2(0.90f, 0.065f));
+                new Vector2(0.10f, 0.08f), new Vector2(0.90f, 0.18f));
         }
 
         void CreateBackground(Transform parent)
@@ -178,19 +148,6 @@ namespace Sushil.Systems
             rect.offsetMin = Vector2.zero;
             rect.offsetMax = Vector2.zero;
             return obj.transform;
-        }
-
-        void CreateControlsPanel(Transform parent)
-        {
-            GameObject panelObj = new GameObject("ControlsPanel");
-            panelObj.transform.SetParent(parent, false);
-            var panel = panelObj.AddComponent<Image>();
-            panel.color = new Color(0.01f, 0.01f, 0.02f, 0.72f);
-            var rect = panel.rectTransform;
-            rect.anchorMin = new Vector2(0.12f, 0.10f);
-            rect.anchorMax = new Vector2(0.88f, 0.32f);
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
         }
 
         Text CreateText(
