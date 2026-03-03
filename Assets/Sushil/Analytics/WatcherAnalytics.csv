@@ -5,3 +5,7 @@ timestamp,scene,event,elapsed_seconds,deaths_this_run,total_deaths,details
 "2026-03-02 16:42:47","SahilLevelDesign","death",3.66,1,1,"Stalker one-shot (trigger)"
 "2026-03-02 16:55:05","SahilLevelDesign","death",41.52,1,1,"Stalker one-shot (trigger)"
 "2026-03-02 16:56:36","SahilLevelDesign","death",87.55,1,2,"Stalker one-shot (trigger)"
+"2026-03-02 23:18:02","SahilLevelDesign","death",5.14,1,1,"Stalker one-shot (trigger)"
+"2026-03-02 23:18:55","SahilLevelDesign","death",42.66,1,1,"Stalker one-shot (trigger)"
+"2026-03-02 23:41:49","SahilLevelDesign","escape",145.75,0,0,"main_door_unlocked"
+"2026-03-03 00:08:30","SahilLevelDesign","escape",87.69,0,0,"main_door_unlocked"

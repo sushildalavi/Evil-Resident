@@ -10,29 +10,30 @@ public class Door : MonoBehaviour, IInteractable
     public float openAngle = 90f;
     public float openSpeed = 2f;
     public bool openClockwise = true;
-    public Vector3 hingeLocalOffset = new Vector3(-0.5f, 0f, 0f);
+    public Vector3 hingeLocalOffset = Vector3.zero;
 
     [Header("Audio (Optional)")]
     public AudioClip unlockSound;
     public AudioClip lockedSound;
 
     private bool isOpen = false;
-    private Quaternion closedRotation;
-    private Vector3 closedPosition;
+    private Quaternion closedLocalRotation;
+    private Vector3 closedLocalPosition;
     private float currentOpenAngle;
     private AudioSource audioSource;
 
     void Start()
     {
-        closedPosition = transform.position;
-        closedRotation = transform.rotation;
+        closedLocalPosition = transform.localPosition;
+        closedLocalRotation = transform.localRotation;
         audioSource = GetComponent<AudioSource>();
         currentOpenAngle = 0f;
     }
 
     void Update()
     {
-        float direction = openClockwise ? 1f : -1f;
+        // Invert configured swing so doors open inward by default across the level.
+        float direction = openClockwise ? -1f : 1f;
         float targetAngle = isOpen ? (openAngle * direction) : 0f;
         currentOpenAngle = Mathf.MoveTowards(currentOpenAngle, targetAngle, openSpeed * 100f * Time.deltaTime);
 
@@ -86,10 +87,14 @@ public class Door : MonoBehaviour, IInteractable
 
     void ApplyHingePose(float angleY)
     {
-        Quaternion q = closedRotation * Quaternion.Euler(0f, angleY, 0f);
-        Vector3 hingeWorld = closedPosition + closedRotation * hingeLocalOffset;
-        Vector3 pos = hingeWorld - (q * hingeLocalOffset);
-        transform.SetPositionAndRotation(pos, q);
+        // Keep hinge math in local space to avoid skew/offset artifacts under scaled parents.
+        Quaternion localRot = closedLocalRotation * Quaternion.Euler(0f, angleY, 0f);
+        Vector3 hingeLocal = hingeLocalOffset;
+        Vector3 localHinge = closedLocalPosition + closedLocalRotation * hingeLocal;
+        Vector3 localPos = localHinge - (localRot * hingeLocal);
+
+        transform.localPosition = localPos;
+        transform.localRotation = localRot;
     }
 
     private void PlaySound(AudioClip clip)

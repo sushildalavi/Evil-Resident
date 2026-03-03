@@ -2835,6 +2835,14 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 4354348589401275070, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
+      propertyPath: openClockwise
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4354348589401275070, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
+      propertyPath: hingeLocalOffset.x
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6721515515934339124, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
       propertyPath: m_Name
       value: DoorFrameRectangle
@@ -4032,6 +4040,14 @@ PrefabInstance:
       propertyPath: requiredKey
       value: 2
       objectReference: {fileID: 0}
+    - target: {fileID: 1509034308862935320, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
+      propertyPath: openClockwise
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1509034308862935320, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
+      propertyPath: hingeLocalOffset.x
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 4054020236162968139, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
       propertyPath: m_LocalScale.x
       value: 4.2246594
@@ -4812,6 +4828,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5150379377033530907, guid: ec5d287a73b5144d18c1a9f310d5768d, type: 3}
+      propertyPath: hingeLocalOffset.x
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 9221652142070693263, guid: ec5d287a73b5144d18c1a9f310d5768d, type: 3}
       propertyPath: m_Name
       value: DoorFrameCircle (1)
@@ -4943,8 +4963,20 @@ PrefabInstance:
     m_TransformParent: {fileID: 0}
     m_Modifications:
     - target: {fileID: 1509034308862935320, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
+      propertyPath: openAngle
+      value: 90
+      objectReference: {fileID: 0}
+    - target: {fileID: 1509034308862935320, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
       propertyPath: requiredKey
       value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 1509034308862935320, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
+      propertyPath: openClockwise
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 1509034308862935320, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
+      propertyPath: hingeLocalOffset.x
+      value: 0.5
       objectReference: {fileID: 0}
     - target: {fileID: 1544303301788699615, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
       propertyPath: m_LocalScale.y

@@ -17,15 +17,15 @@ public class MainDoor : MonoBehaviour, IInteractable
     public GameObject winUI;
 
     private bool isOpen = false;
-    private Quaternion closedRotation;
-    private Vector3 closedPosition;
+    private Quaternion closedLocalRotation;
+    private Vector3 closedLocalPosition;
     private float currentOpenAngle;
     private AudioSource audioSource;
 
     void Start()
     {
-        closedPosition = transform.position;
-        closedRotation = transform.rotation;
+        closedLocalPosition = transform.localPosition;
+        closedLocalRotation = transform.localRotation;
         audioSource = GetComponent<AudioSource>();
         currentOpenAngle = 0f;
 
@@ -35,7 +35,8 @@ public class MainDoor : MonoBehaviour, IInteractable
 
     void Update()
     {
-        float direction = openClockwise ? 1f : -1f;
+        // Invert configured swing so doors open inward by default across the level.
+        float direction = openClockwise ? -1f : 1f;
         float targetAngle = isOpen ? (openAngle * direction) : 0f;
         currentOpenAngle = Mathf.MoveTowards(currentOpenAngle, targetAngle, openSpeed * 100f * Time.deltaTime);
         ApplyHingePose(currentOpenAngle);
@@ -89,9 +90,13 @@ public class MainDoor : MonoBehaviour, IInteractable
 
     void ApplyHingePose(float angleY)
     {
-        Quaternion q = closedRotation * Quaternion.Euler(0f, angleY, 0f);
-        Vector3 hingeWorld = closedPosition + closedRotation * hingeLocalOffset;
-        Vector3 pos = hingeWorld - (q * hingeLocalOffset);
-        transform.SetPositionAndRotation(pos, q);
+        // Use local-space hinge math to stay correct under non-uniform parent scaling.
+        Quaternion localRot = closedLocalRotation * Quaternion.Euler(0f, angleY, 0f);
+        Vector3 hingeLocal = hingeLocalOffset;
+        Vector3 localHinge = closedLocalPosition + closedLocalRotation * hingeLocal;
+        Vector3 localPos = localHinge - (localRot * hingeLocal);
+
+        transform.localPosition = localPos;
+        transform.localRotation = localRot;
     }
 }
