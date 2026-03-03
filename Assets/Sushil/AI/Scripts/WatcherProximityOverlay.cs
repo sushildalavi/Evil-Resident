@@ -14,17 +14,20 @@ namespace Sushil.Systems
         public float criticalDistance = 5.5f;
 
         [Header("Visual Pulse")]
-        public Color pulseColor = new Color(0.9f, 0.05f, 0.05f, 1f);
+        public Color pulseColor = new Color(0.18f, 0.05f, 0.08f, 1f);
         public float minAlpha = 0f;
-        public float maxAlpha = 0.55f;
-        public float minPulseSpeed = 1.5f;
-        public float maxPulseSpeed = 5.2f;
+        public float maxAlpha = 0.22f;
+        public float minPulseSpeed = 1.2f;
+        public float maxPulseSpeed = 3.6f;
+        [Range(0f, 0.25f)] public float beatAccentStrength = 0.12f;
+        [Range(0f, 1f)] public float farSuppression = 0.82f;
+        [Range(0f, 1f)] public float chaseFloor = 0.14f;
 
         [Header("Heartbeat Text")]
-        public bool showHeartbeatText = true;
-        public string heartbeatLabel = "WATCHER NEARBY";
-        public float heartbeatTextMinAlpha = 0.25f;
-        public float heartbeatTextMaxAlpha = 0.95f;
+        public bool showHeartbeatText = false;
+        public string heartbeatLabel = "HEART RATE ELEVATED";
+        public float heartbeatTextMinAlpha = 0.12f;
+        public float heartbeatTextMaxAlpha = 0.65f;
 
         Canvas canvas;
         Image pulseImage;
@@ -93,10 +96,10 @@ namespace Sushil.Systems
                 if (anyChasing && nearest >= 0f && nearest <= detectDistance * 1.25f)
                 {
                     // Keep a weaker pulse while actively hunted, even if raw distance is high.
-                    float chasePulse = 0.45f + 0.55f * Mathf.Sin(Time.unscaledTime * (maxPulseSpeed * 0.75f));
-                    float chaseAlpha = Mathf.Lerp(0.05f, maxAlpha * 0.45f, chasePulse);
-                    float chaseText = Mathf.Lerp(heartbeatTextMinAlpha, heartbeatTextMaxAlpha * 0.75f, chasePulse);
-                    SetAlpha(chaseAlpha, chaseText, "CHASING");
+                    float chasePulse = BuildHeartbeatPulse(maxPulseSpeed * 0.85f);
+                    float chaseAlpha = Mathf.Lerp(chaseFloor * 0.35f, maxAlpha * 0.55f, chasePulse);
+                    float chaseText = Mathf.Lerp(heartbeatTextMinAlpha, heartbeatTextMaxAlpha * 0.85f, chasePulse);
+                    SetAlpha(chaseAlpha, chaseText, "HUNTED");
                     return;
                 }
 
@@ -107,11 +110,33 @@ namespace Sushil.Systems
             float danger = 1f - Mathf.Clamp01((nearest - criticalDistance) / Mathf.Max(0.1f, detectDistance - criticalDistance));
             if (!nearestHasLos) danger *= 0.72f;
             float pulseSpeed = Mathf.Lerp(minPulseSpeed, maxPulseSpeed, danger);
-            float pulse = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * pulseSpeed);
-            float alpha = Mathf.Lerp(minAlpha, maxAlpha, danger * pulse);
+            float pulse = BuildHeartbeatPulse(pulseSpeed * Mathf.Lerp(0.9f, 1.35f, danger));
+
+            // Strong suppression at far range so the effect feels audio-reactive, not constant.
+            float weightedDanger = Mathf.Pow(danger, Mathf.Lerp(2.2f, 1.15f, danger));
+            float suppressed = weightedDanger * (1f - farSuppression);
+            float dangerMix = Mathf.Clamp01(suppressed + (weightedDanger * 0.75f));
+
+            float alpha = Mathf.Lerp(minAlpha, maxAlpha, dangerMix * pulse);
+            if (anyChasing)
+                alpha = Mathf.Max(alpha, chaseFloor * Mathf.Lerp(0.35f, 1f, dangerMix));
             float textAlpha = Mathf.Lerp(heartbeatTextMinAlpha, heartbeatTextMaxAlpha, danger * pulse);
-            string state = danger > 0.75f ? "CRITICAL" : (danger > 0.35f ? "DANGER" : "ALERT");
+            string state = danger > 0.75f ? "CRITICAL" : (danger > 0.35f ? "ELEVATED" : "CAUTION");
             SetAlpha(alpha, textAlpha, state);
+        }
+
+        float BuildHeartbeatPulse(float speed)
+        {
+            float t = Time.unscaledTime;
+            float cycle = Mathf.Repeat(t * speed, 1f);
+
+            // "lub-dub": one strong beat + one softer trailing beat.
+            float beatA = Mathf.Exp(-Mathf.Pow((cycle - 0.16f) / 0.05f, 2f));
+            float beatB = 0.72f * Mathf.Exp(-Mathf.Pow((cycle - 0.33f) / 0.06f, 2f));
+            float envelope = Mathf.Clamp01(beatA + beatB);
+
+            float baseline = 0.08f + 0.12f * (0.5f + 0.5f * Mathf.Sin(t * speed * 0.55f));
+            return Mathf.Clamp01(baseline + envelope * (0.8f + beatAccentStrength));
         }
 
         void ResolveReferences(bool force)
@@ -260,9 +285,9 @@ namespace Sushil.Systems
             GameObject textObj = new GameObject("HeartbeatText");
             textObj.transform.SetParent(canvas.transform, false);
             heartbeatText = textObj.AddComponent<Text>();
-            heartbeatText.font = OverlayTypography.GetFont(52);
+            heartbeatText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             heartbeatText.fontSize = 46;
-            heartbeatText.fontStyle = FontStyle.Bold;
+            heartbeatText.fontStyle = FontStyle.Normal;
             heartbeatText.alignment = TextAnchor.LowerCenter;
             heartbeatText.text = heartbeatLabel;
             heartbeatText.resizeTextForBestFit = true;
@@ -270,7 +295,7 @@ namespace Sushil.Systems
             heartbeatText.resizeTextMaxSize = 46;
             heartbeatText.horizontalOverflow = HorizontalWrapMode.Wrap;
             heartbeatText.verticalOverflow = VerticalWrapMode.Truncate;
-            heartbeatText.color = new Color(1f, 0.2f, 0.2f, 0f);
+            heartbeatText.color = new Color(0.92f, 0.88f, 0.88f, 0f);
 
             var shadow = textObj.AddComponent<Shadow>();
             shadow.effectColor = new Color(0f, 0f, 0f, 0.9f);
@@ -285,9 +310,9 @@ namespace Sushil.Systems
             GameObject subObj = new GameObject("HeartbeatSubText");
             subObj.transform.SetParent(canvas.transform, false);
             subText = subObj.AddComponent<Text>();
-            subText.font = OverlayTypography.GetFont(28);
+            subText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             subText.fontSize = 26;
-            subText.fontStyle = FontStyle.Bold;
+            subText.fontStyle = FontStyle.Normal;
             subText.alignment = TextAnchor.LowerCenter;
             subText.text = string.Empty;
             subText.resizeTextForBestFit = true;
@@ -295,7 +320,7 @@ namespace Sushil.Systems
             subText.resizeTextMaxSize = 26;
             subText.horizontalOverflow = HorizontalWrapMode.Wrap;
             subText.verticalOverflow = VerticalWrapMode.Truncate;
-            subText.color = new Color(1f, 0.75f, 0.75f, 0f);
+            subText.color = new Color(0.85f, 0.8f, 0.8f, 0f);
 
             RectTransform subRect = subText.rectTransform;
             subRect.anchorMin = new Vector2(0f, 0f);

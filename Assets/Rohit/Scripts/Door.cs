@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.AI;
+using Unity.AI.Navigation;
 
 public class Door : MonoBehaviour, IInteractable
 {
@@ -16,18 +18,59 @@ public class Door : MonoBehaviour, IInteractable
     public AudioClip unlockSound;
     public AudioClip lockedSound;
 
+    [Header("AI / Navigation")]
+    public bool blockWhenClosed = true;
+    public bool unblockWhenOpen = true;
+    [Tooltip("If enabled, remove door blocking immediately when the door starts opening.")]
+    public bool immediateUnblockOnOpen = true;
+    [Range(1f, 89f)] public float openUnblockAngle = 65f;
+    public bool autoAddNavObstacle = true;
+    public bool autoAddRuntimeNavLink = true;
+    [Tooltip("Creates both forward/back and left/right links to handle differently oriented door prefabs.")]
+    public bool useDualAxisRuntimeLinks = true;
+    public float navLinkDepth = 1.2f;
+    public float navLinkWidth = 1.3f;
+    public int navLinkAgentTypeID = -1;
+    public bool aiCanOpenDoor = false;
+    public bool aiBypassLock = false;
+
     private bool isOpen = false;
     private Quaternion closedLocalRotation;
     private Vector3 closedLocalPosition;
     private float currentOpenAngle;
     private AudioSource audioSource;
+    private Collider[] cachedColliders;
+    private NavMeshObstacle navObstacle;
+    private NavMeshLink navLinkForwardBack;
+    private NavMeshLink navLinkLeftRight;
+    private bool isBlockingNow;
 
     void Start()
     {
+        // Hard safety defaults so old scene/prefab serialized values cannot regress doorway traversal.
+        unblockWhenOpen = true;
+        immediateUnblockOnOpen = true;
+        autoAddRuntimeNavLink = true;
+
         closedLocalPosition = transform.localPosition;
         closedLocalRotation = transform.localRotation;
         audioSource = GetComponent<AudioSource>();
         currentOpenAngle = 0f;
+        // Only toggle the actual moving panel colliders; keep nearby frame/wall colliders untouched.
+        Transform panel = transform.Find("DoorPanel");
+        cachedColliders = panel != null
+            ? panel.GetComponentsInChildren<Collider>(true)
+            : GetComponentsInChildren<Collider>(true);
+        navObstacle = GetComponent<NavMeshObstacle>();
+        if (autoAddNavObstacle && navObstacle == null)
+        {
+            navObstacle = gameObject.AddComponent<NavMeshObstacle>();
+            navObstacle.carving = true;
+            navObstacle.carveOnlyStationary = true;
+        }
+        if (autoAddRuntimeNavLink)
+            EnsureRuntimeNavLink();
+        SetDoorBlocking(true);
     }
 
     void Update()
@@ -38,9 +81,14 @@ public class Door : MonoBehaviour, IInteractable
         currentOpenAngle = Mathf.MoveTowards(currentOpenAngle, targetAngle, openSpeed * 100f * Time.deltaTime);
 
         ApplyHingePose(currentOpenAngle);
+        SyncDoorBlockingForCurrentAngle();
+        SyncRuntimeNavLink();
     }
 
     public KeyCode GetInteractKey() => KeyCode.E;
+
+    public bool IsOpen => isOpen;
+    public bool IsLocked => isLocked;
 
     public string GetPrompt(RohitFPSController player)
     {
@@ -83,6 +131,127 @@ public class Door : MonoBehaviour, IInteractable
     private void OpenDoor()
     {
         isOpen = true;
+        // Clear blockers immediately at the moment door starts opening.
+        SetDoorBlocking(false);
+        if (navLinkForwardBack != null) navLinkForwardBack.activated = true;
+        if (navLinkLeftRight != null) navLinkLeftRight.activated = true;
+    }
+
+    public bool TryOpenForAI()
+    {
+        if (!aiCanOpenDoor) return false;
+        if (isOpen) return true;
+        if (isLocked && !aiBypassLock) return false;
+
+        // If bypass is allowed, AI can force this door unlocked.
+        if (isLocked && aiBypassLock)
+            isLocked = false;
+
+        OpenDoor();
+        return true;
+    }
+
+    void SyncDoorBlockingForCurrentAngle()
+    {
+        bool shouldBlock;
+        if (!blockWhenClosed && !unblockWhenOpen) return;
+
+        if (!isOpen)
+        {
+            shouldBlock = blockWhenClosed;
+        }
+        else
+        {
+            // For this project: once opening starts, never block traversal at this doorway.
+            shouldBlock = false;
+        }
+
+        SetDoorBlocking(shouldBlock);
+    }
+
+    void SetDoorBlocking(bool block)
+    {
+        if (isBlockingNow == block) return;
+        isBlockingNow = block;
+
+        if (cachedColliders != null)
+        {
+            for (int i = 0; i < cachedColliders.Length; i++)
+            {
+                var c = cachedColliders[i];
+                if (c == null) continue;
+                c.enabled = block;
+            }
+        }
+
+        if (navObstacle != null)
+            navObstacle.enabled = block;
+    }
+
+    void EnsureRuntimeNavLink()
+    {
+        float depth = Mathf.Max(0.4f, navLinkDepth);
+        float width = Mathf.Max(0.4f, navLinkWidth);
+        int agentType = ResolveAgentTypeId();
+
+        if (navLinkForwardBack == null)
+        {
+            navLinkForwardBack = GetComponent<NavMeshLink>();
+            if (navLinkForwardBack == null) navLinkForwardBack = gameObject.AddComponent<NavMeshLink>();
+        }
+        ConfigureLink(navLinkForwardBack, Vector3.back * depth, Vector3.forward * depth, width, agentType);
+
+        if (!useDualAxisRuntimeLinks)
+        {
+            if (navLinkLeftRight != null) navLinkLeftRight.enabled = false;
+            return;
+        }
+
+        if (navLinkLeftRight == null)
+        {
+            NavMeshLink[] all = GetComponents<NavMeshLink>();
+            for (int i = 0; i < all.Length; i++)
+            {
+                if (all[i] != null && all[i] != navLinkForwardBack)
+                {
+                    navLinkLeftRight = all[i];
+                    break;
+                }
+            }
+            if (navLinkLeftRight == null) navLinkLeftRight = gameObject.AddComponent<NavMeshLink>();
+        }
+        ConfigureLink(navLinkLeftRight, Vector3.left * depth, Vector3.right * depth, width, agentType);
+    }
+
+    int ResolveAgentTypeId()
+    {
+        if (navLinkAgentTypeID >= 0) return navLinkAgentTypeID;
+        NavMeshAgent anyAgent = FindFirstObjectByType<NavMeshAgent>();
+        return anyAgent != null ? anyAgent.agentTypeID : 0;
+    }
+
+    void ConfigureLink(NavMeshLink link, Vector3 start, Vector3 end, float width, int agentType)
+    {
+        if (link == null) return;
+        link.enabled = true;
+        link.startPoint = start;
+        link.endPoint = end;
+        link.width = width;
+        link.bidirectional = true;
+        link.autoUpdate = true;
+        link.activated = false;
+        link.agentTypeID = agentType;
+    }
+
+    void SyncRuntimeNavLink()
+    {
+        if (!autoAddRuntimeNavLink) return;
+
+        bool shouldEnable = isOpen && (!isLocked || aiBypassLock);
+        if (navLinkForwardBack != null && navLinkForwardBack.enabled)
+            navLinkForwardBack.activated = shouldEnable;
+        if (navLinkLeftRight != null && navLinkLeftRight.enabled)
+            navLinkLeftRight.activated = shouldEnable;
     }
 
     void ApplyHingePose(float angleY)

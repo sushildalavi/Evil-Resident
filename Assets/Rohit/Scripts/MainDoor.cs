@@ -1,5 +1,7 @@
 using UnityEngine;
 using Sushil.Systems;
+using UnityEngine.AI;
+using Unity.AI.Navigation;
 
 public class MainDoor : MonoBehaviour, IInteractable
 {
@@ -16,18 +18,54 @@ public class MainDoor : MonoBehaviour, IInteractable
     [Header("Win Condition")]
     public GameObject winUI;
 
+    [Header("AI / Navigation")]
+    public bool blockWhenClosed = true;
+    public bool unblockWhenOpen = true;
+    [Tooltip("If enabled, remove door blocking immediately when the door starts opening.")]
+    public bool immediateUnblockOnOpen = true;
+    [Range(1f, 89f)] public float openUnblockAngle = 65f;
+    public bool autoAddNavObstacle = true;
+    public bool autoAddRuntimeNavLink = true;
+    public float navLinkDepth = 1.2f;
+    public float navLinkWidth = 1.3f;
+    public int navLinkAgentTypeID = -1;
+
     private bool isOpen = false;
     private Quaternion closedLocalRotation;
     private Vector3 closedLocalPosition;
     private float currentOpenAngle;
     private AudioSource audioSource;
+    private Collider[] cachedColliders;
+    private NavMeshObstacle navObstacle;
+    private NavMeshLink navLink;
+    private bool isBlockingNow;
 
     void Start()
     {
+        // Hard safety defaults so old scene/prefab serialized values cannot regress doorway traversal.
+        unblockWhenOpen = true;
+        immediateUnblockOnOpen = true;
+        autoAddRuntimeNavLink = true;
+
         closedLocalPosition = transform.localPosition;
         closedLocalRotation = transform.localRotation;
         audioSource = GetComponent<AudioSource>();
         currentOpenAngle = 0f;
+        // Only toggle colliders on moving panel so frame/wall collision remains stable.
+        Transform panel = transform.Find("DoorPanel");
+        cachedColliders = panel != null
+            ? panel.GetComponentsInChildren<Collider>(true)
+            : GetComponentsInChildren<Collider>(true);
+        navObstacle = GetComponent<NavMeshObstacle>();
+        if (autoAddNavObstacle && navObstacle == null)
+        {
+            navObstacle = gameObject.AddComponent<NavMeshObstacle>();
+            navObstacle.carving = true;
+            navObstacle.carveOnlyStationary = true;
+        }
+        if (autoAddRuntimeNavLink)
+            EnsureRuntimeNavLink();
+        SetDoorBlocking(true);
 
         if (winUI != null)
             winUI.SetActive(false);
@@ -40,6 +78,8 @@ public class MainDoor : MonoBehaviour, IInteractable
         float targetAngle = isOpen ? (openAngle * direction) : 0f;
         currentOpenAngle = Mathf.MoveTowards(currentOpenAngle, targetAngle, openSpeed * 100f * Time.deltaTime);
         ApplyHingePose(currentOpenAngle);
+        SyncDoorBlockingForCurrentAngle();
+        SyncRuntimeNavLink();
     }
 
     public KeyCode GetInteractKey() => KeyCode.E;
@@ -64,6 +104,8 @@ public class MainDoor : MonoBehaviour, IInteractable
         if (inventory != null && inventory.HasAllKeys())
         {
             isOpen = true;
+            SetDoorBlocking(false);
+            if (navLink != null) navLink.activated = true;
             PlaySound(unlockSound);
             Debug.Log("The main door opens! You escaped!");
 
@@ -86,6 +128,71 @@ public class MainDoor : MonoBehaviour, IInteractable
     {
         if (clip != null && audioSource != null)
             audioSource.PlayOneShot(clip);
+    }
+
+    void SyncDoorBlockingForCurrentAngle()
+    {
+        bool shouldBlock;
+        if (!blockWhenClosed && !unblockWhenOpen) return;
+
+        if (!isOpen)
+        {
+            shouldBlock = blockWhenClosed;
+        }
+        else
+        {
+            // For this project: once opening starts, never block traversal at this doorway.
+            shouldBlock = false;
+        }
+
+        SetDoorBlocking(shouldBlock);
+    }
+
+    void SetDoorBlocking(bool block)
+    {
+        if (isBlockingNow == block) return;
+        isBlockingNow = block;
+
+        if (cachedColliders != null)
+        {
+            for (int i = 0; i < cachedColliders.Length; i++)
+            {
+                var c = cachedColliders[i];
+                if (c == null) continue;
+                c.enabled = block;
+            }
+        }
+
+        if (navObstacle != null)
+            navObstacle.enabled = block;
+    }
+
+    void EnsureRuntimeNavLink()
+    {
+        if (navLink == null) navLink = GetComponent<NavMeshLink>();
+        if (navLink == null) navLink = gameObject.AddComponent<NavMeshLink>();
+
+        navLink.startPoint = Vector3.back * Mathf.Max(0.4f, navLinkDepth);
+        navLink.endPoint = Vector3.forward * Mathf.Max(0.4f, navLinkDepth);
+        navLink.width = Mathf.Max(0.4f, navLinkWidth);
+        navLink.bidirectional = true;
+        navLink.autoUpdate = true;
+        navLink.activated = false;
+
+        if (navLinkAgentTypeID >= 0)
+        {
+            navLink.agentTypeID = navLinkAgentTypeID;
+            return;
+        }
+
+        NavMeshAgent anyAgent = FindFirstObjectByType<NavMeshAgent>();
+        if (anyAgent != null) navLink.agentTypeID = anyAgent.agentTypeID;
+    }
+
+    void SyncRuntimeNavLink()
+    {
+        if (!autoAddRuntimeNavLink || navLink == null) return;
+        navLink.activated = isOpen;
     }
 
     void ApplyHingePose(float angleY)

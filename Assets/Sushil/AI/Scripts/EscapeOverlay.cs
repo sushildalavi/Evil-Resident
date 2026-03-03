@@ -115,7 +115,7 @@ namespace Sushil.Systems
             var go = new GameObject(name);
             go.transform.SetParent(parent, false);
             var t = go.AddComponent<Text>();
-            t.font = OverlayTypography.GetFont(size);
+            t.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             t.fontSize = size;
             t.fontStyle = style;
             t.color = color;

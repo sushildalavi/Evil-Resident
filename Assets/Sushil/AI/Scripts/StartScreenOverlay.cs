@@ -111,7 +111,7 @@ namespace Sushil.Systems
             Transform content = CreateContentContainer(root.transform);
 
             Text title = CreateText(content, "Title",
-                "THE WATCHER WITHIN", 88, FontStyle.Bold, TextAnchor.MiddleCenter,
+                "IT SAW YOU", 88, FontStyle.Bold, TextAnchor.MiddleCenter,
                 new Color(1f, 0.2f, 0.2f, 1f), new Vector2(0.04f, 0.72f), new Vector2(0.96f, 0.92f));
             AddTextEffects(title.gameObject, new Color(0.18f, 0f, 0f, 1f));
 

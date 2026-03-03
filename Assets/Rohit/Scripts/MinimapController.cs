@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
 using Sushil.AI;
+using Sushil.Systems;
+using System.Collections.Generic;
 
 /// <summary>
 /// Valorant-style minimap: clear layout (walls/floor), player facing, enemy and keys.
@@ -8,19 +10,27 @@ using Sushil.AI;
 /// </summary>
 public class MinimapController : MonoBehaviour
 {
+    [Header("Master Switch")]
+    public bool enableMinimap = false;
+
     [Header("Bounds (world XZ)")]
     public float worldMinX = -60f;
     public float worldMaxX = 60f;
     public float worldMinZ = -60f;
     public float worldMaxZ = 60f;
+    public bool autoFitWorldBoundsFromScene = true;
+    public float mapPaddingWorld = 2f;
 
     [Header("Minimap camera")]
     public float cameraHeight = 50f;
     public float orthoSize = 28f;
     public int renderTextureSize = 384;
+    public bool showWholeSceneLayout = true;
+    public bool useReadableReplacementShader = true;
 
     [Header("Fog of war")]
     public float revealRadiusWorld = 8f;
+    public bool useFogOfWar = false;
 
     [Header("UI")]
     public float minimapSizePixels = 200f;
@@ -30,6 +40,21 @@ public class MinimapController : MonoBehaviour
     public Color enemyColor = new Color(1f, 0.2f, 0.2f, 1f);
     public Color keyColor = new Color(1f, 0.85f, 0.2f, 1f);
 
+    [Header("Layout Markers (Doors Only)")]
+    public bool showDoorMarkers = true;
+    public float doorMarkerLength = 12f;
+    public float doorMarkerThickness = 3f;
+    public Color doorMarkerColor = new Color(0.62f, 0.86f, 1f, 0.95f);
+    public Color escapeDoorMarkerColor = new Color(0.48f, 1f, 0.62f, 1f);
+
+    [Header("Timed Visibility")]
+    public bool showOnlyWhileHidden = true;
+    public bool showInShortIntervals = true;
+    public float firstRevealDelay = 4f;
+    public float visibleDuration = 2.8f;
+    public float hiddenDuration = 10f;
+    public float fadeSpeed = 5f;
+
     Transform player;
     Transform stalker;
     KeyItem[] keyItems;
@@ -37,34 +62,58 @@ public class MinimapController : MonoBehaviour
     RenderTexture renderTexture;
     Texture2D fogTexture;
     RectTransform minimapRect;
+    CanvasGroup panelGroup;
+    RectTransform panelRect;
     RectTransform playerIconRect;
     RectTransform enemyIconRect;
     Image[] keyIcons = new Image[3];
+    readonly List<Door> doorList = new();
+    readonly List<RectTransform> doorMarkerRects = new();
+    MainDoor mainDoor;
+    RectTransform escapeDoorMarkerRect;
     Canvas canvas;
     bool uiBuilt;
     Light minimapLight;
     Shader replacementShader;
     bool useReplacementShader;
+    float nextRevealAt;
+    float hideAt;
+    bool visibleNow;
 
     const int FogResolution = 256;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void EnsureMinimapOnPlayer()
     {
-        // Minimap disabled. Uncomment below to re-enable.
-        // var rohit = FindFirstObjectByType<RohitFPSController>();
-        // if (rohit == null) return;
-        // if (rohit.GetComponent<MinimapController>() != null) return;
-        // rohit.gameObject.AddComponent<MinimapController>();
+        // Minimap disabled intentionally.
     }
 
     void Start()
     {
+        if (!enableMinimap)
+        {
+            enabled = false;
+            return;
+        }
+
+        // Force stable readable style for this project.
+        showWholeSceneLayout = true;
+        useReadableReplacementShader = true;
+        useFogOfWar = false;
+        showDoorMarkers = true;
+        showOnlyWhileHidden = true;
+
         ResolveReferences();
+        if (autoFitWorldBoundsFromScene)
+            AutoFitWorldBoundsFromScene();
         BuildMinimapCamera();
         BuildFogTexture();
         BuildUI();
         uiBuilt = true;
+        nextRevealAt = Time.unscaledTime + Mathf.Max(0f, firstRevealDelay);
+        hideAt = 0f;
+        visibleNow = !showInShortIntervals;
+        SetPanelAlpha(visibleNow ? 1f : 0f);
     }
 
     void ResolveReferences()
@@ -85,13 +134,21 @@ public class MinimapController : MonoBehaviour
             var ai = FindFirstObjectByType<StalkerAI>();
             if (ai != null) stalker = ai.transform;
         }
-
-        RefreshKeyItems();
+        mainDoor = FindFirstObjectByType<MainDoor>();
+        RefreshDoors();
     }
 
-    void RefreshKeyItems()
+    void RefreshDoors()
     {
-        keyItems = FindObjectsByType<KeyItem>(FindObjectsSortMode.None);
+        doorList.Clear();
+        Door[] allDoors = FindObjectsByType<Door>(FindObjectsSortMode.None);
+        if (allDoors == null) return;
+
+        for (int i = 0; i < allDoors.Length; i++)
+        {
+            if (allDoors[i] != null && allDoors[i].gameObject.activeInHierarchy)
+                doorList.Add(allDoors[i]);
+        }
     }
 
     void BuildMinimapCamera()
@@ -99,7 +156,7 @@ public class MinimapController : MonoBehaviour
         if (player == null) return;
 
         replacementShader = Resources.Load<Shader>("Shaders/MinimapReplacement");
-        useReplacementShader = replacementShader != null;
+        useReplacementShader = useReadableReplacementShader && replacementShader != null;
 
         GameObject camGo = new GameObject("MinimapCamera");
         camGo.transform.SetParent(transform);
@@ -178,15 +235,27 @@ public class MinimapController : MonoBehaviour
 
         GameObject panelGo = new GameObject("MinimapPanel");
         panelGo.transform.SetParent(canvas.transform, false);
-        RectTransform panelRect = panelGo.AddComponent<RectTransform>();
+        panelRect = panelGo.AddComponent<RectTransform>();
         panelRect.anchorMin = new Vector2(1f, 0f);
         panelRect.anchorMax = new Vector2(1f, 0f);
         panelRect.pivot = new Vector2(1f, 0f);
-        panelRect.anchoredPosition = new Vector2(-20f, 20f);
+        panelRect.anchoredPosition = new Vector2(-26f, 26f);
         panelRect.sizeDelta = new Vector2(minimapSizePixels, minimapSizePixels);
+        panelGroup = panelGo.AddComponent<CanvasGroup>();
 
         Image panelBg = panelGo.AddComponent<Image>();
-        panelBg.color = new Color(0.08f, 0.08f, 0.12f, 0.95f);
+        panelBg.color = new Color(0.03f, 0.04f, 0.06f, 0.92f);
+
+        GameObject frameGo = new GameObject("Frame");
+        frameGo.transform.SetParent(panelGo.transform, false);
+        Image frame = frameGo.AddComponent<Image>();
+        frame.color = new Color(0.72f, 0.78f, 0.9f, 0.2f);
+        RectTransform frameRect = frame.rectTransform;
+        frameRect.anchorMin = Vector2.zero;
+        frameRect.anchorMax = Vector2.one;
+        frameRect.offsetMin = new Vector2(-2f, -2f);
+        frameRect.offsetMax = new Vector2(2f, 2f);
+        frame.raycastTarget = false;
 
         GameObject mapGo = new GameObject("MinimapImage");
         mapGo.transform.SetParent(panelGo.transform, false);
@@ -210,14 +279,10 @@ public class MinimapController : MonoBehaviour
         fogRect.anchorMax = Vector2.one;
         fogRect.offsetMin = Vector2.zero;
         fogRect.offsetMax = Vector2.zero;
+        fogGo.SetActive(useFogOfWar);
 
-        playerIconRect = CreateArrowIcon(panelGo.transform, "PlayerIcon", playerColor);
-        enemyIconRect = CreateIcon(panelGo.transform, "EnemyIcon", enemyColor, Vector2.zero);
-
-        for (int i = 0; i < 3; i++)
-        {
-            keyIcons[i] = CreateIcon(panelGo.transform, "KeyIcon" + i, keyColor, Vector2.zero).GetComponent<Image>();
-        }
+        if (showDoorMarkers)
+            BuildDoorMarkers(panelGo.transform);
     }
 
     RectTransform CreateArrowIcon(Transform parent, string name, Color color)
@@ -251,9 +316,54 @@ public class MinimapController : MonoBehaviour
         return rect;
     }
 
+    void BuildDoorMarkers(Transform parent)
+    {
+        ClearDoorMarkers();
+        RefreshDoors();
+
+        for (int i = 0; i < doorList.Count; i++)
+        {
+            RectTransform r = CreateDoorMarker(parent, "DoorMarker_" + i, doorMarkerColor);
+            doorMarkerRects.Add(r);
+        }
+
+        if (mainDoor != null)
+            escapeDoorMarkerRect = CreateDoorMarker(parent, "EscapeDoorMarker", escapeDoorMarkerColor);
+    }
+
+    RectTransform CreateDoorMarker(Transform parent, string name, Color color)
+    {
+        GameObject go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        Image img = go.AddComponent<Image>();
+        img.color = color;
+        RectTransform rect = go.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.5f, 0.5f);
+        rect.anchorMax = new Vector2(0.5f, 0.5f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(doorMarkerLength, doorMarkerThickness);
+        return rect;
+    }
+
+    void ClearDoorMarkers()
+    {
+        for (int i = 0; i < doorMarkerRects.Count; i++)
+        {
+            if (doorMarkerRects[i] != null)
+                Destroy(doorMarkerRects[i].gameObject);
+        }
+        doorMarkerRects.Clear();
+        if (escapeDoorMarkerRect != null)
+            Destroy(escapeDoorMarkerRect.gameObject);
+        escapeDoorMarkerRect = null;
+    }
+
     void LateUpdate()
     {
         if (!uiBuilt || minimapCamera == null) return;
+
+        UpdateTimedVisibility();
 
         if (player == null)
         {
@@ -262,13 +372,84 @@ public class MinimapController : MonoBehaviour
         }
 
         Vector3 playerPos = player.position;
-        minimapCamera.transform.position = new Vector3(playerPos.x, playerPos.y + cameraHeight, playerPos.z);
+        if (showWholeSceneLayout)
+        {
+            float cx = (worldMinX + worldMaxX) * 0.5f;
+            float cz = (worldMinZ + worldMaxZ) * 0.5f;
+            float w = Mathf.Max(1f, worldMaxX - worldMinX);
+            float d = Mathf.Max(1f, worldMaxZ - worldMinZ);
+            minimapCamera.orthographicSize = Mathf.Max(w, d) * 0.5f + Mathf.Max(0f, mapPaddingWorld);
+            minimapCamera.transform.position = new Vector3(cx, cameraHeight, cz);
+        }
+        else
+        {
+            minimapCamera.orthographicSize = orthoSize;
+            minimapCamera.transform.position = new Vector3(playerPos.x, playerPos.y + cameraHeight, playerPos.z);
+        }
 
         if (useReplacementShader && replacementShader != null)
             minimapCamera.RenderWithShader(replacementShader, "RenderType");
 
-        UpdateFog(playerPos.x, playerPos.z);
+        if (useFogOfWar)
+            UpdateFog(playerPos.x, playerPos.z);
         UpdateIconPositions(playerPos);
+        UpdateDoorMarkers();
+    }
+
+    void UpdateTimedVisibility()
+    {
+        if (panelGroup == null) return;
+
+        bool overlayBlocking = StartScreenOverlay.IsShowing || PauseOverlay.IsPaused || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing;
+        if (overlayBlocking)
+        {
+            visibleNow = false;
+            SetPanelAlpha(0f);
+            return;
+        }
+
+        if (showOnlyWhileHidden)
+        {
+            bool isHidden = false;
+            if (player != null)
+            {
+                RohitFPSController rohit = player.GetComponent<RohitFPSController>();
+                if (rohit != null) isHidden = rohit.isHidden;
+            }
+            visibleNow = isHidden;
+            float targetHidden = visibleNow ? 1f : 0f;
+            panelGroup.alpha = Mathf.MoveTowards(panelGroup.alpha, targetHidden, Mathf.Max(0.5f, fadeSpeed) * Time.unscaledDeltaTime);
+            return;
+        }
+
+        if (!showInShortIntervals)
+        {
+            visibleNow = true;
+            SetPanelAlpha(1f);
+            return;
+        }
+
+        float now = Time.unscaledTime;
+
+        if (!visibleNow && now >= nextRevealAt)
+        {
+            visibleNow = true;
+            hideAt = now + Mathf.Max(0.5f, visibleDuration);
+        }
+        else if (visibleNow && now >= hideAt)
+        {
+            visibleNow = false;
+            nextRevealAt = now + Mathf.Max(0.5f, hiddenDuration);
+        }
+
+        float target = visibleNow ? 1f : 0f;
+        panelGroup.alpha = Mathf.MoveTowards(panelGroup.alpha, target, Mathf.Max(0.5f, fadeSpeed) * Time.unscaledDeltaTime);
+    }
+
+    void SetPanelAlpha(float a)
+    {
+        if (panelGroup != null)
+            panelGroup.alpha = Mathf.Clamp01(a);
     }
 
     void UpdateFog(float playerX, float playerZ)
@@ -311,45 +492,19 @@ public class MinimapController : MonoBehaviour
     void UpdateIconPositions(Vector3 playerPos)
     {
         float halfW = minimapSizePixels * 0.5f;
-        float scale = halfW / orthoSize;
+        float scale = halfW / Mathf.Max(1f, minimapCamera.orthographicSize);
 
         if (playerIconRect != null)
-        {
-            playerIconRect.anchoredPosition = Vector2.zero;
-            Vector3 forward = player.forward;
-            forward.y = 0f;
-            if (forward.sqrMagnitude > 0.001f)
-            {
-                float angleDeg = -Mathf.Atan2(forward.x, forward.z) * Mathf.Rad2Deg;
-                playerIconRect.localEulerAngles = new Vector3(0f, 0f, angleDeg);
-            }
-        }
+            playerIconRect.gameObject.SetActive(false);
 
         if (stalker != null && enemyIconRect != null)
-        {
-            Vector2 local = WorldToMinimapLocal(stalker.position, playerPos, scale);
-            enemyIconRect.anchoredPosition = ClampToMinimap(local, halfW);
-            enemyIconRect.gameObject.SetActive(true);
-        }
-        else if (enemyIconRect != null)
-        {
             enemyIconRect.gameObject.SetActive(false);
-        }
+        else if (enemyIconRect != null)
+            enemyIconRect.gameObject.SetActive(false);
 
-        RefreshKeyItems();
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < keyIcons.Length; i++)
         {
-            if (keyIcons[i] == null) continue;
-            if (keyItems != null && i < keyItems.Length && keyItems[i] != null && keyItems[i].gameObject.activeInHierarchy)
-            {
-                Vector2 local = WorldToMinimapLocal(keyItems[i].transform.position, playerPos, scale);
-                keyIcons[i].rectTransform.anchoredPosition = ClampToMinimap(local, halfW);
-                keyIcons[i].gameObject.SetActive(true);
-            }
-            else
-            {
-                keyIcons[i].gameObject.SetActive(false);
-            }
+            if (keyIcons[i] != null) keyIcons[i].gameObject.SetActive(false);
         }
     }
 
@@ -360,12 +515,93 @@ public class MinimapController : MonoBehaviour
         return new Vector2(dx * scale, dz * scale);
     }
 
+    Vector2 WorldToMinimapAbsolute(Vector3 world)
+    {
+        float u = Mathf.InverseLerp(worldMinX, worldMaxX, world.x);
+        float v = Mathf.InverseLerp(worldMinZ, worldMaxZ, world.z);
+        float x = (u - 0.5f) * minimapSizePixels;
+        float y = (v - 0.5f) * minimapSizePixels;
+        return new Vector2(x, y);
+    }
+
     static Vector2 ClampToMinimap(Vector2 local, float halfSize)
     {
         float max = halfSize - 4f;
         if (local.sqrMagnitude > max * max)
             return local.normalized * max;
         return local;
+    }
+
+    void UpdateDoorMarkers()
+    {
+        if (!showDoorMarkers) return;
+        if (doorMarkerRects.Count != doorList.Count)
+            BuildDoorMarkers(panelRect != null ? panelRect : canvas.transform);
+
+        float halfW = minimapSizePixels * 0.5f;
+        for (int i = 0; i < doorList.Count; i++)
+        {
+            Door door = doorList[i];
+            RectTransform marker = i < doorMarkerRects.Count ? doorMarkerRects[i] : null;
+            if (door == null || marker == null)
+                continue;
+
+            Vector2 p = WorldToMinimapAbsolute(door.transform.position);
+            marker.anchoredPosition = ClampToMinimap(p, halfW);
+
+            Vector3 f = door.transform.forward;
+            f.y = 0f;
+            if (f.sqrMagnitude > 0.0001f)
+            {
+                float angle = -Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
+                marker.localEulerAngles = new Vector3(0f, 0f, angle);
+            }
+        }
+
+        if (escapeDoorMarkerRect != null && mainDoor != null)
+        {
+            Vector2 p = WorldToMinimapAbsolute(mainDoor.transform.position);
+            escapeDoorMarkerRect.anchoredPosition = ClampToMinimap(p, halfW);
+            Vector3 f = mainDoor.transform.forward;
+            f.y = 0f;
+            if (f.sqrMagnitude > 0.0001f)
+            {
+                float angle = -Mathf.Atan2(f.x, f.z) * Mathf.Rad2Deg;
+                escapeDoorMarkerRect.localEulerAngles = new Vector3(0f, 0f, angle);
+            }
+            escapeDoorMarkerRect.sizeDelta = new Vector2(doorMarkerLength * 1.35f, doorMarkerThickness * 1.35f);
+        }
+    }
+
+    void AutoFitWorldBoundsFromScene()
+    {
+        Renderer[] all = FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+        bool init = false;
+        Bounds b = default;
+
+        for (int i = 0; i < all.Length; i++)
+        {
+            Renderer r = all[i];
+            if (r == null || !r.enabled || !r.gameObject.activeInHierarchy) continue;
+            if (r.GetComponentInParent<Canvas>() != null) continue;
+            if (r is ParticleSystemRenderer) continue;
+            if (!init)
+            {
+                b = r.bounds;
+                init = true;
+            }
+            else
+            {
+                b.Encapsulate(r.bounds);
+            }
+        }
+
+        if (!init) return;
+
+        worldMinX = b.min.x;
+        worldMaxX = b.max.x;
+        worldMinZ = b.min.z;
+        worldMaxZ = b.max.z;
     }
 
     void OnDestroy()
@@ -376,5 +612,6 @@ public class MinimapController : MonoBehaviour
             renderTexture.Release();
         if (fogTexture != null)
             Destroy(fogTexture);
+        ClearDoorMarkers();
     }
 }

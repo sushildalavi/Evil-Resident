@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -13,6 +14,12 @@ namespace Sushil.Demo
         public float sprintSpeed = 8f;
         public float jumpHeight = 1.5f;
         public float gravity = -9.81f;
+        [Header("Collision")]
+        public bool useCapsulePreCast = true;
+        public LayerMask collisionMask = ~0;
+        public float collisionSkin = 0.03f;
+        public bool useNavMeshBoundaryGuard = true;
+        public float navBoundarySkin = 0.06f;
 
         [Header("Look")]
         public float mouseSensitivity = 200f;
@@ -71,13 +78,77 @@ namespace Sushil.Demo
             Vector2 moveInput = GetMoveInput();
             Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
             float speed = isCrouching ? crouchSpeed : (IsSprintHeld() ? sprintSpeed : walkSpeed);
-            controller.Move(move * speed * Time.deltaTime);
+            SafeMove(move * speed * Time.deltaTime);
 
             if (WasJumpPressed() && grounded)
                 yVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
 
             yVelocity += gravity * Time.deltaTime;
-            controller.Move(Vector3.up * yVelocity * Time.deltaTime);
+            SafeMove(Vector3.up * yVelocity * Time.deltaTime);
+        }
+
+        void SafeMove(Vector3 delta)
+        {
+            if (delta.sqrMagnitude <= 0.0000001f || controller == null)
+                return;
+
+            if (useNavMeshBoundaryGuard)
+                delta = ClampDeltaByNavMesh(delta);
+
+            if (!useCapsulePreCast)
+            {
+                controller.Move(delta);
+                return;
+            }
+
+            Vector3 dir = delta.normalized;
+            float dist = delta.magnitude;
+            GetControllerCapsule(out Vector3 p1, out Vector3 p2, out float radius);
+
+            if (Physics.CapsuleCast(p1, p2, radius, dir, out RaycastHit hit, dist + collisionSkin, collisionMask, QueryTriggerInteraction.Ignore))
+            {
+                Transform hitT = hit.collider != null ? hit.collider.transform : null;
+                if (hitT != null && (hitT == transform || hitT.IsChildOf(transform)))
+                {
+                    controller.Move(delta);
+                    return;
+                }
+
+                float allowed = Mathf.Max(0f, hit.distance - collisionSkin);
+                controller.Move(dir * allowed);
+                return;
+            }
+
+            controller.Move(delta);
+        }
+
+        void GetControllerCapsule(out Vector3 p1, out Vector3 p2, out float radius)
+        {
+            radius = Mathf.Max(0.02f, controller.radius * 0.95f);
+            float height = Mathf.Max(controller.height, radius * 2f + 0.01f);
+            Vector3 center = transform.TransformPoint(controller.center);
+            Vector3 up = transform.up;
+            float half = (height * 0.5f) - radius;
+            p1 = center + up * half;
+            p2 = center - up * half;
+        }
+
+        Vector3 ClampDeltaByNavMesh(Vector3 delta)
+        {
+            if (delta.sqrMagnitude <= 0.0000001f) return delta;
+
+            Vector3 origin = transform.position;
+            if (!NavMesh.SamplePosition(origin, out var fromHit, 1.5f, NavMesh.AllAreas))
+                return delta;
+
+            Vector3 target = origin + delta;
+            if (!NavMesh.Raycast(fromHit.position, target, out var navHit, NavMesh.AllAreas))
+                return delta;
+
+            Vector3 allowed = navHit.position - origin;
+            float allowedMag = Mathf.Max(0f, allowed.magnitude - Mathf.Max(0.01f, navBoundarySkin));
+            if (allowedMag <= 0f) return Vector3.zero;
+            return delta.normalized * Mathf.Min(delta.magnitude, allowedMag);
         }
 
         void Look()

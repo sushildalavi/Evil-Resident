@@ -219,7 +219,7 @@ namespace Sushil.Systems
 
         static Font CreateSpookyFont(int size)
         {
-            return OverlayTypography.GetFont(size);
+            return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         }
 
         static bool WasRestartPressed()

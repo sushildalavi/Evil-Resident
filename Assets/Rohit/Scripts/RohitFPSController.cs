@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.AI;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -15,6 +16,12 @@ public class RohitFPSController : MonoBehaviour
     public float deceleration = 20f;
     [Range(0f, 1f)] public float airControl = 0.45f;
     public float groundStickForce = 2f;
+    [Header("Collision")]
+    public bool useCapsulePreCast = true;
+    public LayerMask collisionMask = ~0;
+    public float collisionSkin = 0.03f;
+    public bool useNavMeshBoundaryGuard = true;
+    public float navBoundarySkin = 0.06f;
 
     [Header("Mouse")]
     [Range(50f, 400f)]
@@ -28,7 +35,13 @@ public class RohitFPSController : MonoBehaviour
     public float keyInteractDistance = 10f;
     public float keyProximityRadius = 2.5f;
     public LayerMask interactableLayer;
+    [Tooltip("Solid geometry mask used to block interaction through walls.")]
+    public LayerMask interactionOcclusionMask = ~0;
     public Text promptText;
+
+    [Header("Camera Anti-Clip")]
+    [Tooltip("Lower near clip reduces wall cutaway when standing close to walls.")]
+    public float gameplayNearClip = 0.03f;
 
     [Header("Key Inventory HUD (Optional)")]
     public Text keyHudText;
@@ -69,6 +82,13 @@ public class RohitFPSController : MonoBehaviour
 
         if (keyHudText != null)
             keyHudText.gameObject.SetActive(true);
+
+        if (cameraTransform != null)
+        {
+            Camera cam = cameraTransform.GetComponent<Camera>();
+            if (cam != null)
+                cam.nearClipPlane = Mathf.Clamp(gameplayNearClip, 0.01f, 0.1f);
+        }
     }
 
     void Update()
@@ -105,7 +125,71 @@ public class RohitFPSController : MonoBehaviour
         yVelocity += gravity * Time.deltaTime;
 
         Vector3 finalVelocity = horizontalVelocity + Vector3.up * yVelocity;
-        controller.Move(finalVelocity * Time.deltaTime);
+        SafeMove(finalVelocity * Time.deltaTime);
+    }
+
+    void SafeMove(Vector3 delta)
+    {
+        if (delta.sqrMagnitude <= 0.0000001f || controller == null)
+            return;
+
+        if (useNavMeshBoundaryGuard)
+            delta = ClampDeltaByNavMesh(delta);
+
+        if (!useCapsulePreCast)
+        {
+            controller.Move(delta);
+            return;
+        }
+
+        Vector3 dir = delta.normalized;
+        float dist = delta.magnitude;
+        GetControllerCapsule(out Vector3 p1, out Vector3 p2, out float radius);
+
+        if (Physics.CapsuleCast(p1, p2, radius, dir, out RaycastHit hit, dist + collisionSkin, collisionMask, QueryTriggerInteraction.Ignore))
+        {
+            Transform hitT = hit.collider != null ? hit.collider.transform : null;
+            if (hitT != null && (hitT == transform || hitT.IsChildOf(transform)))
+            {
+                controller.Move(delta);
+                return;
+            }
+
+            float allowed = Mathf.Max(0f, hit.distance - collisionSkin);
+            controller.Move(dir * allowed);
+            return;
+        }
+
+        controller.Move(delta);
+    }
+
+    void GetControllerCapsule(out Vector3 p1, out Vector3 p2, out float radius)
+    {
+        radius = Mathf.Max(0.02f, controller.radius * 0.95f);
+        float height = Mathf.Max(controller.height, radius * 2f + 0.01f);
+        Vector3 center = transform.TransformPoint(controller.center);
+        Vector3 up = transform.up;
+        float half = (height * 0.5f) - radius;
+        p1 = center + up * half;
+        p2 = center - up * half;
+    }
+
+    Vector3 ClampDeltaByNavMesh(Vector3 delta)
+    {
+        if (delta.sqrMagnitude <= 0.0000001f) return delta;
+
+        Vector3 origin = transform.position;
+        if (!NavMesh.SamplePosition(origin, out var fromHit, 1.5f, NavMesh.AllAreas))
+            return delta;
+
+        Vector3 target = origin + delta;
+        if (!NavMesh.Raycast(fromHit.position, target, out var navHit, NavMesh.AllAreas))
+            return delta;
+
+        Vector3 allowed = navHit.position - origin;
+        float allowedMag = Mathf.Max(0f, allowed.magnitude - Mathf.Max(0.01f, navBoundarySkin));
+        if (allowedMag <= 0f) return Vector3.zero;
+        return delta.normalized * Mathf.Min(delta.magnitude, allowedMag);
     }
 
     void Look()
@@ -149,13 +233,16 @@ public class RohitFPSController : MonoBehaviour
         // Proximity-based key pickup so prompt is consistent regardless of key height/look angle.
         if (TryFindNearbyKey(out KeyItem nearbyKey))
         {
-            string prompt = nearbyKey.GetPrompt(this);
-            ShowPrompt(prompt);
+            if (HasLineOfSightToInteractable(nearbyKey, keyInteractDistance))
+            {
+                string prompt = nearbyKey.GetPrompt(this);
+                ShowPrompt(prompt);
 
-            if (WasKeyPressed(nearbyKey.GetInteractKey()))
-                nearbyKey.Interact(this);
+                if (WasKeyPressed(nearbyKey.GetInteractKey()))
+                    nearbyKey.Interact(this);
 
-            return;
+                return;
+            }
         }
 
         if (TryFindInteractable(ray, out IInteractable interactable))
@@ -203,12 +290,17 @@ public class RohitFPSController : MonoBehaviour
                 bool inMask = interactableLayer.value != 0 && IsLayerInMask(col.gameObject.layer, interactableLayer);
                 if (inMask)
                 {
-                    interactable = candidate;
-                    return true;
+                    if (HasLineOfSightToInteractable(candidate, allowedDistance))
+                    {
+                        interactable = candidate;
+                        return true;
+                    }
+                    continue;
                 }
 
                 // Fallback when layer setup is imperfect in scene objects.
-                if (fallbackInteractable == null) fallbackInteractable = candidate;
+                if (fallbackInteractable == null && HasLineOfSightToInteractable(candidate, allowedDistance))
+                    fallbackInteractable = candidate;
                 continue;
             }
 
@@ -258,6 +350,30 @@ public class RohitFPSController : MonoBehaviour
         }
 
         return keyItem != null;
+    }
+
+    bool HasLineOfSightToInteractable(IInteractable interactable, float maxDistance)
+    {
+        if (interactable == null || cameraTransform == null) return false;
+        Component comp = interactable as Component;
+        if (comp == null) return false;
+
+        Collider targetCollider = comp.GetComponentInChildren<Collider>();
+        if (targetCollider == null) targetCollider = comp.GetComponent<Collider>();
+        if (targetCollider == null) return false;
+
+        Vector3 origin = cameraTransform.position;
+        Vector3 target = targetCollider.bounds.center;
+        Vector3 dir = target - origin;
+        float dist = dir.magnitude;
+        if (dist <= 0.001f || dist > maxDistance) return false;
+
+        if (!Physics.Raycast(origin, dir.normalized, out RaycastHit hit, dist + 0.05f, interactionOcclusionMask, QueryTriggerInteraction.Ignore))
+            return true;
+
+        Transform ht = hit.collider != null ? hit.collider.transform : null;
+        if (ht == null) return false;
+        return ht == comp.transform || ht.IsChildOf(comp.transform) || comp.transform.IsChildOf(ht);
     }
 
     bool IsLayerInMask(int layer, LayerMask mask)
