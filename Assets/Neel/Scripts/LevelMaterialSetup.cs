@@ -9,8 +9,18 @@ public class LevelMaterialSetup : MonoBehaviour
     const string WallMaterialPath = "Materials/WallMaterial";
     const string FloorMaterialPath = "Materials/FloorMaterial";
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void ApplyLevelMaterials()
+    [Header("Optional")]
+    [Tooltip("Off by default. Turn on only if you want this script to override scene wall/floor materials at runtime.")]
+    public bool autoApplyOnStart = false;
+
+    void Start()
+    {
+        if (autoApplyOnStart)
+            ApplyLevelMaterials();
+    }
+
+    [ContextMenu("Apply Level Materials Now")]
+    public void ApplyLevelMaterials()
     {
         Material wallMatSource = Resources.Load<Material>(WallMaterialPath);
         Material floorMat = Resources.Load<Material>(FloorMaterialPath);

@@ -7,6 +7,9 @@ namespace Sushil.Demo
 {
     public class PlayerThrow : MonoBehaviour
     {
+        [Header("Feature Toggle")]
+        public bool enableThrowFeature = false;
+
         public GameObject throwablePrefab;
         public Transform throwOrigin;
         public Transform fallbackCamera;
@@ -24,6 +27,7 @@ namespace Sushil.Demo
 
         void Update()
         {
+            if (!enableThrowFeature) return;
             if (Time.time - lastThrowTime < cooldown) return;
 
             if (WasThrowPressed())

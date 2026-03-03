@@ -16,6 +16,7 @@ namespace Sushil.Demo
 
         [Header("Look")]
         public float mouseSensitivity = 200f;
+        public float inputSystemMouseScale = 0.0015f;
         public Transform cameraTransform;
         public bool lockCursorOnStart = true;
 
@@ -81,9 +82,19 @@ namespace Sushil.Demo
 
         void Look()
         {
-            Vector2 lookInput = GetLookInput();
-            float mouseX = lookInput.x * mouseSensitivity * Time.deltaTime;
-            float mouseY = lookInput.y * mouseSensitivity * Time.deltaTime;
+            Vector2 lookInput = GetLookInput(out bool fromInputSystem);
+            float mouseX;
+            float mouseY;
+            if (fromInputSystem)
+            {
+                mouseX = lookInput.x * mouseSensitivity * inputSystemMouseScale;
+                mouseY = lookInput.y * mouseSensitivity * inputSystemMouseScale;
+            }
+            else
+            {
+                mouseX = lookInput.x * mouseSensitivity * Time.deltaTime;
+                mouseY = lookInput.y * mouseSensitivity * Time.deltaTime;
+            }
 
             xRotation -= mouseY;
             xRotation = Mathf.Clamp(xRotation, -90f, 90f);
@@ -140,11 +151,6 @@ namespace Sushil.Demo
             float x = 0f;
             float y = 0f;
 
-#if ENABLE_LEGACY_INPUT_MANAGER
-            x = Input.GetAxisRaw("Horizontal");
-            y = Input.GetAxisRaw("Vertical");
-#endif
-
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null)
             {
@@ -154,28 +160,33 @@ namespace Sushil.Demo
                 if (Keyboard.current.dKey.isPressed) x += 1f;
                 if (Keyboard.current.sKey.isPressed) y -= 1f;
                 if (Keyboard.current.wKey.isPressed) y += 1f;
+                return new Vector2(x, y).normalized;
             }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+            x = Input.GetAxisRaw("Horizontal");
+            y = Input.GetAxisRaw("Vertical");
 #endif
             return new Vector2(x, y).normalized;
         }
 
-        Vector2 GetLookInput()
+        Vector2 GetLookInput(out bool fromInputSystem)
         {
+            fromInputSystem = false;
             float x = 0f;
             float y = 0f;
-
-#if ENABLE_LEGACY_INPUT_MANAGER
-            x = Input.GetAxis("Mouse X");
-            y = Input.GetAxis("Mouse Y");
-#endif
 
 #if ENABLE_INPUT_SYSTEM
             if (Mouse.current != null)
             {
                 Vector2 delta = Mouse.current.delta.ReadValue();
-                x = delta.x;
-                y = delta.y;
+                fromInputSystem = true;
+                return new Vector2(delta.x, delta.y);
             }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+            x = Input.GetAxis("Mouse X");
+            y = Input.GetAxis("Mouse Y");
 #endif
             return new Vector2(x, y);
         }

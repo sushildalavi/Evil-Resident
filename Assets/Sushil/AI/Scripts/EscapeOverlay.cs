@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Sushil.Systems
 {
@@ -26,6 +29,7 @@ namespace Sushil.Systems
             EnsureCreated();
             if (root == null) return;
 
+            GameAnalyticsTracker.RegisterEscape();
             if (title != null) title.text = "CONGRATS,\nYOU ESCAPED";
             if (quote != null) quote.text = quotes[Random.Range(0, quotes.Length)];
             if (hint != null) hint.text = "Press R to play again";
@@ -145,7 +149,7 @@ namespace Sushil.Systems
                     title.color = new Color(0.72f * pulse, 1f, 0.82f * pulse, 1f);
                 }
 
-                if (Input.GetKeyDown(KeyCode.R))
+                if (WasRestartPressed())
                     Restart();
             }
 
@@ -157,6 +161,18 @@ namespace Sushil.Systems
                 var active = SceneManager.GetActiveScene();
                 SceneManager.LoadScene(active.buildIndex);
             }
+        }
+
+        static bool WasRestartPressed()
+        {
+            bool pressed = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            pressed |= Input.GetKeyDown(KeyCode.R);
+#endif
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null) pressed |= Keyboard.current.rKey.wasPressedThisFrame;
+#endif
+            return pressed;
         }
     }
 }

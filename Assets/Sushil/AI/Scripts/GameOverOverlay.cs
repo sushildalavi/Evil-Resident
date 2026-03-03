@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Sushil.Systems
 {
@@ -19,6 +22,7 @@ namespace Sushil.Systems
             EnsureCreated();
             if (overlayRoot == null || titleText == null || reasonText == null || hintText == null) return;
 
+            GameAnalyticsTracker.RegisterDeath(reason);
             ApplyLargeStyle();
 
             titleText.text = "GAME\nOVER";
@@ -198,7 +202,7 @@ namespace Sushil.Systems
                     cardImage.color = new Color(0.08f * pulse, 0.01f, 0.02f, 0.98f);
                 }
 
-                if (Input.GetKeyDown(KeyCode.R))
+                if (WasRestartPressed())
                     RestartCurrentScene();
             }
 
@@ -216,6 +220,18 @@ namespace Sushil.Systems
         static Font CreateSpookyFont(int size)
         {
             return OverlayTypography.GetFont(size);
+        }
+
+        static bool WasRestartPressed()
+        {
+            bool pressed = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            pressed |= Input.GetKeyDown(KeyCode.R);
+#endif
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null) pressed |= Keyboard.current.rKey.wasPressedThisFrame;
+#endif
+            return pressed;
         }
     }
 }

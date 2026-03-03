@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using UnityEngine;
 using Sushil.Systems;
 using Sushil.Demo;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Sushil.AI
 {
@@ -31,6 +34,7 @@ namespace Sushil.AI
         public string landingNoiseType = "land";
 
         [Header("Throw Noise")]
+        public bool enableThrowIntegration = false;
         public KeyCode throwKey = KeyCode.G;
         public bool emitThrowReleaseNoise = false;
         public float throwReleaseNoiseIntensity = 6f;
@@ -65,9 +69,10 @@ namespace Sushil.AI
             if (!ResolveReferences()) return;
 
             UpdateMovementNoise();
-            UpdateThrowNoise();
+            if (enableThrowIntegration)
+                UpdateThrowNoise();
 
-            if (autoConfigureThrownRockImpactNoise && continuouslyConfigureRocks)
+            if (enableThrowIntegration && autoConfigureThrownRockImpactNoise && continuouslyConfigureRocks)
                 EnsureThrowableNoiseOnRocks();
         }
 
@@ -116,7 +121,7 @@ namespace Sushil.AI
 
             if (emitMovementNoise && grounded && speed >= minMoveSpeed)
             {
-                bool sprinting = Input.GetKey(KeyCode.LeftShift);
+                bool sprinting = IsSprintHeld();
                 stepTimer -= Time.deltaTime;
 
                 if (stepTimer <= 0f)
@@ -137,7 +142,7 @@ namespace Sushil.AI
         void UpdateThrowNoise()
         {
             if (throwRock == null) return;
-            if (!Input.GetKeyDown(throwKey)) return;
+            if (!WasKeyPressed(throwKey)) return;
 
             Vector3 throwPos = throwRock.throwPoint != null
                 ? throwRock.throwPoint.position
@@ -249,6 +254,43 @@ namespace Sushil.AI
             if (intensity <= 0f) return;
 
             NoiseSystem.Emit(playerController.transform.position, intensity, noiseType);
+        }
+
+        bool IsSprintHeld()
+        {
+            bool held = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            held |= Input.GetKey(KeyCode.LeftShift);
+#endif
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null) held |= Keyboard.current.leftShiftKey.isPressed;
+#endif
+            return held;
+        }
+
+        bool WasKeyPressed(KeyCode key)
+        {
+            bool pressed = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            pressed |= Input.GetKeyDown(key);
+#endif
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null)
+            {
+                switch (key)
+                {
+                    case KeyCode.G: pressed |= Keyboard.current.gKey.wasPressedThisFrame; break;
+                    case KeyCode.N: pressed |= Keyboard.current.nKey.wasPressedThisFrame; break;
+                    case KeyCode.E: pressed |= Keyboard.current.eKey.wasPressedThisFrame; break;
+                    case KeyCode.P: pressed |= Keyboard.current.pKey.wasPressedThisFrame; break;
+                    case KeyCode.Space: pressed |= Keyboard.current.spaceKey.wasPressedThisFrame; break;
+                    case KeyCode.Return: pressed |= Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame; break;
+                    case KeyCode.Escape: pressed |= Keyboard.current.escapeKey.wasPressedThisFrame; break;
+                    case KeyCode.R: pressed |= Keyboard.current.rKey.wasPressedThisFrame; break;
+                }
+            }
+#endif
+            return pressed;
         }
     }
 }

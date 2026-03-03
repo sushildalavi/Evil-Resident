@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Sushil.Systems
 {
@@ -56,7 +59,7 @@ namespace Sushil.Systems
         void Update()
         {
             if (!showing) return;
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space))
+            if (WasStartPressed())
                 HideAndStart();
         }
 
@@ -77,6 +80,7 @@ namespace Sushil.Systems
             Time.timeScale = 1f;
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
+            GameAnalyticsTracker.BeginRun();
         }
 
         void BuildUI()
@@ -165,7 +169,7 @@ namespace Sushil.Systems
             GameObject obj = new GameObject(name);
             obj.transform.SetParent(parent, false);
             Text text = obj.AddComponent<Text>();
-            text.font = OverlayTypography.GetFont(fontSize);
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             text.fontSize = fontSize;
             text.fontStyle = style;
             text.alignment = anchor;
@@ -195,6 +199,21 @@ namespace Sushil.Systems
             var outline = textObj.AddComponent<Outline>();
             outline.effectColor = outlineColor;
             outline.effectDistance = new Vector2(2f, -2f);
+        }
+
+        bool WasStartPressed()
+        {
+            bool pressed = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            pressed |= Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space);
+#endif
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null)
+                pressed |= Keyboard.current.enterKey.wasPressedThisFrame ||
+                           Keyboard.current.numpadEnterKey.wasPressedThisFrame ||
+                           Keyboard.current.spaceKey.wasPressedThisFrame;
+#endif
+            return pressed;
         }
     }
 }

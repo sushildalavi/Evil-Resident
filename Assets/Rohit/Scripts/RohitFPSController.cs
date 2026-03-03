@@ -1,5 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 public class RohitFPSController : MonoBehaviour
 {
@@ -16,6 +19,8 @@ public class RohitFPSController : MonoBehaviour
     [Header("Mouse")]
     [Range(50f, 400f)]
     public float mouseSensitivity = 200f;
+    [Tooltip("Scale used for Input System raw mouse delta.")]
+    public float inputSystemMouseScale = 0.0015f;
     public Transform cameraTransform;
 
     [Header("Interaction")]
@@ -83,20 +88,18 @@ public class RohitFPSController : MonoBehaviour
         if (isGrounded && yVelocity < 0)
             yVelocity = -Mathf.Abs(groundStickForce);
 
-        float x = Input.GetAxisRaw("Horizontal");
-        float z = Input.GetAxisRaw("Vertical");
-
-        Vector3 input = new Vector3(x, 0f, z);
+        Vector2 moveInput = GetMoveInput();
+        Vector3 input = new Vector3(moveInput.x, 0f, moveInput.y);
         input = Vector3.ClampMagnitude(input, 1f);
 
-        float targetSpeed = Input.GetKey(KeyCode.LeftShift) ? sprintSpeed : walkSpeed;
+        float targetSpeed = IsSprintHeld() ? sprintSpeed : walkSpeed;
         Vector3 desiredHorizontal = transform.TransformDirection(input) * targetSpeed;
 
         float moveRate = input.sqrMagnitude > 0.0001f ? acceleration : deceleration;
         if (!isGrounded) moveRate *= Mathf.Clamp01(airControl);
         horizontalVelocity = Vector3.MoveTowards(horizontalVelocity, desiredHorizontal, moveRate * Time.deltaTime);
 
-        if (Input.GetKeyDown(KeyCode.Space) && isGrounded)
+        if (WasJumpPressed() && isGrounded)
             yVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
 
         yVelocity += gravity * Time.deltaTime;
@@ -107,8 +110,19 @@ public class RohitFPSController : MonoBehaviour
 
     void Look()
     {
-        float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
-        float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
+        Vector2 lookInput = GetLookInput(out bool fromInputSystem);
+        float mouseX;
+        float mouseY;
+        if (fromInputSystem)
+        {
+            mouseX = lookInput.x * mouseSensitivity * inputSystemMouseScale;
+            mouseY = lookInput.y * mouseSensitivity * inputSystemMouseScale;
+        }
+        else
+        {
+            mouseX = lookInput.x * mouseSensitivity * Time.deltaTime;
+            mouseY = lookInput.y * mouseSensitivity * Time.deltaTime;
+        }
 
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -90f, 90f);
@@ -123,7 +137,7 @@ public class RohitFPSController : MonoBehaviour
         {
             ShowPrompt("Press E to Exit Hiding Spot");
 
-            if (Input.GetKeyDown(KeyCode.E) && currentHideObject != null)
+            if (WasKeyPressed(KeyCode.E) && currentHideObject != null)
                 currentHideObject.Interact(this);
 
             return;
@@ -138,7 +152,7 @@ public class RohitFPSController : MonoBehaviour
             string prompt = nearbyKey.GetPrompt(this);
             ShowPrompt(prompt);
 
-            if (Input.GetKeyDown(nearbyKey.GetInteractKey()))
+            if (WasKeyPressed(nearbyKey.GetInteractKey()))
                 nearbyKey.Interact(this);
 
             return;
@@ -150,7 +164,7 @@ public class RohitFPSController : MonoBehaviour
             ShowPrompt(prompt);
 
             KeyCode interactKey = interactable.GetInteractKey();
-            if (Input.GetKeyDown(interactKey))
+            if (WasKeyPressed(interactKey))
                 interactable.Interact(this);
 
             return;
@@ -249,6 +263,93 @@ public class RohitFPSController : MonoBehaviour
     bool IsLayerInMask(int layer, LayerMask mask)
     {
         return (mask.value & (1 << layer)) != 0;
+    }
+
+    Vector2 GetMoveInput()
+    {
+        float x = 0f;
+        float y = 0f;
+
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            if (Keyboard.current.aKey.isPressed) x -= 1f;
+            if (Keyboard.current.dKey.isPressed) x += 1f;
+            if (Keyboard.current.sKey.isPressed) y -= 1f;
+            if (Keyboard.current.wKey.isPressed) y += 1f;
+            return new Vector2(x, y);
+        }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        x += Input.GetAxisRaw("Horizontal");
+        y += Input.GetAxisRaw("Vertical");
+#endif
+        return new Vector2(x, y);
+    }
+
+    Vector2 GetLookInput(out bool fromInputSystem)
+    {
+        fromInputSystem = false;
+        float x = 0f;
+        float y = 0f;
+
+#if ENABLE_INPUT_SYSTEM
+        if (Mouse.current != null)
+        {
+            Vector2 d = Mouse.current.delta.ReadValue();
+            fromInputSystem = true;
+            return new Vector2(d.x, d.y);
+        }
+#endif
+#if ENABLE_LEGACY_INPUT_MANAGER
+        x += Input.GetAxis("Mouse X");
+        y += Input.GetAxis("Mouse Y");
+#endif
+        return new Vector2(x, y);
+    }
+
+    bool IsSprintHeld()
+    {
+        bool held = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+        held |= Input.GetKey(KeyCode.LeftShift);
+#endif
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null) held |= Keyboard.current.leftShiftKey.isPressed;
+#endif
+        return held;
+    }
+
+    bool WasJumpPressed()
+    {
+        return WasKeyPressed(KeyCode.Space);
+    }
+
+    bool WasKeyPressed(KeyCode key)
+    {
+        bool pressed = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+        pressed |= Input.GetKeyDown(key);
+#endif
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null)
+        {
+            switch (key)
+            {
+                case KeyCode.E: pressed |= Keyboard.current.eKey.wasPressedThisFrame; break;
+                case KeyCode.F: pressed |= Keyboard.current.fKey.wasPressedThisFrame; break;
+                case KeyCode.P: pressed |= Keyboard.current.pKey.wasPressedThisFrame; break;
+                case KeyCode.G: pressed |= Keyboard.current.gKey.wasPressedThisFrame; break;
+                case KeyCode.N: pressed |= Keyboard.current.nKey.wasPressedThisFrame; break;
+                case KeyCode.R: pressed |= Keyboard.current.rKey.wasPressedThisFrame; break;
+                case KeyCode.Space: pressed |= Keyboard.current.spaceKey.wasPressedThisFrame; break;
+                case KeyCode.Return: pressed |= Keyboard.current.enterKey.wasPressedThisFrame || Keyboard.current.numpadEnterKey.wasPressedThisFrame; break;
+                case KeyCode.Escape: pressed |= Keyboard.current.escapeKey.wasPressedThisFrame; break;
+                default: break;
+            }
+        }
+#endif
+        return pressed;
     }
 
     void ShowPrompt(string text)

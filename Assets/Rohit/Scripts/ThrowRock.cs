@@ -1,8 +1,14 @@
 using UnityEngine;
 using Sushil.Demo;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 public class ThrowRock : MonoBehaviour
 {
+    [Header("Feature Toggle")]
+    public bool enableThrowFeature = false;
+
     public GameObject rockPrefab;
     public Transform throwPoint;
     public float throwForce = 15f;
@@ -16,7 +22,9 @@ public class ThrowRock : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.G))
+        if (!enableThrowFeature) return;
+
+        if (WasThrowPressed())
         {
             Throw();
         }
@@ -41,5 +49,17 @@ public class ThrowRock : MonoBehaviour
             impactNoiseType);
 
         rb.AddForce(throwPoint.forward * throwForce, ForceMode.Impulse);
+    }
+
+    bool WasThrowPressed()
+    {
+        bool pressed = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+        pressed |= Input.GetKeyDown(KeyCode.G);
+#endif
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null) pressed |= Keyboard.current.gKey.wasPressedThisFrame;
+#endif
+        return pressed;
     }
 }

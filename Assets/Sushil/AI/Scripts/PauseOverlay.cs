@@ -1,6 +1,9 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
 namespace Sushil.Systems
 {
@@ -41,7 +44,7 @@ namespace Sushil.Systems
 
         void Update()
         {
-            if (Input.GetKeyDown(KeyCode.Escape))
+            if (WasEscapePressed())
             {
                 if (StartScreenOverlay.IsShowing || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing) return;
                 TogglePause();
@@ -49,7 +52,7 @@ namespace Sushil.Systems
 
             if (!isPaused) return;
 
-            if (Input.GetKeyDown(KeyCode.R))
+            if (WasRestartPressed())
                 RestartCurrentScene();
         }
 
@@ -132,7 +135,7 @@ namespace Sushil.Systems
             bodyText = CreateText(card.transform, "Body",
                 "Esc  Resume   |   R  Restart\n\n" +
                 "WASD Move   Shift Sprint   Space Jump   Mouse Look\n" +
-                "F Pick Key   E Interact / Hide   G Throw Rock   N Make Noise",
+                "F Pick Key   E Interact / Hide   N Make Noise",
                 26, FontStyle.Normal, TextAnchor.MiddleCenter, Color.white,
                 new Vector2(0f, 0f), new Vector2(1f, 1f),
                 new Vector2(30f, 30f), new Vector2(-30f, -120f));
@@ -177,6 +180,30 @@ namespace Sushil.Systems
         static Font CreateSpookyFont(int size)
         {
             return OverlayTypography.GetFont(size);
+        }
+
+        bool WasEscapePressed()
+        {
+            bool pressed = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            pressed |= Input.GetKeyDown(KeyCode.Escape);
+#endif
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null) pressed |= Keyboard.current.escapeKey.wasPressedThisFrame;
+#endif
+            return pressed;
+        }
+
+        bool WasRestartPressed()
+        {
+            bool pressed = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            pressed |= Input.GetKeyDown(KeyCode.R);
+#endif
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null) pressed |= Keyboard.current.rKey.wasPressedThisFrame;
+#endif
+            return pressed;
         }
     }
 }

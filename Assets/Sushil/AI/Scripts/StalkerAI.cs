@@ -43,6 +43,12 @@ namespace Sushil.AI
         [Header("Navigation Collision Fixes")]
         public bool autoAddObstaclesForHideablesAndCupboards = true;
         public bool autoSyncAgentAndColliderToScale = true;
+        [Tooltip("If true, NavMeshAgent sizing uses collider's authored values and ignores root transform scale. Keep this on when visual scale is enlarged.")]
+        public bool ignoreRootScaleForNavSync = true;
+        [Tooltip("Force agent capsule dimensions each run so door traversal remains stable.")]
+        public bool enforceAgentSize = true;
+        [Range(0.35f, 0.45f)] public float enforcedAgentRadius = 0.40f;
+        [Range(2.0f, 2.3f)] public float enforcedAgentHeight = 2.20f;
         public float obstacleExtraPadding = 0.05f;
 
         [Header("Hiding Spot Checks (Alpha)")]
@@ -214,9 +220,11 @@ namespace Sushil.AI
                 ChangeState(State.Chase);
             }
 
-            // ===== NEW: One-shot kill =====
+            // One-shot kill only when chasing, close, and with clear line of sight.
+            // This prevents unfair kills through walls/closed geometry.
             if (state == State.Chase && !killTriggered &&
                 !isHiddenNow &&
+                CanSeePlayer() &&
                 Vector3.Distance(transform.position, player.position) <= killDistance)
             {
                 TryKillTarget(player.gameObject, "Stalker one-shot");
@@ -862,6 +870,12 @@ namespace Sushil.AI
             if (autoSyncAgentAndColliderToScale)
                 SyncAgentAndColliderToScale();
 
+            if (enforceAgentSize && agent != null)
+            {
+                agent.radius = Mathf.Clamp(enforcedAgentRadius, 0.35f, 0.45f);
+                agent.height = Mathf.Clamp(enforcedAgentHeight, 2.0f, 2.3f);
+            }
+
             if (!autoAddObstaclesForHideablesAndCupboards) return;
 
             // Ensure hideable containers are treated as blocking obstacles for nav.
@@ -895,8 +909,13 @@ namespace Sushil.AI
 
         void SyncAgentAndColliderToScale()
         {
-            float xzScale = Mathf.Max(0.01f, Mathf.Max(transform.lossyScale.x, transform.lossyScale.z));
-            float yScale = Mathf.Max(0.01f, transform.lossyScale.y);
+            float xzScale = 1f;
+            float yScale = 1f;
+            if (!ignoreRootScaleForNavSync)
+            {
+                xzScale = Mathf.Max(0.01f, Mathf.Max(transform.lossyScale.x, transform.lossyScale.z));
+                yScale = Mathf.Max(0.01f, transform.lossyScale.y);
+            }
 
             var capsule = GetComponent<CapsuleCollider>();
             if (capsule != null)
