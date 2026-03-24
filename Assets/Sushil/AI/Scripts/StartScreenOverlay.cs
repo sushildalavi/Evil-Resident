@@ -15,6 +15,9 @@ namespace Sushil.Systems
         Canvas canvas;
         GameObject root;
         bool showing;
+        Text titleText;
+        Text taglineText;
+        Text startHintText;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Bootstrap()
@@ -53,6 +56,7 @@ namespace Sushil.Systems
 
         void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
+            ApplySceneText();
             Show();
         }
 
@@ -114,16 +118,37 @@ namespace Sushil.Systems
                 "IT SAW YOU", 88, FontStyle.Bold, TextAnchor.MiddleCenter,
                 new Color(1f, 0.2f, 0.2f, 1f), new Vector2(0.04f, 0.72f), new Vector2(0.96f, 0.92f));
             AddTextEffects(title.gameObject, new Color(0.18f, 0f, 0f, 1f));
+            titleText = title;
 
-            CreateText(content, "Tagline",
+            taglineText = CreateText(content, "Tagline",
                 "Collect 3 keys. Escape. Don't be seen.",
                 38, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.92f, 0.92f, 0.95f, 1f),
                 new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.64f));
 
-            CreateText(content, "StartHint",
+            startHintText = CreateText(content, "StartHint",
                 "Press ENTER or SPACE to begin",
                 48, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f, 1f),
                 new Vector2(0.10f, 0.08f), new Vector2(0.90f, 0.18f));
+
+            ApplySceneText();
+        }
+
+        void ApplySceneText()
+        {
+            if (titleText == null || taglineText == null || startHintText == null)
+                return;
+
+            if (SceneManager.GetActiveScene().path == "Assets/Sahil/Test/NewLevel.unity")
+            {
+                titleText.text = "EVIL RESIDENT";
+                taglineText.text = "Escape from the main door";
+                startHintText.text = "Press ENTER or SPACE to begin";
+                return;
+            }
+
+            titleText.text = "IT SAW YOU";
+            taglineText.text = "Collect 3 keys. Escape. Don't be seen.";
+            startHintText.text = "Press ENTER or SPACE to begin";
         }
 
         void CreateBackground(Transform parent)
