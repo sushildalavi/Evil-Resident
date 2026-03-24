@@ -135,7 +135,7 @@ namespace Sushil.Systems
             bodyText = CreateText(card.transform, "Body",
                 "Esc  Resume   |   R  Restart\n\n" +
                 "WASD Move   Shift Sprint   Space Jump   Mouse Look\n" +
-                "F Pick Key   E Interact / Hide   N Make Noise",
+                "E Pick Key   F Hide   E Interact   N Make Noise",
                 26, FontStyle.Normal, TextAnchor.MiddleCenter, Color.white,
                 new Vector2(0f, 0f), new Vector2(1f, 1f),
                 new Vector2(30f, 30f), new Vector2(-30f, -120f));

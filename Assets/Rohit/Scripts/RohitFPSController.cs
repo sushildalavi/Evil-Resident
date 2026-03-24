@@ -253,9 +253,13 @@ public class RohitFPSController : MonoBehaviour
     {
         if (isHidden)
         {
-            ShowPrompt("Press E to Exit Hiding Spot");
+            string hidePrompt = currentHideObject != null
+                ? currentHideObject.GetPrompt(this)
+                : "Press F to Exit Hiding Spot";
+            ShowPrompt(hidePrompt);
 
-            if (WasKeyPressed(KeyCode.E) && currentHideObject != null)
+            KeyCode hideKey = currentHideObject != null ? currentHideObject.GetInteractKey() : KeyCode.F;
+            if (WasKeyPressed(hideKey) && currentHideObject != null)
                 currentHideObject.Interact(this);
 
             return;
@@ -572,43 +576,47 @@ public class RohitFPSController : MonoBehaviour
 
     public Vector3 ResolveSafeExitPosition(HideableObject hideObject, Vector3 requestedExitPosition)
     {
+        if (hasPreHidePosition)
+        {
+            float upNudge = controller != null ? Mathf.Max(0.1f, controller.skinWidth + 0.05f) : 0.15f;
+            Vector3 rawPreHide = preHidePosition;
+            if (!WouldControllerOverlapAt(rawPreHide))
+                return rawPreHide;
+
+            Vector3 liftedRawPreHide = rawPreHide + Vector3.up * upNudge;
+            if (!WouldControllerOverlapAt(liftedRawPreHide))
+                return liftedRawPreHide;
+
+            Vector3 snappedPreHide = SnapToNavMesh(rawPreHide);
+            if (!WouldControllerOverlapAt(snappedPreHide))
+                return snappedPreHide;
+
+            Vector3 liftedSnappedPreHide = snappedPreHide + Vector3.up * upNudge;
+            if (!WouldControllerOverlapAt(liftedSnappedPreHide))
+                return liftedSnappedPreHide;
+
+            // Final fallback: prefer previous known player location over risky side offsets.
+            return rawPreHide;
+        }
+
         Vector3[] candidates;
 
         if (hideObject != null)
         {
             Transform t = hideObject.transform;
-            if (hasPreHidePosition)
+            candidates = new[]
             {
-                candidates = new[]
-                {
-                    preHidePosition,
-                    requestedExitPosition,
-                    t.position + t.forward * 1.2f,
-                    t.position - t.forward * 1.2f,
-                    t.position + t.right * 1.2f,
-                    t.position - t.right * 1.2f,
-                    t.position + Vector3.up * 0.2f
-                };
-            }
-            else
-            {
-                candidates = new[]
-                {
-                    requestedExitPosition,
-                    t.position + t.forward * 1.2f,
-                    t.position - t.forward * 1.2f,
-                    t.position + t.right * 1.2f,
-                    t.position - t.right * 1.2f,
-                    t.position + Vector3.up * 0.2f
-                };
-            }
+                requestedExitPosition,
+                t.position + t.forward * 1.2f,
+                t.position - t.forward * 1.2f,
+                t.position + t.right * 1.2f,
+                t.position - t.right * 1.2f,
+                t.position + Vector3.up * 0.2f
+            };
         }
         else
         {
-            if (hasPreHidePosition)
-                candidates = new[] { preHidePosition, requestedExitPosition };
-            else
-                candidates = new[] { requestedExitPosition };
+            candidates = new[] { requestedExitPosition };
         }
 
         for (int i = 0; i < candidates.Length; i++)

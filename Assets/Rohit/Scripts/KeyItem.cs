@@ -44,14 +44,14 @@ public class KeyItem : MonoBehaviour, IInteractable
             AnimateAura();
     }
 
-    public KeyCode GetInteractKey() => KeyCode.F;
+    public KeyCode GetInteractKey() => KeyCode.E;
 
     public string GetPrompt(RohitFPSController player)
     {
         PlayerInventory inventory = player.GetComponent<PlayerInventory>();
         if (inventory != null && inventory.HasKey(keyType))
             return $"{keyType} Key (already collected)";
-        return $"Press F to pick up {keyType} Key";
+        return $"Press E to pick up {keyType} Key";
     }
 
     public void Interact(RohitFPSController player)

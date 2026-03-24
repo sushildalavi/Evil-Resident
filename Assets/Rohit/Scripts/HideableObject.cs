@@ -9,14 +9,14 @@ public class HideableObject : MonoBehaviour, IInteractable
     [Header("Camera Override (Optional)")]
     public Transform hiddenCameraPoint;
 
-    public KeyCode GetInteractKey() => KeyCode.E;
+    public KeyCode GetInteractKey() => KeyCode.F;
 
     public string GetPrompt(RohitFPSController player)
     {
         if (player.isHidden && player.currentHideObject == this)
-            return "Press E to Exit Hiding Spot";
+            return "Press F to Exit Hiding Spot";
         if (!player.isHidden)
-            return "Press E to Hide";
+            return "Press F to Hide";
         return "";
     }
 
