@@ -336,6 +336,20 @@ namespace Sushil.AI
                 roamWholeHouseWhenPlayerLost = true;
                 wholeHouseSearchDuration = Mathf.Max(wholeHouseSearchDuration, 18f);
                 lostSightLastKnownBias = Mathf.Max(lostSightLastKnownBias, 0.55f);
+                fakeLeaveChance = 0f;
+                pauseOutsideChance = 0f;
+                pauseMin = 0f;
+                pauseMax = 0f;
+                checkHidingChance = 0f;
+                inspectPauseMin = 0f;
+                inspectPauseMax = 0f;
+                doorwayWarpAssist = true;
+                doorwayStuckSeconds = Mathf.Min(doorwayStuckSeconds, 0.18f);
+                doorwayAssistRange = Mathf.Max(doorwayAssistRange, 24f);
+                doorwayAssistSampleRadius = Mathf.Max(doorwayAssistSampleRadius, 1.75f);
+                requireClearPathForWarp = false;
+                destinationRetrySamples = Mathf.Max(destinationRetrySamples, 24);
+                destinationRetryRadius = Mathf.Max(destinationRetryRadius, 5.5f);
                 killDistance = Mathf.Min(killDistance, 1.2f);
             }
             // Disable restrictive custom geometry gates that can deadlock at narrow door edges.
@@ -741,14 +755,25 @@ namespace Sushil.AI
                 }
 
                 agent.isStopped = false;
-                if (!TrySetDestination(targetPos)) { yield return null; continue; }
+                if (!TrySetDestination(targetPos))
+                {
+                    if (UseContinuousMovementProfile() &&
+                        TryGetRandomRoamPoint(transform.position, Mathf.Max(4f, localPatrolRadius), out var recoveryPatrolPoint))
+                    {
+                        TrySetDestination(recoveryPatrolPoint);
+                    }
+
+                    yield return null;
+                    continue;
+                }
 
                 while (state == State.Patrol && IsAgentReady() && agent.pathPending) yield return null;
                 while (state == State.Patrol && IsAgentReady() &&
                        !HasReachedDestination(0.25f))
                     yield return null;
 
-                yield return new WaitForSeconds(Random.Range(0.6f, 1.6f));
+                float patrolWait = UseContinuousMovementProfile() ? 0.05f : Random.Range(0.6f, 1.6f);
+                yield return new WaitForSeconds(patrolWait);
             }
         }
 
@@ -796,7 +821,8 @@ namespace Sushil.AI
             bool searchingWholeHouse = wholeHouseSearchMode && roamWholeHouseWhenPlayerLost;
             if (searchingWholeHouse)
                 activeSearchDuration = Mathf.Max(activeSearchDuration, wholeHouseSearchDuration);
-            bool shouldFakeLeave = forceFakeLeaveOnce || Random.value < fakeLeaveChance;
+            bool shouldFakeLeave = !UseContinuousMovementProfile() &&
+                                  (forceFakeLeaveOnce || Random.value < fakeLeaveChance);
             if (hasSuspectedHideSpot) shouldFakeLeave = false;
             forceFakeLeaveOnce = false;
 
@@ -842,17 +868,19 @@ namespace Sushil.AI
                         agent.isStopped = false;
                         TrySetDestination(away);
                     }
-                    yield return new WaitForSeconds(1.0f);
+                    float awayDelay = UseContinuousMovementProfile() ? 0.05f : 1.0f;
+                    yield return new WaitForSeconds(awayDelay);
                 }
 
                 TrySetDestination(center);
-                yield return new WaitForSeconds(0.7f);
+                float returnDelay = UseContinuousMovementProfile() ? 0.05f : 0.7f;
+                yield return new WaitForSeconds(returnDelay);
             }
 
             while (state == State.Search && elapsed < activeSearchDuration)
             {
                 // Stand still and "listen"
-                if (Random.value < pauseOutsideChance)
+                if (!UseContinuousMovementProfile() && Random.value < pauseOutsideChance)
                 {
                     if (IsAgentReady()) agent.isStopped = true;
                     yield return new WaitForSeconds(Random.Range(pauseMin, pauseMax));
@@ -862,7 +890,7 @@ namespace Sushil.AI
                 TryHandleHiddenTakedown();
 
                 // Sometimes go check a hiding inspect point
-                if (hidingInspectPoints.Count > 0 && Random.value < checkHidingChance)
+                if (!UseContinuousMovementProfile() && hidingInspectPoints.Count > 0 && Random.value < checkHidingChance)
                 {
                     if (TryGetRandomInspectPoint(out var inspectPoint) && IsAgentReady())
                     {
@@ -911,7 +939,8 @@ namespace Sushil.AI
                         TrySetDestination(roamPoint);
                 }
 
-                yield return new WaitForSeconds(Random.Range(0.6f, 1.2f));
+                float searchWait = UseContinuousMovementProfile() ? 0.05f : Random.Range(0.6f, 1.2f);
+                yield return new WaitForSeconds(searchWait);
                 elapsed += 1f;
             }
 
@@ -971,7 +1000,7 @@ namespace Sushil.AI
                     Vector3 chaseTarget = canSee
                         ? player.position
                         : lastSeenPlayerPos;
-                    bool moved = TrySetDestination(chaseTarget);
+                    bool moved = TrySetChaseDestination(chaseTarget);
                     if (!moved)
                     {
                         // Fallback for doorway edge-cases: push to nearest valid nav point near target.
@@ -1917,6 +1946,39 @@ namespace Sushil.AI
             return agent.SetDestination(resolved);
         }
 
+        bool TrySetChaseDestination(Vector3 destination)
+        {
+            if (TrySetDestination(destination))
+                return true;
+
+            float[] radii = UseContinuousMovementProfile()
+                ? new[] { 1.25f, 2.5f, 4f, 6f }
+                : new[] { 1.5f, 3f, 4.5f };
+
+            for (int r = 0; r < radii.Length; r++)
+            {
+                float radius = radii[r];
+                for (int i = 0; i < 10; i++)
+                {
+                    Vector2 circle = Random.insideUnitCircle.normalized * radius;
+                    if (circle.sqrMagnitude < 0.0001f)
+                        continue;
+
+                    Vector3 candidate = destination + new Vector3(circle.x, 0f, circle.y);
+                    if (TrySetDestination(candidate))
+                        return true;
+                }
+            }
+
+            if (UseContinuousMovementProfile() &&
+                TryGetRandomRoamPoint(destination, Mathf.Max(6f, searchRadius * outwardSearchMultiplier), out var roamFallback))
+            {
+                return TrySetDestination(roamFallback);
+            }
+
+            return false;
+        }
+
         bool ResolveReachableDestination(Vector3 desired, out Vector3 resolved)
         {
             resolved = desired;
@@ -2360,6 +2422,11 @@ namespace Sushil.AI
         bool IsSahilTestNewLevel()
         {
             return SceneManager.GetActiveScene().path == "Assets/Sahil/Test/NewLevel.unity";
+        }
+
+        bool UseContinuousMovementProfile()
+        {
+            return IsSahilTestNewLevel();
         }
 
         bool IsPlayerHidden()
