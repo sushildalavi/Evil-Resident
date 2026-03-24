@@ -59,6 +59,7 @@ public class RohitFPSController : MonoBehaviour
 
     [HideInInspector] public bool isHidden = false;
     [HideInInspector] public HideableObject currentHideObject;
+    [HideInInspector] public bool isInPuzzle = false;
 
     void OnDisable()
     {
@@ -105,11 +106,15 @@ public class RohitFPSController : MonoBehaviour
 
     void Update()
     {
-        if (!isHidden)
+        if (!isHidden && !isInPuzzle)
             Move();
 
-        Look();
-        HandleInteraction();
+        if (!isInPuzzle)
+            Look();
+
+        if (!isInPuzzle)
+            HandleInteraction();
+
         UpdateKeyHud();
     }
 
