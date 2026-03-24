@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.SceneManagement;
 using Sushil.Systems;
 
 namespace Sushil.AI
@@ -322,6 +323,21 @@ namespace Sushil.AI
             lostSightToSearchDelay = Mathf.Max(lostSightToSearchDelay, 0.75f);
             // Keep the takedown range tight even if the scene has a larger serialized value.
             killDistance = Mathf.Min(killDistance, 1.45f);
+            if (IsSahilTestNewLevel())
+            {
+                sightRange = Mathf.Max(sightRange, 34f);
+                visionAcquireSeconds = 0f;
+                visionLoseSeconds = Mathf.Max(visionLoseSeconds, 0.32f);
+                allowProximityChaseWithoutNoise = true;
+                proximityChaseDistance = Mathf.Max(proximityChaseDistance, 4.0f);
+                chaseMemorySeconds = Mathf.Max(chaseMemorySeconds, 8f);
+                lostSightPursuitSeconds = Mathf.Max(lostSightPursuitSeconds, 10f);
+                lostSightToSearchDelay = Mathf.Max(lostSightToSearchDelay, 1.0f);
+                roamWholeHouseWhenPlayerLost = true;
+                wholeHouseSearchDuration = Mathf.Max(wholeHouseSearchDuration, 18f);
+                lostSightLastKnownBias = Mathf.Max(lostSightLastKnownBias, 0.55f);
+                killDistance = Mathf.Min(killDistance, 1.2f);
+            }
             // Disable restrictive custom geometry gates that can deadlock at narrow door edges.
             validatePathAgainstGeometry = false;
             rejectDestinationsInsideBlockingGeometry = false;
@@ -2278,11 +2294,18 @@ namespace Sushil.AI
             }
 
             Vector3 eye = transform.position + Vector3.up * 1.6f;
+            Vector3 lateral = player.right;
+            lateral.y = 0f;
+            if (lateral.sqrMagnitude < 0.0001f)
+                lateral = Vector3.right;
+            lateral = lateral.normalized * 0.22f;
             Vector3[] targetPoints =
             {
                 player.position + Vector3.up * 1.6f,
                 player.position + Vector3.up * 1.2f,
-                player.position + Vector3.up * 0.8f
+                player.position + Vector3.up * 0.8f,
+                player.position + Vector3.up * 1.2f + lateral,
+                player.position + Vector3.up * 1.2f - lateral
             };
 
             for (int i = 0; i < targetPoints.Length; i++)
@@ -2332,6 +2355,11 @@ namespace Sushil.AI
 
             float horizontalDistance = Vector3.Distance(stalkerFlat, playerFlat);
             return horizontalDistance <= Mathf.Max(proximityChaseDistance, killDistance + 1.25f);
+        }
+
+        bool IsSahilTestNewLevel()
+        {
+            return SceneManager.GetActiveScene().path == "Assets/Sahil/Test/NewLevel.unity";
         }
 
         bool IsPlayerHidden()

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Sushil.Systems;
 
 namespace Sushil.AI
@@ -108,7 +109,13 @@ namespace Sushil.AI
                 Mathf.Abs(transform.lossyScale.z));
 
             float colliderWorldRadius = killTrigger.radius * Mathf.Max(0.01f, maxScale);
-            return Mathf.Min(colliderWorldRadius, MaxRuntimeWorldKillRadius);
+            float maxKillRadius = IsSahilTestNewLevel() ? 0.95f : MaxRuntimeWorldKillRadius;
+            return Mathf.Min(colliderWorldRadius, maxKillRadius);
+        }
+
+        bool IsSahilTestNewLevel()
+        {
+            return SceneManager.GetActiveScene().path == "Assets/Sahil/Test/NewLevel.unity";
         }
     }
 }
