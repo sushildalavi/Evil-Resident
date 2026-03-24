@@ -160,6 +160,13 @@ namespace Sushil.AI
         public float hideTriggeredSearchDuration = 7.5f;
         public float lastSeenSearchDurationBoost = 2f;
 
+        [Header("Lost Target Search")]
+        [Tooltip("When the stalker loses sight of the player, search across the whole house instead of only hovering near the last seen spot.")]
+        public bool roamWholeHouseWhenPlayerLost = true;
+        public float wholeHouseSearchDuration = 14f;
+        public float lostSightToSearchDelay = 0.35f;
+        [Range(0f, 1f)] public float lostSightLastKnownBias = 0.35f;
+
         [Header("Creep Moments (optional but nice)")]
         [Range(0f, 1f)] public float pauseOutsideChance = 0.25f;
         public float pauseMin = 0.8f;
@@ -223,7 +230,6 @@ namespace Sushil.AI
         private bool wasPlayerHiddenLastFrame;
         private float chaseUntilTime = -1f;
         private float ignoreSightUntilTime = -1f;
-        private float farChaseTimer = 0f;
         private static readonly HashSet<int> killedRohitInstanceIds = new();
         private Vector3 lastSeenPlayerPos;
         private float lastSeenPlayerTime = -999f;
@@ -261,6 +267,8 @@ namespace Sushil.AI
         private Vector3 investigateTargetPos;
         private Vector3 playerSpawnPosition;
         private bool hasPlayerSpawnPosition;
+        private bool wholeHouseSearchMode;
+        private Vector3 wholeHouseSearchLastKnownPos;
 
         void Reset() { agent = GetComponent<NavMeshAgent>(); }
 
@@ -289,24 +297,31 @@ namespace Sushil.AI
             doorwayAssistRange = Mathf.Max(doorwayAssistRange, 20f);
             doorwayAssistSampleRadius = Mathf.Max(doorwayAssistSampleRadius, 1.25f);
             requireClearPathForWarp = false;
-            // Aggressive chase defaults (requested).
-            omnidirectionalVision = true;
-            sightRange = Mathf.Max(sightRange, 32f);
-            requireNoiseToChase = false;
-            maintainChaseUntilHidden = true;
-            limitVisualChaseTime = false;
-            chaseMemorySeconds = Mathf.Max(chaseMemorySeconds, 6f);
-            lostSightPursuitSeconds = Mathf.Max(lostSightPursuitSeconds, 8f);
-            keepChaseWhenRecentlySeen = true;
-            loseChaseWhenFar = false;
-            // Slight speed nerf so chase is still threatening but fair.
+            // Keep a readable pacing difference between patrol and chase without overriding
+            // the sight/search behavior configured for this scene.
             chaseMoveSpeed = Mathf.Min(chaseMoveSpeed, 5.2f);
             patrolMoveSpeed = Mathf.Min(patrolMoveSpeed, 3.0f);
             chaseAcceleration = Mathf.Min(chaseAcceleration, 11f);
-            // Keep initial spawn noticeably far from player start.
-            minSpawnDistanceFromPlayer = Mathf.Max(minSpawnDistanceFromPlayer, 20f);
-            minSpawnDistanceFromPlayerSpawn = Mathf.Max(minSpawnDistanceFromPlayerSpawn, 26f);
-            spawnSampleAttempts = Mathf.Max(spawnSampleAttempts, 96);
+            // Tighten chase behavior without touching the slower movement envelope.
+            omnidirectionalVision = true;
+            alwaysChaseWhenVisible = true;
+            sightAlwaysStartsChase = true;
+            requireNoiseToChase = false;
+            allowProximityChaseWithoutNoise = true;
+            maintainChaseUntilHidden = true;
+            limitVisualChaseTime = false;
+            keepChaseWhenRecentlySeen = true;
+            relentlessVisualChase = true;
+            loseChaseWhenFar = false;
+            sightRange = Mathf.Max(sightRange, 28f);
+            proximityChaseDistance = Mathf.Max(proximityChaseDistance, 3.4f);
+            visionAcquireSeconds = Mathf.Min(visionAcquireSeconds, 0.02f);
+            visionLoseSeconds = Mathf.Min(visionLoseSeconds, 0.20f);
+            chaseMemorySeconds = Mathf.Max(chaseMemorySeconds, 6f);
+            lostSightPursuitSeconds = Mathf.Max(lostSightPursuitSeconds, 8f);
+            lostSightToSearchDelay = Mathf.Max(lostSightToSearchDelay, 0.75f);
+            // Keep the takedown range tight even if the scene has a larger serialized value.
+            killDistance = Mathf.Min(killDistance, 1.45f);
             // Disable restrictive custom geometry gates that can deadlock at narrow door edges.
             validatePathAgainstGeometry = false;
             rejectDestinationsInsideBlockingGeometry = false;
@@ -382,9 +397,7 @@ namespace Sushil.AI
             if (state == State.Chase && isHiddenNow)
             {
                 MarkSuspectedHideSpot();
-                lastNoisePos = player.position;
-                lastNoiseIntensity = Mathf.Max(lastNoiseIntensity, 6f);
-                hasNoise = true;
+                BeginWholeHouseSearch(player.position, hideTriggeredSearchDuration + lastSeenSearchDurationBoost);
                 if (!killPlayerIfFoundHidden && forceFakeLeaveAfterPlayerHides)
                 {
                     forceFakeLeaveOnce = true;
@@ -400,7 +413,16 @@ namespace Sushil.AI
                 return;
             }
 
+            bool rawCanSee = CanSeePlayer();
             bool canSee = UpdateStableVision();
+            if (!canSee && rawCanSee && sightAlwaysStartsChase && Time.time >= ignoreSightUntilTime)
+            {
+                stablePlayerVisible = true;
+                visibleAccum = Mathf.Max(visibleAccum, Mathf.Max(Time.deltaTime, visionAcquireSeconds));
+                hiddenAccum = 0f;
+                canSee = true;
+            }
+            bool proximityChaseAllowed = ShouldForceProximityChase(isHiddenNow);
             if (canSee)
             {
                 lastSeenPlayerPos = player.position;
@@ -408,27 +430,31 @@ namespace Sushil.AI
                 if (state == State.Chase && relentlessVisualChase)
                     StartVisualChaseWindow();
             }
-            bool chaseUnlocked = !requireNoiseToChase ||
-                                 (Time.time - lastHeardNoiseTime <= noiseChaseWindow) ||
-                                 (allowProximityChaseWithoutNoise &&
-                                  Vector3.Distance(transform.position, player.position) <= proximityChaseDistance);
 
-            bool justExitedHideInSight = wasPlayerHiddenLastFrame && !isHiddenNow && canSee;
-            bool visualChaseAllowed = canSee &&
-                                     Time.time >= ignoreSightUntilTime &&
-                                     (alwaysChaseWhenVisible || sightAlwaysStartsChase || chaseUnlocked);
+            bool justExitedHideInSight = wasPlayerHiddenLastFrame && !isHiddenNow && (canSee || rawCanSee || proximityChaseAllowed);
+            bool visualChaseAllowed = !isHiddenNow && (canSee || rawCanSee || proximityChaseAllowed) && Time.time >= ignoreSightUntilTime;
             if (state != State.Chase && (justExitedHideInSight || visualChaseAllowed))
             {
+                lastSeenPlayerPos = player.position;
+                lastSeenPlayerTime = Time.time;
                 StartVisualChaseWindow();
                 ChangeState(State.Chase);
             }
 
-            // One-shot kill only when chasing, close, and with clear line of sight.
-            // This prevents unfair kills through walls/closed geometry.
-            if (state == State.Chase && !killTriggered &&
+            // Kill should be reliable at close range once the stalker has reached the player.
+            Vector3 stalkerFlat = transform.position;
+            stalkerFlat.y = 0f;
+            Vector3 playerFlat = player.position;
+            playerFlat.y = 0f;
+            float horizontalDistanceToPlayer = Vector3.Distance(stalkerFlat, playerFlat);
+
+            bool lethalContact = horizontalDistanceToPlayer <= Mathf.Max(1.1f, killDistance * 0.8f);
+            bool chaseOrSightThreat = state == State.Chase || rawCanSee || stablePlayerVisible;
+
+            if (!killTriggered &&
                 !isHiddenNow &&
-                stablePlayerVisible &&
-                Vector3.Distance(transform.position, player.position) <= killDistance)
+                horizontalDistanceToPlayer <= killDistance &&
+                (chaseOrSightThreat || lethalContact))
             {
                 TryKillTarget(player.gameObject, "Stalker one-shot");
             }
@@ -460,13 +486,16 @@ namespace Sushil.AI
                 }
             }
             if (newState != State.Chase) chaseUntilTime = -1f;
-            if (newState != State.Chase) farChaseTimer = 0f;
             if (newState != State.Chase)
             {
                 chaseStuckTimer = 0f;
                 chaseLostSightTimer = 0f;
             }
-            if (newState != State.Search) hiddenTakedownTimer = 0f;
+            if (newState != State.Search)
+            {
+                hiddenTakedownTimer = 0f;
+                wholeHouseSearchMode = false;
+            }
 
             routine = newState switch
             {
@@ -525,9 +554,25 @@ namespace Sushil.AI
             }
 
             // Non-throw noises can force chase even without LOS/range (for manual noise key).
-            lastSeenPlayerPos = targetPos;
-            lastSeenPlayerTime = Time.time;
-            ChangeState(State.Chase);
+            investigateTargetPos = targetPos;
+            hasInvestigateTarget = true;
+
+            if (state != State.Chase)
+                ChangeState(State.Investigate);
+        }
+
+        void BeginWholeHouseSearch(Vector3 lastKnownPos, float minimumDuration = -1f)
+        {
+            wholeHouseSearchMode = roamWholeHouseWhenPlayerLost;
+            wholeHouseSearchLastKnownPos = lastKnownPos;
+            investigateTargetPos = lastKnownPos;
+            hasInvestigateTarget = true;
+            lastNoisePos = lastKnownPos;
+            lastNoiseIntensity = Mathf.Max(lastNoiseIntensity, minNoiseIntensity + 1f);
+            hasNoise = true;
+
+            float requestedDuration = minimumDuration > 0f ? minimumDuration : wholeHouseSearchDuration;
+            forcedNextSearchDuration = Mathf.Max(forcedNextSearchDuration, requestedDuration);
         }
 
         void ResolvePlayerReference()
@@ -592,7 +637,6 @@ namespace Sushil.AI
             if (rohit == null) return;
             int rohitId = rohit.GetInstanceID();
             if (killedRohitInstanceIds.Contains(rohitId)) return;
-            if (!rohit.enabled) return;
 
             Debug.Log($"[StalkerAI] {reason} (Rohit fallback)");
             killedRohitInstanceIds.Add(rohitId);
@@ -603,8 +647,27 @@ namespace Sushil.AI
             var throwRock = rohit.GetComponent<ThrowRock>();
             if (throwRock != null) throwRock.enabled = false;
 
+            var interactionUi = rohit.GetComponent<InteractionUI>();
+            if (interactionUi != null) interactionUi.enabled = false;
+
+            var torch = rohit.GetComponent<PlayerTorch>();
+            if (torch != null) torch.enabled = false;
+
+            var noiseTester = rohit.GetComponent<Sushil.Demo.NoiseTester>();
+            if (noiseTester != null) noiseTester.enabled = false;
+
+            var noiseBridge = rohit.GetComponent<StalkerRohitNoiseBridge>();
+            if (noiseBridge != null) noiseBridge.enabled = false;
+
             var cc = rohit.GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
+
+            var rb = rohit.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+            }
 
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -686,8 +749,10 @@ namespace Sushil.AI
             while (state == State.Investigate && IsAgentReady() &&
                    !HasReachedDestination(0.35f))
             {
-                if (stablePlayerVisible)
+                if (CanSeePlayer() || ShouldForceProximityChase(IsPlayerHidden()) || stablePlayerVisible)
                 {
+                    lastSeenPlayerPos = player.position;
+                    lastSeenPlayerTime = Time.time;
                     ChangeState(State.Chase);
                     yield break;
                 }
@@ -695,8 +760,10 @@ namespace Sushil.AI
             }
 
             if (state != State.Investigate) yield break;
-            if (stablePlayerVisible)
+            if (CanSeePlayer() || ShouldForceProximityChase(IsPlayerHidden()) || stablePlayerVisible)
             {
+                lastSeenPlayerPos = player.position;
+                lastSeenPlayerTime = Time.time;
                 ChangeState(State.Chase);
                 yield break;
             }
@@ -710,9 +777,27 @@ namespace Sushil.AI
             Vector3 center = hasInvestigateTarget ? investigateTargetPos : lastNoisePos;
             float activeSearchDuration = forcedNextSearchDuration > 0f ? forcedNextSearchDuration : searchDuration;
             forcedNextSearchDuration = -1f;
+            bool searchingWholeHouse = wholeHouseSearchMode && roamWholeHouseWhenPlayerLost;
+            if (searchingWholeHouse)
+                activeSearchDuration = Mathf.Max(activeSearchDuration, wholeHouseSearchDuration);
             bool shouldFakeLeave = forceFakeLeaveOnce || Random.value < fakeLeaveChance;
             if (hasSuspectedHideSpot) shouldFakeLeave = false;
             forceFakeLeaveOnce = false;
+
+            if (searchingWholeHouse && wholeHouseSearchLastKnownPos != Vector3.zero && IsAgentReady())
+            {
+                agent.isStopped = false;
+                if (TrySetDestination(wholeHouseSearchLastKnownPos))
+                {
+                    float approachTime = 0f;
+                    while (state == State.Search && approachTime < 2.25f && IsAgentReady() && !HasReachedDestination(0.45f))
+                    {
+                        approachTime += Time.deltaTime;
+                        TryHandleHiddenTakedown();
+                        yield return null;
+                    }
+                }
+            }
 
             if (hasSuspectedHideSpot && IsAgentReady())
             {
@@ -789,10 +874,26 @@ namespace Sushil.AI
                 }
 
                 // Normal wandering around the noise center
-                float localPhase = activeSearchDuration * Mathf.Clamp01(roomSuspicionPortion);
-                float radius = elapsed < localPhase ? searchRadius : (searchRadius * outwardSearchMultiplier);
-                if (TryGetRandomRoamPoint(center, radius, out var roamPoint))
-                    TrySetDestination(roamPoint);
+                if (searchingWholeHouse)
+                {
+                    Vector3 searchCenter = (Random.value < lostSightLastKnownBias)
+                        ? wholeHouseSearchLastKnownPos
+                        : roamCenter;
+                    float radius = Mathf.Max(freeRoamRadius, searchRadius * outwardSearchMultiplier);
+
+                    if (TryGetRandomRoamPoint(searchCenter, radius, out var roamPoint) ||
+                        TryGetRandomRoamPoint(roamCenter, Mathf.Max(radius, freeRoamRadius), out roamPoint))
+                    {
+                        TrySetDestination(roamPoint);
+                    }
+                }
+                else
+                {
+                    float localPhase = activeSearchDuration * Mathf.Clamp01(roomSuspicionPortion);
+                    float radius = elapsed < localPhase ? searchRadius : (searchRadius * outwardSearchMultiplier);
+                    if (TryGetRandomRoamPoint(center, radius, out var roamPoint))
+                        TrySetDestination(roamPoint);
+                }
 
                 yield return new WaitForSeconds(Random.Range(0.6f, 1.2f));
                 elapsed += 1f;
@@ -801,6 +902,7 @@ namespace Sushil.AI
             hasNoise = false;
             hasInvestigateTarget = false;
             hasSuspectedHideSpot = false;
+            wholeHouseSearchMode = false;
             ChangeState(State.Patrol);
         }
 
@@ -825,19 +927,22 @@ namespace Sushil.AI
                     yield break;
                 }
 
-                bool canSee = stablePlayerVisible;
-                bool hasFreshNoise = Time.time - lastHeardNoiseTime <= noiseChaseWindow;
+                bool rawCanSee = CanSeePlayer();
+                bool canSee = stablePlayerVisible || rawCanSee;
+                if (rawCanSee)
+                {
+                    stablePlayerVisible = true;
+                    visibleAccum = Mathf.Max(visibleAccum, Mathf.Max(Time.deltaTime, visionAcquireSeconds));
+                    hiddenAccum = 0f;
+                }
 
                 if (canSee)
                 {
                     lastSeenPlayerPos = player.position;
                     lastSeenPlayerTime = Time.time;
                     chaseLostSightTimer = 0f;
-                }
-                else if (hasFreshNoise)
-                {
-                    lastSeenPlayerPos = GetNoiseTrackedPosition(lastNoisePos, lastNoiseIntensity);
-                    lastSeenPlayerTime = Time.time;
+                    if (relentlessVisualChase)
+                        StartVisualChaseWindow();
                 }
                 else
                 {
@@ -857,70 +962,20 @@ namespace Sushil.AI
                         if (NavMesh.SamplePosition(chaseTarget, out var fallbackHit, 2.5f, NavMesh.AllAreas))
                             moved = agent.SetDestination(fallbackHit.position);
                     }
-                    bool trackingRecentSeen = (Time.time - lastSeenPlayerTime) <= Mathf.Max(0.8f, chaseMemorySeconds * 1.5f);
-                    UpdateDoorwayAssist(canSee || trackingRecentSeen, moved, chaseTarget);
+                    UpdateDoorwayAssist(true, moved, chaseTarget);
                 }
 
-                // If LOS is lost, keep running to last known point for memory duration first.
-                float memorySeconds = Mathf.Max(
-                    Mathf.Clamp(chaseMemorySeconds, 1.5f, 8f),
-                    Mathf.Clamp(lostSightPursuitSeconds, 1.5f, 12f));
-                if (!canSee && !hasFreshNoise && chaseLostSightTimer > memorySeconds)
+                float lastSeenMemorySeconds = Mathf.Max(
+                    Mathf.Max(0.25f, chaseMemorySeconds),
+                    Mathf.Max(0.25f, lostSightPursuitSeconds));
+
+                if (!canSee &&
+                    chaseLostSightTimer >= Mathf.Max(0.05f, lostSightToSearchDelay) &&
+                    chaseLostSightTimer >= lastSeenMemorySeconds)
                 {
-                    investigateTargetPos = lastSeenPlayerPos;
-                    hasInvestigateTarget = true;
-                    ChangeState(State.Investigate);
+                    BeginWholeHouseSearch(lastSeenPlayerPos);
+                    ChangeState(State.Search);
                     yield break;
-                }
-
-                if (loseChaseWhenFar)
-                {
-                    bool recentlyTracking = canSee || chaseLostSightTimer < Mathf.Clamp(lostSightPursuitSeconds, 1.5f, 12f);
-                    bool allowFarDrop = !keepChaseWhenRecentlySeen || !recentlyTracking;
-                    float chaseDistance = Vector3.Distance(transform.position, player.position);
-                    if (allowFarDrop && chaseDistance > maxChaseDistance)
-                    {
-                        farChaseTimer += Time.deltaTime;
-                        if (farChaseTimer >= farLoseDelay)
-                        {
-                            lastNoisePos = lastSeenPlayerPos;
-                            lastNoiseIntensity = Mathf.Max(lastNoiseIntensity, 5f);
-                            hasNoise = true;
-                            ChangeState(State.Search);
-                            yield break;
-                        }
-                    }
-                    else
-                    {
-                        farChaseTimer = 0f;
-                    }
-                }
-
-                if (limitVisualChaseTime && !relentlessVisualChase && chaseUntilTime > 0f && Time.time >= chaseUntilTime)
-                {
-                    // Do not hard-drop chase timer while still seeing/recently tracking target.
-                    if (!canSee && chaseLostSightTimer > 1.0f)
-                    {
-                        lastNoisePos = lastSeenPlayerPos;
-                        lastNoiseIntensity = Mathf.Max(lastNoiseIntensity, 5f);
-                        hasNoise = true;
-                        ChangeState(State.Search);
-                        yield break;
-                    }
-                }
-
-                if (!maintainChaseUntilHidden && !canSee)
-                {
-                    Vector3 lastKnown = lastSeenPlayerPos;
-                    yield return new WaitForSeconds(1.1f);
-
-                    if (!stablePlayerVisible)
-                    {
-                        investigateTargetPos = lastKnown;
-                        hasInvestigateTarget = true;
-                        ChangeState(State.Investigate);
-                        yield break;
-                    }
                 }
 
                 yield return null;
@@ -2223,7 +2278,24 @@ namespace Sushil.AI
             }
 
             Vector3 eye = transform.position + Vector3.up * 1.6f;
-            Vector3 target = player.position + Vector3.up * 1.2f;
+            Vector3[] targetPoints =
+            {
+                player.position + Vector3.up * 1.6f,
+                player.position + Vector3.up * 1.2f,
+                player.position + Vector3.up * 0.8f
+            };
+
+            for (int i = 0; i < targetPoints.Length; i++)
+            {
+                if (HasLineOfSightToTargetPoint(eye, targetPoints[i]))
+                    return true;
+            }
+
+            return false;
+        }
+
+        bool HasLineOfSightToTargetPoint(Vector3 eye, Vector3 target)
+        {
             Vector3 dir = (target - eye).normalized;
             float rayDist = Mathf.Min(sightRange, Vector3.Distance(eye, target) + 0.5f);
 
@@ -2236,18 +2308,30 @@ namespace Sushil.AI
             for (int i = 0; i < hits.Length; i++)
             {
                 Transform hitT = hits[i].collider.transform;
-                if (hitT == transform || hitT.IsChildOf(transform)) continue; // ignore stalker self hits
+                if (hitT == transform || hitT.IsChildOf(transform)) continue;
 
                 if (hitT == player) return true;
                 if (hitT.IsChildOf(player)) return true;
                 if (hitT.GetComponentInParent<RohitFPSController>() != null) return true;
                 if (hitT.GetComponentInParent<PlayerDeath>() != null) return true;
-
-                // First non-self blocker before player means no LOS.
                 return false;
             }
 
             return false;
+        }
+
+        bool ShouldForceProximityChase(bool isHiddenNow)
+        {
+            if (!allowProximityChaseWithoutNoise || isHiddenNow || player == null)
+                return false;
+
+            Vector3 stalkerFlat = transform.position;
+            stalkerFlat.y = 0f;
+            Vector3 playerFlat = player.position;
+            playerFlat.y = 0f;
+
+            float horizontalDistance = Vector3.Distance(stalkerFlat, playerFlat);
+            return horizontalDistance <= Mathf.Max(proximityChaseDistance, killDistance + 1.25f);
         }
 
         bool IsPlayerHidden()

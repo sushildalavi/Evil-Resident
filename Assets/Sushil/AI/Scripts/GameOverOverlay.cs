@@ -26,8 +26,10 @@ namespace Sushil.Systems
             ApplyLargeStyle();
 
             titleText.text = "GAME\nOVER";
-            reasonText.text = "The Watcher caught you.";
+            reasonText.text = BuildReasonText(reason);
             hintText.text = "Press R to Restart";
+            Time.timeScale = 0f;
+            AudioListener.pause = true;
             overlayRoot.SetActive(true);
             if (driver != null) driver.IsShowing = true;
         }
@@ -36,6 +38,8 @@ namespace Sushil.Systems
         {
             if (overlayRoot != null) overlayRoot.SetActive(false);
             if (driver != null) driver.IsShowing = false;
+            Time.timeScale = 1f;
+            AudioListener.pause = false;
         }
 
         static void EnsureCreated()
@@ -211,10 +215,25 @@ namespace Sushil.Systems
                 IsShowing = false;
                 if (overlayRoot != null) overlayRoot.SetActive(false);
                 Time.timeScale = 1f;
+                AudioListener.pause = false;
 
                 Scene active = SceneManager.GetActiveScene();
                 SceneManager.LoadScene(active.buildIndex);
             }
+        }
+
+        static string BuildReasonText(string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason))
+                return "The Stalker caught you.";
+
+            string lower = reason.ToLowerInvariant();
+            if (lower.Contains("stalker"))
+                return "The Stalker caught you.";
+            if (lower.Contains("watcher"))
+                return "The Watcher caught you.";
+
+            return reason;
         }
 
         static Font CreateSpookyFont(int size)
