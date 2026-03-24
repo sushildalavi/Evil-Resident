@@ -48,6 +48,9 @@ namespace Sushil.Demo
         void Start()
         {
             controller = GetComponent<CharacterController>();
+            // Ensure stairs/ramp can be walked without requiring a jump.
+            controller.stepOffset = Mathf.Max(controller.stepOffset, 0.4f);
+            controller.slopeLimit = Mathf.Max(controller.slopeLimit, 55f);
             standHeight = controller.height;
             standCenter = controller.center;
 
@@ -114,6 +117,12 @@ namespace Sushil.Demo
                     return;
                 }
 
+                if (IsWalkableSlopeHit(hit, delta))
+                {
+                    controller.Move(delta);
+                    return;
+                }
+
                 float allowed = Mathf.Max(0f, hit.distance - collisionSkin);
                 controller.Move(dir * allowed);
                 return;
@@ -131,6 +140,16 @@ namespace Sushil.Demo
             float half = (height * 0.5f) - radius;
             p1 = center + up * half;
             p2 = center - up * half;
+        }
+
+        bool IsWalkableSlopeHit(RaycastHit hit, Vector3 delta)
+        {
+            if (controller == null) return false;
+
+            float slopeAngle = Vector3.Angle(hit.normal, transform.up);
+            bool withinSlopeLimit = slopeAngle <= controller.slopeLimit + 0.5f;
+            bool notPushingDownHard = Vector3.Dot(delta.normalized, transform.up) > -0.35f;
+            return withinSlopeLimit && notPushingDownHard;
         }
 
         Vector3 ClampDeltaByNavMesh(Vector3 delta)
