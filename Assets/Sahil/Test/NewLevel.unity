@@ -4972,6 +4972,10 @@ PrefabInstance:
       value: 10
       objectReference: {fileID: 0}
     - target: {fileID: 4403181079989416031, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: mouseSensitivity
+      value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 4403181079989416031, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
       propertyPath: useCapsulePreCast
       value: 0
       objectReference: {fileID: 0}
