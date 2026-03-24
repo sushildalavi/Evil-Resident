@@ -24,7 +24,8 @@ public class HideableObject : MonoBehaviour, IInteractable
     {
         if (!player.isHidden)
         {
-            player.HideAt(hidePoint, this);
+            Transform targetHidePoint = hidePoint != null ? hidePoint : transform;
+            player.HideAt(targetHidePoint, this);
         }
         else if (player.currentHideObject == this)
         {
@@ -34,6 +35,7 @@ public class HideableObject : MonoBehaviour, IInteractable
             else
                 exitPos = transform.position + transform.forward * 2f;
 
+            exitPos = player.ResolveSafeExitPosition(this, exitPos);
             player.ExitHide(exitPos);
         }
     }

@@ -887,8 +887,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ec69a16fd735d4db69a29a95a30038a2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::HideableObject
-  hidePoint: {fileID: 7897042098713348953}
-  interactionPoint: {fileID: 2095385325160971}
+  hidePoint: {fileID: 2095385325160971}
+  exitPoint: {fileID: 2095385325160971}
+  hiddenCameraPoint: {fileID: 7897042098713348953}
 --- !u!1 &4937135677482034660
 GameObject:
   m_ObjectHideFlags: 0

@@ -49,6 +49,11 @@ public class RohitFPSController : MonoBehaviour
     float yVelocity;
     Vector3 horizontalVelocity;
     float xRotation = 0f;
+    Vector3 defaultCameraLocalPos;
+    Quaternion defaultCameraLocalRot;
+    bool hasDefaultCameraPose;
+    Vector3 preHidePosition;
+    bool hasPreHidePosition;
     CharacterController controller;
     PlayerInventory inventory;
 
@@ -91,6 +96,10 @@ public class RohitFPSController : MonoBehaviour
             Camera cam = cameraTransform.GetComponent<Camera>();
             if (cam != null)
                 cam.nearClipPlane = Mathf.Clamp(gameplayNearClip, 0.01f, 0.1f);
+
+            defaultCameraLocalPos = cameraTransform.localPosition;
+            defaultCameraLocalRot = cameraTransform.localRotation;
+            hasDefaultCameraPose = true;
         }
     }
 
@@ -516,9 +525,19 @@ public class RohitFPSController : MonoBehaviour
 
     public void HideAt(Transform hidePoint, HideableObject hideObject)
     {
+        preHidePosition = transform.position;
+        hasPreHidePosition = true;
+
         controller.enabled = false;
         transform.position = hidePoint.position;
         controller.enabled = true;
+
+        if (hideObject != null && hideObject.hiddenCameraPoint != null && cameraTransform != null)
+        {
+            cameraTransform.position = hideObject.hiddenCameraPoint.position;
+            cameraTransform.rotation = hideObject.hiddenCameraPoint.rotation;
+            xRotation = NormalizePitch(cameraTransform.localEulerAngles.x);
+        }
 
         horizontalVelocity = Vector3.zero;
         yVelocity = 0f;
@@ -532,9 +551,122 @@ public class RohitFPSController : MonoBehaviour
         transform.position = exitPosition;
         controller.enabled = true;
 
+        if (hasDefaultCameraPose && cameraTransform != null)
+        {
+            cameraTransform.localPosition = defaultCameraLocalPos;
+            cameraTransform.localRotation = defaultCameraLocalRot;
+            xRotation = NormalizePitch(cameraTransform.localEulerAngles.x);
+        }
+
         horizontalVelocity = Vector3.zero;
         yVelocity = 0f;
         isHidden = false;
         currentHideObject = null;
+        hasPreHidePosition = false;
+    }
+
+    public Vector3 ResolveSafeExitPosition(HideableObject hideObject, Vector3 requestedExitPosition)
+    {
+        Vector3[] candidates;
+
+        if (hideObject != null)
+        {
+            Transform t = hideObject.transform;
+            if (hasPreHidePosition)
+            {
+                candidates = new[]
+                {
+                    preHidePosition,
+                    requestedExitPosition,
+                    t.position + t.forward * 1.2f,
+                    t.position - t.forward * 1.2f,
+                    t.position + t.right * 1.2f,
+                    t.position - t.right * 1.2f,
+                    t.position + Vector3.up * 0.2f
+                };
+            }
+            else
+            {
+                candidates = new[]
+                {
+                    requestedExitPosition,
+                    t.position + t.forward * 1.2f,
+                    t.position - t.forward * 1.2f,
+                    t.position + t.right * 1.2f,
+                    t.position - t.right * 1.2f,
+                    t.position + Vector3.up * 0.2f
+                };
+            }
+        }
+        else
+        {
+            if (hasPreHidePosition)
+                candidates = new[] { preHidePosition, requestedExitPosition };
+            else
+                candidates = new[] { requestedExitPosition };
+        }
+
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            Vector3 candidate = SnapToNavMesh(candidates[i]);
+            if (!WouldControllerOverlapAt(candidate))
+                return candidate;
+        }
+
+        return transform.position;
+    }
+
+    Vector3 SnapToNavMesh(Vector3 position)
+    {
+        if (!useNavMeshBoundaryGuard)
+            return position;
+
+        if (NavMesh.SamplePosition(position, out var hit, 2f, NavMesh.AllAreas))
+            return hit.position;
+
+        return position;
+    }
+
+    bool WouldControllerOverlapAt(Vector3 worldPosition)
+    {
+        if (controller == null)
+            return false;
+
+        float radius = Mathf.Max(0.02f, controller.radius * 0.95f);
+        float height = Mathf.Max(controller.height, radius * 2f + 0.01f);
+
+        Vector3 center = worldPosition + transform.TransformVector(controller.center);
+        Vector3 up = transform.up;
+        float half = (height * 0.5f) - radius;
+        Vector3 p1 = center + up * half;
+        Vector3 p2 = center - up * half;
+
+        Collider[] overlaps = Physics.OverlapCapsule(
+            p1,
+            p2,
+            radius,
+            collisionMask,
+            QueryTriggerInteraction.Ignore
+        );
+
+        for (int i = 0; i < overlaps.Length; i++)
+        {
+            Collider c = overlaps[i];
+            if (c == null) continue;
+
+            Transform hitT = c.transform;
+            if (hitT == transform || hitT.IsChildOf(transform))
+                continue;
+
+            return true;
+        }
+
+        return false;
+    }
+
+    static float NormalizePitch(float eulerX)
+    {
+        if (eulerX > 180f) eulerX -= 360f;
+        return Mathf.Clamp(eulerX, -90f, 90f);
     }
 }
