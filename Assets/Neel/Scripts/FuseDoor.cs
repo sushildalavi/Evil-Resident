@@ -2,11 +2,14 @@ using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
 
-public class Door : MonoBehaviour, IInteractable
+public class FuseDoor : MonoBehaviour, IInteractable
 {
-    [Header("Lock Settings")]
-    public KeyType requiredKey;
-    public bool isLocked = true;
+    [Header("Fuse Requirement")]
+    public FuseBox[] requiredFuseBoxes;
+    [Tooltip("If no fuse boxes are assigned, use all FuseBox objects found in the scene.")]
+    public bool autoFindFuseBoxesIfUnassigned = true;
+    public string lockedPrompt = "Fill the fuses first";
+    public string openPrompt = "Press E to Open Door";
 
     [Header("Open Animation")]
     public float openAngle = 90f;
@@ -15,7 +18,7 @@ public class Door : MonoBehaviour, IInteractable
     public Vector3 hingeLocalOffset = Vector3.zero;
 
     [Header("Audio (Optional)")]
-    public AudioClip unlockSound;
+    public AudioClip openSound;
     public AudioClip lockedSound;
 
     [Header("AI / Navigation")]
@@ -31,8 +34,6 @@ public class Door : MonoBehaviour, IInteractable
     public float navLinkDepth = 1.2f;
     public float navLinkWidth = 1.3f;
     public int navLinkAgentTypeID = -1;
-    public bool aiCanOpenDoor = false;
-    public bool aiBypassLock = false;
 
     private bool isOpen = false;
     private Quaternion closedLocalRotation;
@@ -47,20 +48,16 @@ public class Door : MonoBehaviour, IInteractable
 
     void Start()
     {
-        // Hard safety defaults so old scene/prefab serialized values cannot regress doorway traversal.
-        unblockWhenOpen = true;
-        immediateUnblockOnOpen = true;
-        autoAddRuntimeNavLink = true;
-
         closedLocalPosition = transform.localPosition;
         closedLocalRotation = transform.localRotation;
         audioSource = GetComponent<AudioSource>();
         currentOpenAngle = 0f;
-        // Only toggle the actual moving panel colliders; keep nearby frame/wall colliders untouched.
+
         Transform panel = transform.Find("DoorPanel");
         cachedColliders = panel != null
             ? panel.GetComponentsInChildren<Collider>(true)
             : GetComponentsInChildren<Collider>(true);
+
         navObstacle = GetComponent<NavMeshObstacle>();
         if (autoAddNavObstacle && navObstacle == null)
         {
@@ -68,14 +65,15 @@ public class Door : MonoBehaviour, IInteractable
             navObstacle.carving = true;
             navObstacle.carveOnlyStationary = true;
         }
+
         if (autoAddRuntimeNavLink)
             EnsureRuntimeNavLink();
+
         SetDoorBlocking(true);
     }
 
     void Update()
     {
-        // Invert configured swing so doors open inward by default across the level.
         float direction = openClockwise ? -1f : 1f;
         float targetAngle = isOpen ? (openAngle * direction) : 0f;
         currentOpenAngle = Mathf.MoveTowards(currentOpenAngle, targetAngle, openSpeed * 100f * Time.deltaTime);
@@ -87,68 +85,56 @@ public class Door : MonoBehaviour, IInteractable
 
     public KeyCode GetInteractKey() => KeyCode.E;
 
-    public bool IsOpen => isOpen;
-    public bool IsLocked => isLocked;
-
     public string GetPrompt(RohitFPSController player)
     {
         if (isOpen) return "";
-
-        if (!isLocked) return "Press E to Open Door";
-
-        PlayerInventory inventory = player.GetComponent<PlayerInventory>();
-        if (inventory != null && inventory.HasKey(requiredKey))
-            return $"Press E to Unlock ({requiredKey} Key)";
-
-        return $"Locked - Requires {requiredKey} Key";
+        return AreRequiredFuseBoxesFull() ? openPrompt : lockedPrompt;
     }
 
     public void Interact(RohitFPSController player)
     {
         if (isOpen) return;
 
-        if (!isLocked)
+        if (!AreRequiredFuseBoxesFull())
         {
-            OpenDoor();
+            PlaySound(lockedSound);
+            Debug.Log(lockedPrompt);
             return;
         }
 
-        PlayerInventory inventory = player.GetComponent<PlayerInventory>();
-        if (inventory != null && inventory.HasKey(requiredKey))
-        {
-            isLocked = false;
-            OpenDoor();
-            PlaySound(unlockSound);
-            Debug.Log($"Unlocked door with {requiredKey} Key!");
-        }
-        else
-        {
-            PlaySound(lockedSound);
-            Debug.Log($"This door requires the {requiredKey} Key.");
-        }
+        OpenDoor();
     }
 
     public void OpenDoor()
     {
+        if (isOpen) return;
         isOpen = true;
-        // Clear blockers immediately at the moment door starts opening.
         SetDoorBlocking(false);
         if (navLinkForwardBack != null) navLinkForwardBack.activated = true;
         if (navLinkLeftRight != null) navLinkLeftRight.activated = true;
+        PlaySound(openSound);
     }
 
-    public bool TryOpenForAI()
+    bool AreRequiredFuseBoxesFull()
     {
-        if (!aiCanOpenDoor) return false;
-        if (isOpen) return true;
-        if (isLocked && !aiBypassLock) return false;
+        FuseBox[] boxes = requiredFuseBoxes;
+        if ((boxes == null || boxes.Length == 0) && autoFindFuseBoxesIfUnassigned)
+            boxes = FindObjectsByType<FuseBox>(FindObjectsSortMode.None);
 
-        // If bypass is allowed, AI can force this door unlocked.
-        if (isLocked && aiBypassLock)
-            isLocked = false;
+        if (boxes == null || boxes.Length == 0)
+            return false;
 
-        OpenDoor();
-        return true;
+        int validCount = 0;
+        for (int i = 0; i < boxes.Length; i++)
+        {
+            FuseBox box = boxes[i];
+            if (box == null) continue;
+            validCount++;
+            if (!box.IsFull)
+                return false;
+        }
+
+        return validCount > 0;
     }
 
     void SyncDoorBlockingForCurrentAngle()
@@ -162,7 +148,6 @@ public class Door : MonoBehaviour, IInteractable
         }
         else
         {
-            // For this project: once opening starts, never block traversal at this doorway.
             shouldBlock = false;
         }
 
@@ -247,7 +232,7 @@ public class Door : MonoBehaviour, IInteractable
     {
         if (!autoAddRuntimeNavLink) return;
 
-        bool shouldEnable = isOpen && (!isLocked || aiBypassLock);
+        bool shouldEnable = isOpen;
         if (navLinkForwardBack != null && navLinkForwardBack.enabled)
             navLinkForwardBack.activated = shouldEnable;
         if (navLinkLeftRight != null && navLinkLeftRight.enabled)
@@ -256,7 +241,6 @@ public class Door : MonoBehaviour, IInteractable
 
     void ApplyHingePose(float angleY)
     {
-        // Keep hinge math in local space to avoid skew/offset artifacts under scaled parents.
         Quaternion localRot = closedLocalRotation * Quaternion.Euler(0f, angleY, 0f);
         Vector3 hingeLocal = hingeLocalOffset;
         Vector3 localHinge = closedLocalPosition + closedLocalRotation * hingeLocal;
@@ -266,10 +250,9 @@ public class Door : MonoBehaviour, IInteractable
         transform.localRotation = localRot;
     }
 
-    private void PlaySound(AudioClip clip)
+    void PlaySound(AudioClip clip)
     {
         if (clip != null && audioSource != null)
             audioSource.PlayOneShot(clip);
     }
-
 }

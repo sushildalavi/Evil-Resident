@@ -776,8 +776,8 @@ Transform:
   m_GameObject: {fileID: 6519043711620312481}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -7.44, y: 0.60801, z: 2.22}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalPosition: {x: -23.17, y: 2.36, z: -49.081}
+  m_LocalScale: {x: 2.3381233, y: 1.7588, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4082456555462013302}
@@ -805,7 +805,15 @@ MonoBehaviour:
   - {fileID: 631524090762288258}
   - {fileID: 8380304946594287977}
   slotLights: []
-  fusePrefabs: []
+  preferFusePrefabColor: 1
+  fallbackSlotColors:
+  - {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  - {r: 0, g: 0.4, b: 1, a: 1}
+  - {r: 0.6, g: 0.2, b: 1, a: 1}
+  fusePrefabs:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
   door: {fileID: 0}
   sparkEffect: {fileID: 0}
 --- !u!65 &6595128029461773732
