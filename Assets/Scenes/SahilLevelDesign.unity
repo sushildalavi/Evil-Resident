@@ -7272,7 +7272,7 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 34981044288592155, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
       propertyPath: mouseSensitivity
-      value: 400
+      value: 100
       objectReference: {fileID: 0}
     - target: {fileID: 34981044288592155, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
       propertyPath: interactableLayer.m_Bits

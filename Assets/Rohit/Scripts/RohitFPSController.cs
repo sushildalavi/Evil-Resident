@@ -204,8 +204,9 @@ public class RohitFPSController : MonoBehaviour
         }
         else
         {
-            mouseX = lookInput.x * mouseSensitivity * Time.deltaTime;
-            mouseY = lookInput.y * mouseSensitivity * Time.deltaTime;
+            float scale = 0.015f;
+            mouseX = lookInput.x * mouseSensitivity * scale;
+            mouseY = lookInput.y * mouseSensitivity * scale;
         }
 
         xRotation -= mouseY;
