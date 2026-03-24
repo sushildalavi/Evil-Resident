@@ -128,7 +128,7 @@ public class Door : MonoBehaviour, IInteractable
         }
     }
 
-    private void OpenDoor()
+    public void OpenDoor()
     {
         isOpen = true;
         // Clear blockers immediately at the moment door starts opening.
