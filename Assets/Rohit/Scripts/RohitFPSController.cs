@@ -28,6 +28,10 @@ public class RohitFPSController : MonoBehaviour
     public float mouseSensitivity = 200f;
     [Tooltip("Scale used for Input System raw mouse delta.")]
     public float inputSystemMouseScale = 0.0015f;
+    [Tooltip("Extra multiplier applied only on WebGL builds to match editor look feel.")]
+    [Range(0.05f, 2f)] public float webGLMouseMultiplier = 0.35f;
+    [Tooltip("Clamp raw pointer delta to reduce single-frame browser spikes.")]
+    [Range(5f, 500f)] public float maxMouseDeltaPerFrame = 60f;
     public Transform cameraTransform;
 
     [Header("Interaction")]
@@ -232,8 +236,10 @@ public class RohitFPSController : MonoBehaviour
         float mouseY;
         if (fromInputSystem)
         {
-            mouseX = lookInput.x * mouseSensitivity * inputSystemMouseScale;
-            mouseY = lookInput.y * mouseSensitivity * inputSystemMouseScale;
+            Vector2 clampedLook = Vector2.ClampMagnitude(lookInput, Mathf.Max(5f, maxMouseDeltaPerFrame));
+            float webScale = Application.platform == RuntimePlatform.WebGLPlayer ? webGLMouseMultiplier : 1f;
+            mouseX = clampedLook.x * mouseSensitivity * inputSystemMouseScale * webScale;
+            mouseY = clampedLook.y * mouseSensitivity * inputSystemMouseScale * webScale;
         }
         else
         {
