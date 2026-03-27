@@ -24,6 +24,8 @@ namespace Sushil.Demo
         [Header("Look")]
         public float mouseSensitivity = 200f;
         public float inputSystemMouseScale = 0.0015f;
+        [Range(0.05f, 2f)] public float webGLMouseMultiplier = 0.35f;
+        [Range(5f, 500f)] public float maxMouseDeltaPerFrame = 60f;
         public Transform cameraTransform;
         public bool lockCursorOnStart = true;
 
@@ -177,8 +179,10 @@ namespace Sushil.Demo
             float mouseY;
             if (fromInputSystem)
             {
-                mouseX = lookInput.x * mouseSensitivity * inputSystemMouseScale;
-                mouseY = lookInput.y * mouseSensitivity * inputSystemMouseScale;
+                Vector2 clampedLook = Vector2.ClampMagnitude(lookInput, Mathf.Max(5f, maxMouseDeltaPerFrame));
+                float webScale = Application.platform == RuntimePlatform.WebGLPlayer ? webGLMouseMultiplier : 1f;
+                mouseX = clampedLook.x * mouseSensitivity * inputSystemMouseScale * webScale;
+                mouseY = clampedLook.y * mouseSensitivity * inputSystemMouseScale * webScale;
             }
             else
             {

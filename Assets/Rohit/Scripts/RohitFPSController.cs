@@ -28,12 +28,17 @@ public class RohitFPSController : MonoBehaviour
     public float mouseSensitivity = 200f;
     [Tooltip("Scale used for Input System raw mouse delta.")]
     public float inputSystemMouseScale = 0.0015f;
+    [Tooltip("Extra multiplier applied only on WebGL builds to match editor look feel.")]
+    [Range(0.05f, 2f)] public float webGLMouseMultiplier = 0.35f;
+    [Tooltip("Clamp raw pointer delta to reduce single-frame browser spikes.")]
+    [Range(5f, 500f)] public float maxMouseDeltaPerFrame = 60f;
     public Transform cameraTransform;
 
     [Header("Interaction")]
     public float interactDistance = 5f;
     public float keyInteractDistance = 10f;
     public float keyProximityRadius = 2.5f;
+    public float fuseProximityRadius = 2.5f;
     public LayerMask interactableLayer;
     [Tooltip("Solid geometry mask used to block interaction through walls.")]
     public LayerMask interactionOcclusionMask = ~0;
@@ -232,8 +237,10 @@ public class RohitFPSController : MonoBehaviour
         float mouseY;
         if (fromInputSystem)
         {
-            mouseX = lookInput.x * mouseSensitivity * inputSystemMouseScale;
-            mouseY = lookInput.y * mouseSensitivity * inputSystemMouseScale;
+            Vector2 clampedLook = Vector2.ClampMagnitude(lookInput, Mathf.Max(5f, maxMouseDeltaPerFrame));
+            float webScale = Application.platform == RuntimePlatform.WebGLPlayer ? webGLMouseMultiplier : 1f;
+            mouseX = clampedLook.x * mouseSensitivity * inputSystemMouseScale * webScale;
+            mouseY = clampedLook.y * mouseSensitivity * inputSystemMouseScale * webScale;
         }
         else
         {
@@ -278,6 +285,21 @@ public class RohitFPSController : MonoBehaviour
 
                 if (WasKeyPressed(nearbyKey.GetInteractKey()))
                     nearbyKey.Interact(this);
+
+                return;
+            }
+        }
+
+        // Proximity-based fuse pickup to avoid missing small fuse colliders.
+        if (TryFindNearbyFuse(out FusePickup nearbyFuse))
+        {
+            if (HasLineOfSightToInteractable(nearbyFuse, keyInteractDistance))
+            {
+                string prompt = nearbyFuse.GetPrompt(this);
+                ShowPrompt(prompt);
+
+                if (WasKeyPressed(nearbyFuse.GetInteractKey()))
+                    nearbyFuse.Interact(this);
 
                 return;
             }
@@ -388,6 +410,41 @@ public class RohitFPSController : MonoBehaviour
         }
 
         return keyItem != null;
+    }
+
+    bool TryFindNearbyFuse(out FusePickup fusePickup)
+    {
+        fusePickup = null;
+
+        FusePickup[] allFuses = FindObjectsByType<FusePickup>(FindObjectsSortMode.None);
+        if (allFuses == null || allFuses.Length == 0) return false;
+
+        float bestSqr = float.MaxValue;
+        Vector3 playerPos = transform.position;
+        float radius = Mathf.Max(0.1f, fuseProximityRadius);
+        float radiusSqr = radius * radius;
+
+        for (int i = 0; i < allFuses.Length; i++)
+        {
+            FusePickup candidate = allFuses[i];
+            if (candidate == null || !candidate.gameObject.activeInHierarchy) continue;
+
+            Vector3 fusePos = candidate.transform.position;
+
+            // Keep XZ-only distance so uneven floor height does not block pickup prompt.
+            Vector2 playerXZ = new Vector2(playerPos.x, playerPos.z);
+            Vector2 fuseXZ = new Vector2(fusePos.x, fusePos.z);
+            float sqr = (playerXZ - fuseXZ).sqrMagnitude;
+            if (sqr > radiusSqr) continue;
+
+            if (sqr < bestSqr)
+            {
+                bestSqr = sqr;
+                fusePickup = candidate;
+            }
+        }
+
+        return fusePickup != null;
     }
 
     bool HasLineOfSightToInteractable(IInteractable interactable, float maxDistance)

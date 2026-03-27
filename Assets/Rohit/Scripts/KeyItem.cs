@@ -8,7 +8,7 @@ public class KeyItem : MonoBehaviour, IInteractable
     [Header("Floating Animation")]
     public float rotateSpeed = 50f;
     public float bobSpeed = 2f;
-    public float bobHeight = 0.25f;
+    public float bobHeight = 0.12f;
 
     [Header("Highlight Aura")]
     public bool enableAura = true;
@@ -37,7 +37,9 @@ public class KeyItem : MonoBehaviour, IInteractable
     {
         transform.Rotate(Vector3.up * rotateSpeed * Time.deltaTime);
         Vector3 pos = startPos;
-        pos.y += Mathf.Sin(Time.time * bobSpeed) * bobHeight;
+        // Keep bob motion above base height so keys do not dip below floor.
+        float bob01 = (Mathf.Sin(Time.time * bobSpeed) * 0.5f) + 0.5f;
+        pos.y += bob01 * bobHeight;
         transform.position = pos;
 
         if (enableAura)
