@@ -82,3 +82,5 @@ timestamp,scene,event,elapsed_seconds,deaths_this_run,total_deaths,details
 "2026-03-24 11:06:39","NewLevel","death",6.85,1,6,"Stalker one-shot (trigger)"
 "2026-03-24 11:07:19","NewLevel","death",3.23,1,1,"Stalker one-shot (trigger)"
 "2026-03-24 11:09:27","NewLevel","death",125.85,1,2,"Stalker one-shot"
+"2026-03-24 12:16:29","NewLevel","death",21.91,1,1,"Stalker one-shot (trigger)"
+"2026-03-24 12:16:45","NewLevel","death",11.75,1,2,"Stalker one-shot (trigger)"
