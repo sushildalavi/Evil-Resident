@@ -17,7 +17,7 @@ namespace Sushil.Systems
         static readonly string[] quotes =
         {
             "He heard your footsteps. He missed your final one.",
-            "The Watcher blinked. You didn't.",
+            "The Resident blinked. You didn't.",
             "Doors are loud. Freedom is louder.",
             "You left with your pulse. He kept the silence."
         };

@@ -66,6 +66,32 @@ namespace Sushil.Systems
             Collider existing = t.GetComponent<Collider>();
             MeshFilter mf = t.GetComponent<MeshFilter>();
             Mesh mesh = mf != null ? mf.sharedMesh : null;
+            bool hasNegativeScale = HasNegativeLossyScale(t);
+
+            if (hasNegativeScale)
+            {
+                if (existing is BoxCollider oldBox)
+                    Object.Destroy(oldBox);
+                if (existing is MeshCollider existingMesh)
+                {
+                    ConfigureMeshCollider(existingMesh, mesh);
+                    existingMesh.isTrigger = false;
+                    existingMesh.enabled = true;
+                    return;
+                }
+
+                if (mesh != null)
+                {
+                    MeshCollider meshCollider = t.GetComponent<MeshCollider>();
+                    if (meshCollider == null) meshCollider = t.gameObject.AddComponent<MeshCollider>();
+                    ConfigureMeshCollider(meshCollider, mesh);
+                    meshCollider.isTrigger = false;
+                    meshCollider.enabled = true;
+                    addedColliderCount++;
+                }
+
+                return;
+            }
 
             bool useSolidBox = existing == null || existing is MeshCollider;
             if (useSolidBox)
@@ -105,19 +131,50 @@ namespace Sushil.Systems
             {
                 Collider c = t.GetComponent<Collider>();
                 MeshRenderer mr = t.GetComponent<MeshRenderer>();
+                bool hasNegativeScale = HasNegativeLossyScale(t);
                 if (c == null && mr != null)
                 {
-                    BoxCollider box = t.gameObject.AddComponent<BoxCollider>();
-                    ConfigureBoxFromRenderer(box, mr);
-                    box.isTrigger = false;
-                    box.enabled = true;
-                    addedColliderCount++;
+                    if (hasNegativeScale)
+                    {
+                        MeshFilter mf = mr.GetComponent<MeshFilter>();
+                        if (mf != null && mf.sharedMesh != null)
+                        {
+                            MeshCollider meshCollider = t.gameObject.AddComponent<MeshCollider>();
+                            ConfigureMeshCollider(meshCollider, mf.sharedMesh);
+                            meshCollider.isTrigger = false;
+                            meshCollider.enabled = true;
+                            addedColliderCount++;
+                        }
+                    }
+                    else
+                    {
+                        BoxCollider box = t.gameObject.AddComponent<BoxCollider>();
+                        ConfigureBoxFromRenderer(box, mr);
+                        box.isTrigger = false;
+                        box.enabled = true;
+                        addedColliderCount++;
+                    }
                 }
 
                 // Ensure existing box colliders are thick enough.
                 BoxCollider bc = t.GetComponent<BoxCollider>();
                 if (bc != null)
                 {
+                    if (hasNegativeScale)
+                    {
+                        Object.Destroy(bc);
+                        MeshFilter mf = t.GetComponent<MeshFilter>();
+                        if (mf != null && mf.sharedMesh != null)
+                        {
+                            MeshCollider meshCollider = t.GetComponent<MeshCollider>();
+                            if (meshCollider == null) meshCollider = t.gameObject.AddComponent<MeshCollider>();
+                            ConfigureMeshCollider(meshCollider, mf.sharedMesh);
+                            meshCollider.isTrigger = false;
+                            meshCollider.enabled = true;
+                        }
+                        return;
+                    }
+
                     ClampBoxThickness(bc);
                     bc.isTrigger = false;
                     bc.enabled = true;
@@ -146,6 +203,14 @@ namespace Sushil.Systems
 
             box.center = b.center;
             box.size = size;
+        }
+
+        static void ConfigureMeshCollider(MeshCollider meshCollider, Mesh mesh)
+        {
+            if (meshCollider == null) return;
+            meshCollider.sharedMesh = null;
+            meshCollider.convex = false;
+            meshCollider.sharedMesh = mesh;
         }
 
         static void ConfigureBoxFromRenderer(BoxCollider box, MeshRenderer mr)
@@ -188,6 +253,13 @@ namespace Sushil.Systems
             if (size.y < MinColliderThickness) size.y = MinColliderThickness;
             if (size.z < MinColliderThickness) size.z = MinColliderThickness;
             box.size = size;
+        }
+
+        static bool HasNegativeLossyScale(Transform t)
+        {
+            if (t == null) return false;
+            Vector3 s = t.lossyScale;
+            return s.x < 0f || s.y < 0f || s.z < 0f;
         }
     }
 }

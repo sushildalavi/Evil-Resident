@@ -92,13 +92,13 @@ namespace Sushil.AI
 
             yield return null;
 
-            var stalkers = FindObjectsByType<StalkerAI>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
-            foreach (var stalker in stalkers)
+            var residents = FindObjectsByType<ResidentAI>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+            foreach (var resident in residents)
             {
-                if (stalker == null || stalker.gameObject.scene != scene)
+                if (resident == null || resident.gameObject.scene != scene)
                     continue;
 
-                RefreshStalkerOnNavMesh(stalker);
+                RefreshResidentOnNavMesh(resident);
             }
         }
 
@@ -113,16 +113,16 @@ namespace Sushil.AI
             surface.minRegionArea = 0.1f;
         }
 
-        static void RefreshStalkerOnNavMesh(StalkerAI stalker)
+        static void RefreshResidentOnNavMesh(ResidentAI resident)
         {
-            var agent = stalker.agent != null ? stalker.agent : stalker.GetComponent<NavMeshAgent>();
+            var agent = resident.agent != null ? resident.agent : resident.GetComponent<NavMeshAgent>();
             if (agent == null)
                 return;
 
             if (!agent.enabled)
                 agent.enabled = true;
 
-            if (!NavMesh.SamplePosition(stalker.transform.position, out var hit, 6f, NavMesh.AllAreas))
+            if (!NavMesh.SamplePosition(resident.transform.position, out var hit, 6f, NavMesh.AllAreas))
                 return;
 
             agent.Warp(hit.position);

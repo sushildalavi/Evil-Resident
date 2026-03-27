@@ -87,7 +87,7 @@ namespace Sushil.Systems
             if (!shownRunHintThisRound && Time.unscaledTime >= roundStartTime + Mathf.Max(0f, startHintDelay))
             {
                 shownRunHintThisRound = true;
-                QueueHint("Tip: Hold SHIFT to sprint away from the Watcher.");
+                QueueHint("Tip: Hold SHIFT to sprint away from the Resident.");
             }
 
             bool hidden = player.isHidden;

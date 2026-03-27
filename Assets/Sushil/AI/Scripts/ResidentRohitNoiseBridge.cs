@@ -9,7 +9,7 @@ using UnityEngine.InputSystem;
 
 namespace Sushil.AI
 {
-    public class StalkerRohitNoiseBridge : MonoBehaviour
+    public class ResidentRohitNoiseBridge : MonoBehaviour
     {
         [Header("Player Source")]
         public RohitFPSController playerController;

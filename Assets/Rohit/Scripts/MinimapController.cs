@@ -56,7 +56,7 @@ public class MinimapController : MonoBehaviour
     public float fadeSpeed = 5f;
 
     Transform player;
-    Transform stalker;
+    Transform resident;
     KeyItem[] keyItems;
     Camera minimapCamera;
     RenderTexture renderTexture;
@@ -129,10 +129,10 @@ public class MinimapController : MonoBehaviour
             if (go != null) player = go.transform;
         }
 
-        if (stalker == null)
+        if (resident == null)
         {
-            var ai = FindFirstObjectByType<StalkerAI>();
-            if (ai != null) stalker = ai.transform;
+            var ai = FindFirstObjectByType<ResidentAI>();
+            if (ai != null) resident = ai.transform;
         }
         mainDoor = FindFirstObjectByType<MainDoor>();
         RefreshDoors();
@@ -497,7 +497,7 @@ public class MinimapController : MonoBehaviour
         if (playerIconRect != null)
             playerIconRect.gameObject.SetActive(false);
 
-        if (stalker != null && enemyIconRect != null)
+        if (resident != null && enemyIconRect != null)
             enemyIconRect.gameObject.SetActive(false);
         else if (enemyIconRect != null)
             enemyIconRect.gameObject.SetActive(false);

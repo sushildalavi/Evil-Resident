@@ -27,7 +27,7 @@ namespace Sushil.Systems
                 if (!string.IsNullOrEmpty(filePath)) return filePath;
 
                 string analyticsDir = Path.Combine(Application.dataPath, "Sushil", "Analytics");
-                filePath = Path.Combine(analyticsDir, "WatcherAnalytics.csv");
+                filePath = Path.Combine(analyticsDir, "ResidentAnalytics.csv");
                 return filePath;
             }
         }
@@ -84,7 +84,7 @@ namespace Sushil.Systems
                 // Build outputs can be read-only near Application.dataPath.
                 string fallbackDir = Path.Combine(Application.persistentDataPath, "Sushil", "Analytics");
                 Directory.CreateDirectory(fallbackDir);
-                filePath = Path.Combine(fallbackDir, "WatcherAnalytics.csv");
+                filePath = Path.Combine(fallbackDir, "ResidentAnalytics.csv");
                 Debug.LogWarning($"[Analytics] Project path not writable, using fallback path: {filePath}. Reason: {ex.Message}");
             }
 

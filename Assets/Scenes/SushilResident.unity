@@ -740,7 +740,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8212839126718544149, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
       propertyPath: m_Name
-      value: Stalker
+      value: Resident
       objectReference: {fileID: 0}
     - target: {fileID: 8855339063735690731, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
       propertyPath: 'hidingInspectPoints.Array.data[0]'

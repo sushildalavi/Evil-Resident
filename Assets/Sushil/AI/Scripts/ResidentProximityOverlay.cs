@@ -5,13 +5,14 @@ using Sushil.AI;
 
 namespace Sushil.Systems
 {
-    public class WatcherProximityOverlay : MonoBehaviour
+    public class ResidentProximityOverlay : MonoBehaviour
     {
-        static WatcherProximityOverlay instance;
+        static ResidentProximityOverlay instance;
 
         [Header("Distance")]
         public float detectDistance = 18f;
         public float criticalDistance = 5.5f;
+        public bool enableScreenPulse = false;
 
         [Header("Visual Pulse")]
         public Color pulseColor = new Color(0.18f, 0.05f, 0.08f, 1f);
@@ -37,15 +38,15 @@ namespace Sushil.Systems
         Transform player;
         RohitFPSController rohitPlayer;
         PlayerHide playerHide;
-        StalkerAI[] stalkers;
+        ResidentAI[] residents;
         float nextRefreshTime;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Bootstrap()
         {
             if (instance != null) return;
-            GameObject go = new GameObject("WatcherProximityOverlay");
-            instance = go.AddComponent<WatcherProximityOverlay>();
+            GameObject go = new GameObject("ResidentProximityOverlay");
+            instance = go.AddComponent<ResidentProximityOverlay>();
             DontDestroyOnLoad(go);
         }
 
@@ -65,6 +66,12 @@ namespace Sushil.Systems
 
         void Update()
         {
+            if (!enableScreenPulse)
+            {
+                SetAlpha(0f, 0f, string.Empty);
+                return;
+            }
+
             if (StartScreenOverlay.IsShowing || PauseOverlay.IsPaused || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing)
             {
                 SetAlpha(0f, 0f, string.Empty);
@@ -83,14 +90,14 @@ namespace Sushil.Systems
                 nextRefreshTime = Time.unscaledTime + 0.5f;
             }
 
-            if (player == null || stalkers == null || stalkers.Length == 0)
+            if (player == null || residents == null || residents.Length == 0)
             {
                 SetAlpha(0f, 0f, string.Empty);
                 return;
             }
 
-            float nearest = GetNearestWatcherThreatDistance(out bool nearestHasLos);
-            bool anyChasing = IsAnyWatcherChasing();
+            float nearest = GetNearestResidentThreatDistance(out bool nearestHasLos);
+            bool anyChasing = IsAnyResidentChasing();
             if (nearest < 0f || nearest > detectDistance)
             {
                 if (anyChasing && nearest >= 0f && nearest <= detectDistance * 1.25f)
@@ -173,8 +180,8 @@ namespace Sushil.Systems
                 }
             }
 
-            if (force || stalkers == null || stalkers.Length == 0)
-                stalkers = FindObjectsByType<StalkerAI>(FindObjectsSortMode.None);
+            if (force || residents == null || residents.Length == 0)
+                residents = FindObjectsByType<ResidentAI>(FindObjectsSortMode.None);
         }
 
         bool IsPlayerHidden()
@@ -184,19 +191,19 @@ namespace Sushil.Systems
             return false;
         }
 
-        float GetNearestWatcherThreatDistance(out bool hasLosToNearest)
+        float GetNearestResidentThreatDistance(out bool hasLosToNearest)
         {
             float best = float.MaxValue;
             hasLosToNearest = false;
             bool found = false;
 
-            for (int i = 0; i < stalkers.Length; i++)
+            for (int i = 0; i < residents.Length; i++)
             {
-                var s = stalkers[i];
+                var s = residents[i];
                 if (s == null || !s.gameObject.activeInHierarchy) continue;
 
                 float raw = Vector3.Distance(player.position, s.transform.position);
-                bool hasLos = HasLineOfSightToWatcher(s.transform);
+                bool hasLos = HasLineOfSightToResident(s.transform);
                 float pathDistance = GetPathDistance(player.position, s.transform.position);
                 float effective = pathDistance >= 0f ? pathDistance : (raw * 2.2f);
                 if (!hasLos) effective *= 1.35f;
@@ -224,12 +231,12 @@ namespace Sushil.Systems
             return sum;
         }
 
-        bool HasLineOfSightToWatcher(Transform watcher)
+        bool HasLineOfSightToResident(Transform resident)
         {
-            if (player == null || watcher == null) return false;
+            if (player == null || resident == null) return false;
 
             Vector3 origin = player.position + Vector3.up * 1.35f;
-            Vector3 target = watcher.position + Vector3.up * 1.4f;
+            Vector3 target = resident.position + Vector3.up * 1.4f;
             Vector3 dir = (target - origin);
             float dist = dir.magnitude;
             if (dist <= 0.05f) return true;
@@ -240,19 +247,19 @@ namespace Sushil.Systems
 
             Transform t = hit.collider != null ? hit.collider.transform : null;
             if (t == null) return false;
-            if (t == watcher || t.IsChildOf(watcher)) return true;
+            if (t == resident || t.IsChildOf(resident)) return true;
             if (t == player || t.IsChildOf(player)) return true;
             return false;
         }
 
-        bool IsAnyWatcherChasing()
+        bool IsAnyResidentChasing()
         {
-            if (stalkers == null) return false;
-            for (int i = 0; i < stalkers.Length; i++)
+            if (residents == null) return false;
+            for (int i = 0; i < residents.Length; i++)
             {
-                var s = stalkers[i];
+                var s = residents[i];
                 if (s == null || !s.gameObject.activeInHierarchy) continue;
-                if (s.state == StalkerAI.State.Chase) return true;
+                if (s.state == ResidentAI.State.Chase) return true;
             }
             return false;
         }

@@ -420,7 +420,7 @@ GameObject:
   - component: {fileID: 303184551}
   - component: {fileID: 303184550}
   m_Layer: 0
-  m_Name: Stalker
+  m_Name: Resident
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -558,7 +558,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5e753ca40c0be47a8ad09f8292cc5de7, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.StalkerAI
+  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.ResidentAI
   agent: {fileID: 303184544}
   player: {fileID: 1298537084}
   losMask:
@@ -597,7 +597,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fa0ae392fc18e4374b5d97a50b5a6a53, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.StalkerKillZone
+  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.ResidentKillZone
 --- !u!135 &303184551
 SphereCollider:
   m_ObjectHideFlags: 0

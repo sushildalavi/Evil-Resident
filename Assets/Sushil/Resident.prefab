@@ -28,8 +28,8 @@ Transform:
   m_GameObject: {fileID: 143395792443931888}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.2800001, z: 0}
-  m_LocalScale: {x: 0.40000004, y: 0.42000002, z: 0.26}
+  m_LocalPosition: {x: 0, y: 1.22, z: 0}
+  m_LocalScale: {x: 0.34, y: 0.5, z: 0.22}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5251762362001046291}
@@ -190,7 +190,7 @@ GameObject:
   - component: {fileID: 2394031574729481630}
   - component: {fileID: 9069851669935751747}
   m_Layer: 0
-  m_Name: Stalker
+  m_Name: Resident
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -280,7 +280,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5e753ca40c0be47a8ad09f8292cc5de7, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.StalkerAI
+  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.ResidentAI
   agent: {fileID: 1290766429478029062}
   player: {fileID: 0}
   losMask:
@@ -457,7 +457,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: fa0ae392fc18e4374b5d97a50b5a6a53, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.StalkerKillZone
+  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.ResidentKillZone
   armDelay: 0.05
   onlyKillDuringChase: 0
 --- !u!1 &2878784859561979213
@@ -488,8 +488,8 @@ Transform:
   m_GameObject: {fileID: 2878784859561979213}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 1.9500002, z: 0}
-  m_LocalScale: {x: 0.26, y: 0.3, z: 0.26}
+  m_LocalPosition: {x: 0, y: 1.82, z: 0}
+  m_LocalScale: {x: 0.22, y: 0.26, z: 0.22}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5251762362001046291}
@@ -712,8 +712,8 @@ Transform:
   m_GameObject: {fileID: 4413401458319227804}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.30000052, y: 0.8000001, z: 0}
-  m_LocalScale: {x: 0.08, y: 1.8, z: 0.08}
+  m_LocalPosition: {x: -0.24, y: 0.94, z: 0}
+  m_LocalScale: {x: 0.085, y: 1.12, z: 0.095}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5251762362001046291}
@@ -855,8 +855,8 @@ Transform:
   m_GameObject: {fileID: 5215088912904891457}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.30000052, y: 0.8000001, z: 0}
-  m_LocalScale: {x: 0.08, y: 1.8, z: 0.08}
+  m_LocalPosition: {x: 0.24, y: 0.94, z: 0}
+  m_LocalScale: {x: 0.085, y: 1.12, z: 0.095}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5251762362001046291}
@@ -1149,8 +1149,8 @@ Transform:
   m_GameObject: {fileID: 7742952824201480245}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: -0.13999939, y: 0.45, z: 0}
-  m_LocalScale: {x: 0.10000001, y: 2, z: 0.10000001}
+  m_LocalPosition: {x: -0.105, y: 0.3, z: 0}
+  m_LocalScale: {x: 0.105, y: 1.54, z: 0.11}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5251762362001046291}
@@ -1261,8 +1261,8 @@ Transform:
   m_GameObject: {fileID: 9133568884569217202}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.13999939, y: 0.45, z: 0}
-  m_LocalScale: {x: 0.10000001, y: 2, z: 0.10000001}
+  m_LocalPosition: {x: 0.105, y: 0.3, z: 0}
+  m_LocalScale: {x: 0.105, y: 1.54, z: 0.11}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 5251762362001046291}
