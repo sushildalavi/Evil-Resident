@@ -38,6 +38,7 @@ public class RohitFPSController : MonoBehaviour
     public float interactDistance = 5f;
     public float keyInteractDistance = 10f;
     public float keyProximityRadius = 2.5f;
+    public float fuseProximityRadius = 2.5f;
     public LayerMask interactableLayer;
     [Tooltip("Solid geometry mask used to block interaction through walls.")]
     public LayerMask interactionOcclusionMask = ~0;
@@ -289,6 +290,21 @@ public class RohitFPSController : MonoBehaviour
             }
         }
 
+        // Proximity-based fuse pickup to avoid missing small fuse colliders.
+        if (TryFindNearbyFuse(out FusePickup nearbyFuse))
+        {
+            if (HasLineOfSightToInteractable(nearbyFuse, keyInteractDistance))
+            {
+                string prompt = nearbyFuse.GetPrompt(this);
+                ShowPrompt(prompt);
+
+                if (WasKeyPressed(nearbyFuse.GetInteractKey()))
+                    nearbyFuse.Interact(this);
+
+                return;
+            }
+        }
+
         if (TryFindInteractable(ray, out IInteractable interactable))
         {
             string prompt = interactable.GetPrompt(this);
@@ -394,6 +410,41 @@ public class RohitFPSController : MonoBehaviour
         }
 
         return keyItem != null;
+    }
+
+    bool TryFindNearbyFuse(out FusePickup fusePickup)
+    {
+        fusePickup = null;
+
+        FusePickup[] allFuses = FindObjectsByType<FusePickup>(FindObjectsSortMode.None);
+        if (allFuses == null || allFuses.Length == 0) return false;
+
+        float bestSqr = float.MaxValue;
+        Vector3 playerPos = transform.position;
+        float radius = Mathf.Max(0.1f, fuseProximityRadius);
+        float radiusSqr = radius * radius;
+
+        for (int i = 0; i < allFuses.Length; i++)
+        {
+            FusePickup candidate = allFuses[i];
+            if (candidate == null || !candidate.gameObject.activeInHierarchy) continue;
+
+            Vector3 fusePos = candidate.transform.position;
+
+            // Keep XZ-only distance so uneven floor height does not block pickup prompt.
+            Vector2 playerXZ = new Vector2(playerPos.x, playerPos.z);
+            Vector2 fuseXZ = new Vector2(fusePos.x, fusePos.z);
+            float sqr = (playerXZ - fuseXZ).sqrMagnitude;
+            if (sqr > radiusSqr) continue;
+
+            if (sqr < bestSqr)
+            {
+                bestSqr = sqr;
+                fusePickup = candidate;
+            }
+        }
+
+        return fusePickup != null;
     }
 
     bool HasLineOfSightToInteractable(IInteractable interactable, float maxDistance)
