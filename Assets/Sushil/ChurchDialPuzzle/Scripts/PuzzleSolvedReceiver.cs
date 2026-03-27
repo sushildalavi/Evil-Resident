@@ -5,7 +5,6 @@ using UnityEngine.Events;
 public class PuzzleSolvedReceiver : MonoBehaviour
 {
     [Header("Vault Reveal")]
-    [SerializeField] private VaultDoorRevealController vaultDoorRevealController;
     [SerializeField] private VaultRevealController legacyVaultRevealController;
 
     [Header("Doors")]
@@ -54,9 +53,6 @@ public class PuzzleSolvedReceiver : MonoBehaviour
 
         UnlockDoors();
 
-        if (vaultDoorRevealController != null)
-            vaultDoorRevealController.OpenVault();
-
         if (legacyVaultRevealController != null)
             legacyVaultRevealController.Reveal();
 
@@ -72,11 +68,6 @@ public class PuzzleSolvedReceiver : MonoBehaviour
             audioSource.PlayOneShot(solvedSound);
 
         onSolved.Invoke();
-    }
-
-    public void SetVaultDoorReveal(VaultDoorRevealController revealController)
-    {
-        vaultDoorRevealController = revealController;
     }
 
     public void SetVaultReveal(VaultRevealController revealController)
