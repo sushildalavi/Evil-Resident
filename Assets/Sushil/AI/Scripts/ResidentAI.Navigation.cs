@@ -1538,6 +1538,60 @@ namespace Sushil.AI
             return Mathf.Max(stepBlend, slopeBlend * 0.85f) >= 0.24f;
         }
 
+        bool IsStrictStairOccupantPosition(Vector3 worldPos)
+        {
+            if (!TryGetGroundHeight(worldPos, out float baseHeight, out float baseSlope))
+                return false;
+
+            if (baseSlope >= 15f)
+                return true;
+
+            float sampleDistance = Mathf.Max(0.14f, stairProbeForwardDistance * 0.32f);
+            Vector3[] sampleOffsets =
+            {
+                Vector3.forward * sampleDistance,
+                Vector3.back * sampleDistance,
+                Vector3.right * sampleDistance,
+                Vector3.left * sampleDistance,
+            };
+
+            int steppedSamples = 0;
+            float strongestStep = 0f;
+            for (int i = 0; i < sampleOffsets.Length; i++)
+            {
+                if (!TryGetGroundHeight(worldPos + sampleOffsets[i], out float sampleHeight, out _))
+                    continue;
+
+                float delta = Mathf.Abs(sampleHeight - baseHeight);
+                strongestStep = Mathf.Max(strongestStep, delta);
+                if (delta >= 0.045f)
+                    steppedSamples++;
+            }
+
+            return steppedSamples >= 2 && strongestStep >= 0.06f;
+        }
+
+        bool TryGetFirstVerticalPathTransition(NavMeshPath path, out Vector3 transitionStart, out Vector3 transitionEnd)
+        {
+            transitionStart = Vector3.zero;
+            transitionEnd = Vector3.zero;
+            if (path == null || path.corners == null || path.corners.Length < 2)
+                return false;
+
+            Vector3[] corners = path.corners;
+            for (int i = 0; i < corners.Length - 1; i++)
+            {
+                if (Mathf.Abs(corners[i + 1].y - corners[i].y) <= 0.08f)
+                    continue;
+
+                transitionStart = corners[i];
+                transitionEnd = corners[i + 1];
+                return true;
+            }
+
+            return false;
+        }
+
         float GetPathLength(NavMeshPath path)
         {
             if (path == null || path.corners == null || path.corners.Length < 2)
@@ -1574,9 +1628,31 @@ namespace Sushil.AI
             float verticalDelta = Mathf.Abs(targetHit.position.y - selfHit.position.y);
             bool selfOnStairs = GetStairBlend() >= 0.2f || IsCurrentlyOnElevatedPath() || IsStairLikePosition(selfHit.position);
             bool targetOnStairs = IsStairLikePosition(targetHit.position);
+            bool selfStrictStairs = IsStrictStairOccupantPosition(selfHit.position);
+            bool targetStrictStairs = IsStrictStairOccupantPosition(targetHit.position);
 
             if (selfOnStairs != targetOnStairs && verticalDelta > 0.08f)
                 return false;
+            if (selfStrictStairs != targetStrictStairs && verticalDelta > 0.06f)
+                return false;
+
+            if (verticalDelta > 0.08f && TryGetFirstVerticalPathTransition(closePath, out Vector3 transitionStart, out Vector3 transitionEnd))
+            {
+                float selfToTransition = Vector2.Distance(
+                    new Vector2(selfHit.position.x, selfHit.position.z),
+                    new Vector2(transitionStart.x, transitionStart.z));
+                float targetToTransition = Vector2.Distance(
+                    new Vector2(targetHit.position.x, targetHit.position.z),
+                    new Vector2(transitionEnd.x, transitionEnd.z));
+
+                if (targetHit.position.y > selfHit.position.y + 0.08f &&
+                    selfToTransition > Mathf.Max(0.16f, killDistance * 0.28f))
+                    return false;
+
+                if (selfHit.position.y > targetHit.position.y + 0.08f &&
+                    targetToTransition > Mathf.Max(0.16f, killDistance * 0.28f))
+                    return false;
+            }
 
             float allowedPathLength = Mathf.Max(killDistance + 0.45f, direct3D + 0.55f);
             if (verticalDelta > 0.3f)

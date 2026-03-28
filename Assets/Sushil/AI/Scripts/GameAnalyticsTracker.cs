@@ -9,6 +9,9 @@ namespace Sushil.Systems
 {
     public static class GameAnalyticsTracker
     {
+        const string AnalyticsFileName = "ResidentAnalytics.csv";
+        const string CsvHeader = "timestamp,scene,event,elapsed_seconds,deaths_this_run,total_deaths,details";
+
         static bool runActive;
         static float runStartTime;
         static int deathsThisRun;
@@ -27,7 +30,7 @@ namespace Sushil.Systems
                 if (!string.IsNullOrEmpty(filePath)) return filePath;
 
                 string analyticsDir = Path.Combine(Application.dataPath, "Sushil", "Analytics");
-                filePath = Path.Combine(analyticsDir, "ResidentAnalytics.csv");
+                filePath = Path.Combine(analyticsDir, AnalyticsFileName);
                 return filePath;
             }
         }
@@ -38,6 +41,7 @@ namespace Sushil.Systems
             runStartTime = Time.time;
             deathsThisRun = 0;
             Initialize();
+            AppendRow("run_started", "start_screen_dismissed");
         }
 
         public static void Initialize()
@@ -63,29 +67,28 @@ namespace Sushil.Systems
         static void EnsureCsvHeader()
         {
             EnsureWritablePath();
-
-            if (File.Exists(AnalyticsPath)) return;
-            string header = "timestamp,scene,event,elapsed_seconds,deaths_this_run,total_deaths,details";
-            File.WriteAllText(AnalyticsPath, header + Environment.NewLine);
+            ExecuteWrite(() =>
+            {
+                if (File.Exists(AnalyticsPath)) return;
+                File.WriteAllText(AnalyticsPath, CsvHeader + Environment.NewLine);
+            }, "create analytics header");
         }
 
         static void EnsureWritablePath()
         {
-            string dir = Path.GetDirectoryName(AnalyticsPath);
-            if (string.IsNullOrEmpty(dir)) return;
-
             try
             {
-                if (!Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
+                EnsureDirectoryExists();
             }
             catch (Exception ex)
             {
-                // Build outputs can be read-only near Application.dataPath.
-                string fallbackDir = Path.Combine(Application.persistentDataPath, "Sushil", "Analytics");
-                Directory.CreateDirectory(fallbackDir);
-                filePath = Path.Combine(fallbackDir, "ResidentAnalytics.csv");
-                Debug.LogWarning($"[Analytics] Project path not writable, using fallback path: {filePath}. Reason: {ex.Message}");
+                if (!TrySwitchToFallbackPath(ex))
+                {
+                    Debug.LogError($"[Analytics] Failed to prepare analytics directory at {AnalyticsPath}. Reason: {ex}");
+                    return;
+                }
+
+                EnsureDirectoryExists();
             }
 
             if (!pathLogged)
@@ -112,7 +115,55 @@ namespace Sushil.Systems
                 totalDeaths.ToString(CultureInfo.InvariantCulture),
                 SanitizeForCsv(details));
 
-            File.AppendAllText(AnalyticsPath, row + Environment.NewLine);
+            ExecuteWrite(() => File.AppendAllText(AnalyticsPath, row + Environment.NewLine), $"append analytics event '{evt}'");
+        }
+
+        static void EnsureDirectoryExists()
+        {
+            string dir = Path.GetDirectoryName(AnalyticsPath);
+            if (string.IsNullOrEmpty(dir)) return;
+
+            if (!Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+        }
+
+        static void ExecuteWrite(Action writeAction, string operation)
+        {
+            try
+            {
+                writeAction();
+            }
+            catch (Exception ex)
+            {
+                if (!TrySwitchToFallbackPath(ex))
+                {
+                    Debug.LogError($"[Analytics] Failed to {operation} at {AnalyticsPath}. Reason: {ex}");
+                    return;
+                }
+
+                try
+                {
+                    EnsureDirectoryExists();
+                    writeAction();
+                }
+                catch (Exception fallbackEx)
+                {
+                    Debug.LogError($"[Analytics] Failed to {operation} at fallback path {AnalyticsPath}. Reason: {fallbackEx}");
+                }
+            }
+        }
+
+        static bool TrySwitchToFallbackPath(Exception ex)
+        {
+            string fallbackDir = Path.Combine(Application.persistentDataPath, "Sushil", "Analytics");
+            string fallbackPath = Path.Combine(fallbackDir, AnalyticsFileName);
+            if (string.Equals(AnalyticsPath, fallbackPath, StringComparison.Ordinal))
+                return false;
+
+            filePath = fallbackPath;
+            pathLogged = false;
+            Debug.LogWarning($"[Analytics] Project path not writable, using fallback path: {filePath}. Reason: {ex.Message}");
+            return true;
         }
 
         static string SanitizeForCsv(string value)

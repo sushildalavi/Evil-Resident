@@ -71,6 +71,10 @@ namespace Sushil.AI
         public int destinationRetrySamples = 10;
         public float destinationRetryRadius = 3.2f;
 
+        [Header("Movement Recovery")]
+        [Tooltip("When disabled, the resident will not use runtime warp/snap recovery. This removes the visible twitch/teleport effect but makes it less aggressive about unsticking itself.")]
+        public bool allowRuntimeRecoveryWarps = false;
+
         [Header("Hard Movement Constraints")]
         [Tooltip("Layers treated as hard blockers for resident movement validation.")]
         public LayerMask blockingGeometryMask = ~0;
@@ -447,7 +451,13 @@ namespace Sushil.AI
             // Keep hard geometry validation enabled so chase logic cannot cut through walls.
             validatePathAgainstGeometry = true;
             rejectDestinationsInsideBlockingGeometry = true;
-            enforceRuntimeAntiClip = true;
+            enforceRuntimeAntiClip = allowRuntimeRecoveryWarps;
+            if (!allowRuntimeRecoveryWarps)
+            {
+                keepAgentSnappedToNavMesh = false;
+                enforceNavMeshBoundaryAntiClip = false;
+                enableStairTraverseAssist = false;
+            }
 
             // Avoid floating weirdness
             agent.baseOffset = 0f;
@@ -507,10 +517,13 @@ namespace Sushil.AI
                 if (player == null) return;
             }
 
-            StabilizeAgentOnNavMesh();
             ApplyDynamicNavigationProfile();
-            ApplyStairTraverseAssist();
-            TryGeneralStuckRecovery();
+            if (allowRuntimeRecoveryWarps)
+            {
+                StabilizeAgentOnNavMesh();
+                ApplyStairTraverseAssist();
+                TryGeneralStuckRecovery();
+            }
 
             if (killAttackActive)
             {
@@ -600,7 +613,8 @@ namespace Sushil.AI
 
         void LateUpdate()
         {
-            EnforceRuntimeNoClip();
+            if (allowRuntimeRecoveryWarps)
+                EnforceRuntimeNoClip();
         }
 
         void ChangeState(State newState)
