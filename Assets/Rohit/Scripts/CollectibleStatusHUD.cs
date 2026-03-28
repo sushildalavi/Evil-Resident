@@ -7,13 +7,17 @@ using UnityEngine.UI;
 public class CollectibleStatusHUD : MonoBehaviour
 {
     const float RefreshInterval = 0.35f;
-    const float RootPadding = 12f;
+    const float RootPadding = 14f;
     const float KeyTokenWidth = 92f;
     const float KeyTokenHeight = 58f;
     const float KeyTokenGap = 10f;
     const float FuseTokenWidth = 50f;
     const float FuseTokenHeight = 66f;
     const float FuseTokenGap = 10f;
+    const float SectionHeaderHeight = 34f;
+    const float SectionDetailTop = 40f;
+    const float SectionTokenTop = 60f;
+    const float SectionMinWidth = 448f;
 
     static readonly KeyType[] KeyOrder =
     {
@@ -127,12 +131,12 @@ public class CollectibleStatusHUD : MonoBehaviour
         scaler.matchWidthOrHeight = 0.5f;
         gameObject.AddComponent<GraphicRaycaster>();
 
-        rootRect = CreatePanel("CollectibleRoot", transform, new Color(0.04f, 0.05f, 0.09f, 0.92f));
+        rootRect = CreatePanel("CollectibleRoot", transform, new Color(0.04f, 0.05f, 0.09f, 0.94f));
         rootRect.anchorMin = new Vector2(0f, 1f);
         rootRect.anchorMax = new Vector2(0f, 1f);
         rootRect.pivot = new Vector2(0f, 1f);
         rootRect.anchoredPosition = new Vector2(22f, -22f);
-        rootRect.sizeDelta = new Vector2(420f, 188f);
+        rootRect.sizeDelta = new Vector2(468f, 232f);
 
         AddOutline(rootRect.gameObject, new Color(0f, 0f, 0f, 0.55f), new Vector2(1f, -1f));
         AddShadow(rootRect.gameObject, new Color(0f, 0f, 0f, 0.60f), new Vector2(4f, -4f));
@@ -140,11 +144,11 @@ public class CollectibleStatusHUD : MonoBehaviour
         rootGlow = CreateImage("RootGlow", rootRect, new Color(0.55f, 0.80f, 1f, 0.12f));
         Stretch(rootGlow.rectTransform, 3f, 3f, 3f, 3f);
 
-        Image headerGlow = CreateImage("HeaderGlow", rootRect, new Color(0.35f, 0.64f, 1f, 0.10f));
-        SetTopStretch(headerGlow.rectTransform, 4f, 4f, 4f, 34f);
+        Image headerGlow = CreateImage("HeaderGlow", rootRect, new Color(0.35f, 0.64f, 1f, 0.12f));
+        SetTopStretch(headerGlow.rectTransform, 4f, 4f, 4f, 38f);
 
         Image headerLine = CreateImage("HeaderLine", rootRect, new Color(0.80f, 0.88f, 1f, 0.18f));
-        SetTopLeft(headerLine.rectTransform, RootPadding, 50f, 268f, 2f);
+        SetTopStretch(headerLine.rectTransform, RootPadding, 54f, 156f, 2f);
 
         titleText = CreateText("Title", rootRect, "OBJECTIVE TRACKER", 24, FontStyle.Bold, TextAnchor.MiddleLeft,
             new Color(0.96f, 0.98f, 1f, 0.99f));
@@ -159,10 +163,10 @@ public class CollectibleStatusHUD : MonoBehaviour
         CreateHeaderChip("ChipGreen", 86f, KeyAccentColors[1]);
         CreateHeaderChip("ChipBlue", 56f, KeyAccentColors[2]);
 
-        keySection = CreateSection("Keys", "KEYS");
-        fuseSection = CreateSection("Fuses", "FUSES");
-        keySection.accentBar.color = new Color(0.95f, 0.52f, 0.52f, 0.92f);
-        fuseSection.accentBar.color = new Color(0.56f, 0.78f, 1f, 0.90f);
+        keySection = CreateSection("Keys", "RGB KEYS");
+        fuseSection = CreateSection("Fuses", "POWER CELLS");
+        ApplySectionAccent(keySection, new Color(0.95f, 0.52f, 0.52f, 0.92f));
+        ApplySectionAccent(fuseSection, new Color(0.56f, 0.78f, 1f, 0.90f));
 
         BuildKeyTokens();
         RebuildFuseTokens(3);
@@ -207,6 +211,7 @@ public class CollectibleStatusHUD : MonoBehaviour
         int collectedKeys = inventory != null ? inventory.KeyCount : 0;
         int collectedFuses = inventory != null ? inventory.TotalFusesCollected : 0;
         int carryingFuses = inventory != null ? inventory.FuseCount : 0;
+        int installedFuses = Mathf.Max(0, collectedFuses - carryingFuses);
 
         float rootPulse = 0.92f + 0.08f * Mathf.Sin(Time.unscaledTime * 1.7f);
         if (rootGlow != null)
@@ -220,12 +225,26 @@ public class CollectibleStatusHUD : MonoBehaviour
             fuseSection.root.gameObject.SetActive(targetFuseCount > 0);
 
         if (keySection.summaryText != null)
-            keySection.summaryText.text = $"{collectedKeys}/{targetKeyCount} COLLECTED";
+            keySection.summaryText.text = $"{collectedKeys}/{targetKeyCount} SECURED";
+        if (keySection.detailText != null)
+        {
+            int remainingKeys = Mathf.Max(0, targetKeyCount - collectedKeys);
+            keySection.detailText.text = remainingKeys > 0
+                ? $"{remainingKeys} KEY{(remainingKeys == 1 ? string.Empty : "S")} STILL MISSING"
+                : "ALL KEY SHAPES COLLECTED";
+        }
 
         if (fuseSection.summaryText != null)
+            fuseSection.summaryText.text = $"{collectedFuses}/{targetFuseCount} SECURED";
+        if (fuseSection.detailText != null)
         {
-            string carrySuffix = carryingFuses > 0 ? $"  |  CARRY {carryingFuses}" : string.Empty;
-            fuseSection.summaryText.text = $"{collectedFuses}/{targetFuseCount} COLLECTED{carrySuffix}";
+            int missingFuses = Mathf.Max(0, targetFuseCount - installedFuses);
+            if (carryingFuses > 0)
+                fuseSection.detailText.text = $"{installedFuses} INSTALLED  |  {carryingFuses} CARRYING";
+            else if (missingFuses > 0)
+                fuseSection.detailText.text = $"{missingFuses} SLOT{(missingFuses == 1 ? string.Empty : "S")} STILL EMPTY";
+            else
+                fuseSection.detailText.text = "ALL POWER CELLS INSTALLED";
         }
 
         for (int i = 0; i < keyTokens.Count; i++)
@@ -236,7 +255,6 @@ public class CollectibleStatusHUD : MonoBehaviour
             ApplyKeyStyle(token, collected, KeyAccentColors[i], pulse);
         }
 
-        int installedFuses = Mathf.Max(0, collectedFuses - carryingFuses);
         for (int i = 0; i < fuseTokens.Count; i++)
         {
             FuseState state = FuseState.Missing;
@@ -254,14 +272,14 @@ public class CollectibleStatusHUD : MonoBehaviour
         float keyAreaWidth = (KeyTokenWidth * keyTokens.Count) + (KeyTokenGap * Mathf.Max(0, keyTokens.Count - 1));
         float fuseAreaWidth = (FuseTokenWidth * fuseTokens.Count) + (FuseTokenGap * Mathf.Max(0, fuseTokens.Count - 1));
         float contentWidth = Mathf.Max(keyAreaWidth, fuseAreaWidth);
-        float rootWidth = Mathf.Max(430f, 148f + contentWidth + RootPadding);
+        float rootWidth = Mathf.Max(SectionMinWidth, contentWidth + (RootPadding * 2f) + 32f);
 
         SetTopLeft(titleText.rectTransform, RootPadding, 10f, rootWidth - (RootPadding * 2f), 24f);
         SetTopLeft(subtitleText.rectTransform, RootPadding, 34f, rootWidth - 180f, 14f);
 
         float top = 60f;
-        float keyHeight = 68f;
-        float fuseHeight = 86f;
+        float keyHeight = SectionTokenTop + KeyTokenHeight + 12f;
+        float fuseHeight = SectionTokenTop + FuseTokenHeight + 12f;
 
         if (targetKeyCount > 0)
         {
@@ -281,9 +299,16 @@ public class CollectibleStatusHUD : MonoBehaviour
     void LayoutSection(SectionView section, float top, float width, float height, float tokenAreaWidth, float tokenAreaHeight)
     {
         SetTopLeft(section.root, RootPadding, top, width, height);
-        SetTopLeft(section.titleText.rectTransform, 12f, 10f, 118f, 18f);
-        SetTopLeft(section.summaryText.rectTransform, 12f, 32f, 124f, 18f);
-        SetTopLeft(section.tokenHost, 138f, Mathf.Max(5f, (height - tokenAreaHeight) * 0.5f), tokenAreaWidth, tokenAreaHeight);
+        SetTopLeft(section.headerTint.rectTransform, 8f, 8f, width - 16f, SectionHeaderHeight);
+        SetTopLeft(section.titleText.rectTransform, 14f, 16f, 160f, 18f);
+
+        float summaryWidth = Mathf.Clamp(width * 0.34f, 156f, 212f);
+        SetTopRight(section.summaryPlate.rectTransform, 12f, 12f, summaryWidth, 24f);
+        Stretch(section.summaryText.rectTransform, 8f, 2f, 8f, 2f);
+        SetTopLeft(section.detailText.rectTransform, 14f, SectionDetailTop, width - 28f, 15f);
+
+        float tokenX = Mathf.Max(14f, (width - tokenAreaWidth) * 0.5f);
+        SetTopLeft(section.tokenHost, tokenX, SectionTokenTop, tokenAreaWidth, tokenAreaHeight);
 
         float x = 0f;
         if (section == keySection)
@@ -316,15 +341,32 @@ public class CollectibleStatusHUD : MonoBehaviour
         accentBar.rectTransform.anchoredPosition = Vector2.zero;
         accentBar.rectTransform.sizeDelta = new Vector2(4f, 0f);
 
-        Image edgeLight = CreateImage("EdgeLight", rect, new Color(1f, 1f, 1f, 0.06f));
-        SetTopLeft(edgeLight.rectTransform, 8f, 4f, 180f, 1f);
+        Image headerTint = CreateImage("HeaderTint", rect, new Color(1f, 1f, 1f, 0.06f));
+        Image edgeLight = CreateImage("EdgeLight", rect, new Color(1f, 1f, 1f, 0.08f));
+        SetTopLeft(edgeLight.rectTransform, 12f, 10f, 196f, 1f);
+
+        Image summaryPlate = CreateImage("SummaryPlate", rect, new Color(0.16f, 0.19f, 0.26f, 0.96f));
+        AddOutline(summaryPlate.gameObject, new Color(0f, 0f, 0f, 0.30f), new Vector2(1f, -1f));
 
         Text sectionTitle = CreateText("Title", rect, title, 16, FontStyle.Bold, TextAnchor.MiddleLeft,
             new Color(0.91f, 0.95f, 1f, 0.96f));
         AddShadow(sectionTitle.gameObject, new Color(0f, 0f, 0f, 0.7f), new Vector2(2f, -2f));
 
-        Text summary = CreateText("Summary", rect, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleLeft,
-            new Color(0.70f, 0.78f, 0.88f, 0.92f));
+        Text summary = CreateText("Summary", summaryPlate.rectTransform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleCenter,
+            new Color(0.96f, 0.98f, 1f, 0.96f));
+        summary.resizeTextForBestFit = true;
+        summary.resizeTextMinSize = 8;
+        summary.resizeTextMaxSize = 12;
+        summary.horizontalOverflow = HorizontalWrapMode.Wrap;
+        summary.verticalOverflow = VerticalWrapMode.Truncate;
+
+        Text detail = CreateText("Detail", rect, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleLeft,
+            new Color(0.78f, 0.84f, 0.92f, 0.86f));
+        detail.resizeTextForBestFit = true;
+        detail.resizeTextMinSize = 8;
+        detail.resizeTextMaxSize = 11;
+        detail.horizontalOverflow = HorizontalWrapMode.Wrap;
+        detail.verticalOverflow = VerticalWrapMode.Truncate;
 
         RectTransform tokenHost = new GameObject("TokenHost", typeof(RectTransform)).GetComponent<RectTransform>();
         tokenHost.SetParent(rect, false);
@@ -336,10 +378,22 @@ public class CollectibleStatusHUD : MonoBehaviour
         {
             root = rect,
             accentBar = accentBar,
+            headerTint = headerTint,
+            summaryPlate = summaryPlate,
             titleText = sectionTitle,
             summaryText = summary,
+            detailText = detail,
             tokenHost = tokenHost
         };
+    }
+
+    void ApplySectionAccent(SectionView section, Color accent)
+    {
+        section.accentBar.color = accent;
+        if (section.headerTint != null)
+            section.headerTint.color = new Color(accent.r, accent.g, accent.b, 0.09f);
+        if (section.summaryPlate != null)
+            section.summaryPlate.color = Color.Lerp(accent, new Color(0.08f, 0.10f, 0.16f, 0.96f), 0.68f);
     }
 
     void BuildKeyTokens()
@@ -739,8 +793,11 @@ public class CollectibleStatusHUD : MonoBehaviour
     {
         public RectTransform root;
         public Image accentBar;
+        public Image headerTint;
+        public Image summaryPlate;
         public Text titleText;
         public Text summaryText;
+        public Text detailText;
         public RectTransform tokenHost;
     }
 

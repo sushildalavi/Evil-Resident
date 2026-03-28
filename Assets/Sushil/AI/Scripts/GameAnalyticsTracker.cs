@@ -214,7 +214,7 @@ namespace Sushil.Systems
             if (hudText == null) return;
 
             TimeSpan t = TimeSpan.FromSeconds(GameAnalyticsTracker.ElapsedSeconds);
-            hudText.text = $"Time: {t.Minutes:00}:{t.Seconds:00}  Deaths: {GameAnalyticsTracker.DeathsThisRun}";
+            hudText.text = $"Time: {t.Minutes:00}:{t.Seconds:00}  Deaths: {GameAnalyticsTracker.TotalDeaths}";
         }
 
         void BuildUI()

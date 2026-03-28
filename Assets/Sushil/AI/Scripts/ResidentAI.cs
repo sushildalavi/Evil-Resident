@@ -281,16 +281,34 @@ namespace Sushil.AI
         private Transform armR;
         private Transform legL;
         private Transform legR;
+        private Transform head;
         private Vector3 visualBaseLocalPos;
         private Quaternion visualBaseLocalRot;
         private Vector3 armLBaseLocalPos;
         private Vector3 armRBaseLocalPos;
         private Vector3 legLBaseLocalPos;
         private Vector3 legRBaseLocalPos;
+        private Quaternion headBaseRot;
         private Quaternion armLBaseRot;
         private Quaternion armRBaseRot;
         private Quaternion legLBaseRot;
         private Quaternion legRBaseRot;
+        private Transform faceRig;
+        private Transform leftPupil;
+        private Transform rightPupil;
+        private Transform leftBrow;
+        private Transform rightBrow;
+        private Transform mouthVoid;
+        private Transform upperTeeth;
+        private Transform lowerTeeth;
+        private Vector3 leftPupilBaseLocalPos;
+        private Vector3 rightPupilBaseLocalPos;
+        private Quaternion leftBrowBaseLocalRot;
+        private Quaternion rightBrowBaseLocalRot;
+        private Vector3 mouthVoidBaseLocalScale;
+        private Vector3 upperTeethBaseLocalPos;
+        private Vector3 lowerTeethBaseLocalPos;
+        private float faceSeed;
         private float motionPhase;
         private float smoothedMove01;
         private Transform[] clawShaftsL = new Transform[4];
@@ -334,6 +352,10 @@ namespace Sushil.AI
         private bool hasPlayerSpawnPosition;
         private bool wholeHouseSearchMode;
         private Vector3 wholeHouseSearchLastKnownPos;
+        private static Material faceVoidSharedMaterial;
+        private static Material faceEyeSharedMaterial;
+        private static Material facePupilSharedMaterial;
+        private static Material faceToothSharedMaterial;
 
         void Reset() { agent = GetComponent<NavMeshAgent>(); }
 
@@ -1260,6 +1282,7 @@ namespace Sushil.AI
             armR = FindChildRecursive(visualRoot, "Arm_R");
             legL = FindChildRecursive(visualRoot, "Leg_L");
             legR = FindChildRecursive(visualRoot, "Leg_R");
+            head = FindChildRecursive(visualRoot, "Head");
             NormalizeHumanoidRig();
 
             if (visualRoot == null) return;
@@ -1270,6 +1293,9 @@ namespace Sushil.AI
             if (armR != null) { armRBaseLocalPos = armR.localPosition; armRBaseRot = armR.localRotation; }
             if (legL != null) { legLBaseLocalPos = legL.localPosition; legLBaseRot = legL.localRotation; }
             if (legR != null) { legRBaseLocalPos = legR.localPosition; legRBaseRot = legR.localRotation; }
+            if (head != null) headBaseRot = head.localRotation;
+
+            SetupFaceRig();
 
         }
 
@@ -1321,6 +1347,193 @@ namespace Sushil.AI
             }
         }
 
+        void SetupFaceRig()
+        {
+            if (head == null)
+                return;
+
+            faceSeed = Mathf.Abs(GetInstanceID() * 0.173f);
+            faceRig = head.Find("FaceRig");
+            if (faceRig == null)
+            {
+                faceRig = new GameObject("FaceRig").transform;
+                faceRig.SetParent(head, false);
+            }
+
+            faceRig.localPosition = Vector3.zero;
+            faceRig.localRotation = Quaternion.identity;
+            faceRig.localScale = Vector3.one;
+
+            EnsureFacePrimitive(faceRig, "EyeSocket_L", PrimitiveType.Cube,
+                new Vector3(-0.17f, 0.09f, 0.39f), Quaternion.Euler(0f, -6f, 0f), new Vector3(0.20f, 0.12f, 0.05f),
+                GetFaceVoidMaterial());
+            EnsureFacePrimitive(faceRig, "EyeSocket_R", PrimitiveType.Cube,
+                new Vector3(0.17f, 0.09f, 0.39f), Quaternion.Euler(0f, 6f, 0f), new Vector3(0.20f, 0.12f, 0.05f),
+                GetFaceVoidMaterial());
+            EnsureFacePrimitive(faceRig, "Eye_L", PrimitiveType.Sphere,
+                new Vector3(-0.17f, 0.09f, 0.44f), Quaternion.identity, new Vector3(0.13f, 0.12f, 0.09f),
+                GetFaceEyeMaterial());
+            EnsureFacePrimitive(faceRig, "Eye_R", PrimitiveType.Sphere,
+                new Vector3(0.17f, 0.09f, 0.44f), Quaternion.identity, new Vector3(0.13f, 0.12f, 0.09f),
+                GetFaceEyeMaterial());
+
+            leftPupil = EnsureFacePrimitive(faceRig, "Pupil_L", PrimitiveType.Sphere,
+                new Vector3(-0.17f, 0.09f, 0.49f), Quaternion.identity, new Vector3(0.05f, 0.05f, 0.03f),
+                GetFacePupilMaterial());
+            rightPupil = EnsureFacePrimitive(faceRig, "Pupil_R", PrimitiveType.Sphere,
+                new Vector3(0.17f, 0.09f, 0.49f), Quaternion.identity, new Vector3(0.05f, 0.05f, 0.03f),
+                GetFacePupilMaterial());
+
+            leftBrow = EnsureFacePrimitive(faceRig, "Brow_L", PrimitiveType.Cube,
+                new Vector3(-0.17f, 0.21f, 0.41f), Quaternion.Euler(0f, 0f, -18f), new Vector3(0.22f, 0.04f, 0.05f),
+                GetFaceVoidMaterial());
+            rightBrow = EnsureFacePrimitive(faceRig, "Brow_R", PrimitiveType.Cube,
+                new Vector3(0.17f, 0.21f, 0.41f), Quaternion.Euler(0f, 0f, 18f), new Vector3(0.22f, 0.04f, 0.05f),
+                GetFaceVoidMaterial());
+
+            mouthVoid = EnsureFacePrimitive(faceRig, "MouthVoid", PrimitiveType.Cube,
+                new Vector3(0f, -0.18f, 0.43f), Quaternion.identity, new Vector3(0.36f, 0.06f, 0.08f),
+                GetFaceVoidMaterial());
+
+            upperTeeth = EnsureFaceAnchor(faceRig, "UpperTeeth", new Vector3(0f, -0.12f, 0.47f));
+            lowerTeeth = EnsureFaceAnchor(faceRig, "LowerTeeth", new Vector3(0f, -0.22f, 0.47f));
+
+            EnsureFacePrimitive(upperTeeth, "FangOuter_L", PrimitiveType.Cube,
+                new Vector3(-0.13f, -0.06f, 0f), Quaternion.Euler(0f, 0f, 10f), new Vector3(0.045f, 0.14f, 0.04f),
+                GetFaceToothMaterial());
+            EnsureFacePrimitive(upperTeeth, "FangInner_L", PrimitiveType.Cube,
+                new Vector3(-0.05f, -0.05f, 0f), Quaternion.identity, new Vector3(0.035f, 0.11f, 0.03f),
+                GetFaceToothMaterial());
+            EnsureFacePrimitive(upperTeeth, "FangInner_R", PrimitiveType.Cube,
+                new Vector3(0.05f, -0.05f, 0f), Quaternion.identity, new Vector3(0.035f, 0.11f, 0.03f),
+                GetFaceToothMaterial());
+            EnsureFacePrimitive(upperTeeth, "FangOuter_R", PrimitiveType.Cube,
+                new Vector3(0.13f, -0.06f, 0f), Quaternion.Euler(0f, 0f, -10f), new Vector3(0.045f, 0.14f, 0.04f),
+                GetFaceToothMaterial());
+
+            EnsureFacePrimitive(lowerTeeth, "FangOuter_L", PrimitiveType.Cube,
+                new Vector3(-0.11f, 0.05f, 0f), Quaternion.Euler(0f, 0f, -10f), new Vector3(0.04f, 0.11f, 0.035f),
+                GetFaceToothMaterial());
+            EnsureFacePrimitive(lowerTeeth, "FangInner_L", PrimitiveType.Cube,
+                new Vector3(-0.04f, 0.04f, 0f), Quaternion.identity, new Vector3(0.032f, 0.09f, 0.03f),
+                GetFaceToothMaterial());
+            EnsureFacePrimitive(lowerTeeth, "FangInner_R", PrimitiveType.Cube,
+                new Vector3(0.04f, 0.04f, 0f), Quaternion.identity, new Vector3(0.032f, 0.09f, 0.03f),
+                GetFaceToothMaterial());
+            EnsureFacePrimitive(lowerTeeth, "FangOuter_R", PrimitiveType.Cube,
+                new Vector3(0.11f, 0.05f, 0f), Quaternion.Euler(0f, 0f, 10f), new Vector3(0.04f, 0.11f, 0.035f),
+                GetFaceToothMaterial());
+
+            if (leftPupil != null) leftPupilBaseLocalPos = leftPupil.localPosition;
+            if (rightPupil != null) rightPupilBaseLocalPos = rightPupil.localPosition;
+            if (leftBrow != null) leftBrowBaseLocalRot = leftBrow.localRotation;
+            if (rightBrow != null) rightBrowBaseLocalRot = rightBrow.localRotation;
+            if (mouthVoid != null) mouthVoidBaseLocalScale = mouthVoid.localScale;
+            if (upperTeeth != null) upperTeethBaseLocalPos = upperTeeth.localPosition;
+            if (lowerTeeth != null) lowerTeethBaseLocalPos = lowerTeeth.localPosition;
+        }
+
+        Transform EnsureFaceAnchor(Transform parent, string name, Vector3 localPosition)
+        {
+            Transform anchor = parent.Find(name);
+            if (anchor == null)
+            {
+                anchor = new GameObject(name).transform;
+                anchor.SetParent(parent, false);
+            }
+
+            anchor.localPosition = localPosition;
+            anchor.localRotation = Quaternion.identity;
+            anchor.localScale = Vector3.one;
+            return anchor;
+        }
+
+        Transform EnsureFacePrimitive(Transform parent, string name, PrimitiveType primitiveType, Vector3 localPosition, Quaternion localRotation, Vector3 localScale, Material material)
+        {
+            Transform child = parent.Find(name);
+            if (child == null)
+            {
+                GameObject primitive = GameObject.CreatePrimitive(primitiveType);
+                primitive.name = name;
+                child = primitive.transform;
+                child.SetParent(parent, false);
+            }
+
+            child.localPosition = localPosition;
+            child.localRotation = localRotation;
+            child.localScale = localScale;
+
+            Collider primitiveCollider = child.GetComponent<Collider>();
+            if (primitiveCollider != null)
+                primitiveCollider.enabled = false;
+
+            Renderer renderer = child.GetComponent<Renderer>();
+            if (renderer != null && material != null)
+            {
+                renderer.sharedMaterial = material;
+                renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
+            }
+
+            return child;
+        }
+
+        static Material GetFaceVoidMaterial()
+        {
+            if (faceVoidSharedMaterial == null)
+                faceVoidSharedMaterial = CreateFaceMaterial("ResidentFaceVoid", new Color(0.04f, 0.01f, 0.01f, 1f), Color.black, 0.05f);
+            return faceVoidSharedMaterial;
+        }
+
+        static Material GetFaceEyeMaterial()
+        {
+            if (faceEyeSharedMaterial == null)
+                faceEyeSharedMaterial = CreateFaceMaterial("ResidentFaceEye", new Color(0.88f, 0.82f, 0.76f, 1f), new Color(0.08f, 0.02f, 0.02f), 0.12f);
+            return faceEyeSharedMaterial;
+        }
+
+        static Material GetFacePupilMaterial()
+        {
+            if (facePupilSharedMaterial == null)
+                facePupilSharedMaterial = CreateFaceMaterial("ResidentFacePupil", new Color(0.48f, 0.03f, 0.03f, 1f), new Color(1.25f, 0.08f, 0.08f), 0.08f);
+            return facePupilSharedMaterial;
+        }
+
+        static Material GetFaceToothMaterial()
+        {
+            if (faceToothSharedMaterial == null)
+                faceToothSharedMaterial = CreateFaceMaterial("ResidentFaceTooth", new Color(0.76f, 0.70f, 0.59f, 1f), Color.black, 0.02f);
+            return faceToothSharedMaterial;
+        }
+
+        static Material CreateFaceMaterial(string materialName, Color baseColor, Color emissionColor, float smoothness)
+        {
+            Shader shader = Shader.Find("Standard");
+            if (shader == null) shader = Shader.Find("Universal Render Pipeline/Lit");
+            if (shader == null) shader = Shader.Find("HDRP/Lit");
+            if (shader == null) shader = Shader.Find("Sprites/Default");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+
+            Material material = new Material(shader);
+            material.name = materialName;
+
+            if (material.HasProperty("_Color"))
+                material.SetColor("_Color", baseColor);
+            if (material.HasProperty("_BaseColor"))
+                material.SetColor("_BaseColor", baseColor);
+            if (material.HasProperty("_Smoothness"))
+                material.SetFloat("_Smoothness", smoothness);
+            if (material.HasProperty("_Metallic"))
+                material.SetFloat("_Metallic", 0f);
+            if (emissionColor.maxColorComponent > 0.001f && material.HasProperty("_EmissionColor"))
+            {
+                material.EnableKeyword("_EMISSION");
+                material.SetColor("_EmissionColor", emissionColor);
+            }
+
+            return material;
+        }
+
         Transform FindChildRecursive(Transform root, string childName)
         {
             if (root == null) return null;
@@ -1338,7 +1551,12 @@ namespace Sushil.AI
             if (visualRoot == null) return;
 
             float dt = Mathf.Max(Time.deltaTime, 0.0001f);
-            if (killAttackActive) { UpdateKillAttackAnimation(); return; }
+            if (killAttackActive)
+            {
+                UpdateKillAttackAnimation();
+                UpdateFaceAnimation(1f, true, dt);
+                return;
+            }
 
             float velocity = IsAgentReady() ? agent.velocity.magnitude : 0f;
             float speedRef = IsAgentReady() ? Mathf.Max(0.1f, agent.speed) : 1f;
@@ -1431,6 +1649,101 @@ namespace Sushil.AI
             }
 
             UpdateClawAnimation(move01, chasing);
+            UpdateFaceAnimation(move01, chasing, dt);
+        }
+
+        void UpdateFaceAnimation(float move01, bool chasing, float dt)
+        {
+            if (head == null || leftPupil == null || rightPupil == null)
+                return;
+
+            Vector3 lookTarget = GetFaceLookTarget();
+            Vector3 toTarget = lookTarget - head.position;
+            if (toTarget.sqrMagnitude < 0.0001f)
+                toTarget = transform.forward;
+
+            Transform parent = head.parent != null ? head.parent : transform;
+            Vector3 parentLocalDir = parent.InverseTransformDirection(toTarget.normalized);
+            float planarMagnitude = Mathf.Max(0.0001f, Mathf.Sqrt((parentLocalDir.x * parentLocalDir.x) + (parentLocalDir.z * parentLocalDir.z)));
+            float yaw = Mathf.Atan2(parentLocalDir.x, parentLocalDir.z) * Mathf.Rad2Deg;
+            float pitch = -Mathf.Atan2(parentLocalDir.y, planarMagnitude) * Mathf.Rad2Deg;
+
+            float threat = killAttackActive
+                ? 1f
+                : state == State.Chase
+                    ? Mathf.Lerp(0.58f, 0.95f, move01)
+                    : state == State.Search || state == State.Investigate
+                        ? 0.34f
+                        : 0.14f;
+
+            float yawClamp = Mathf.Lerp(idleLookAroundMaxAngle * 0.45f, 34f, threat);
+            float downClamp = Mathf.Lerp(12f, 20f, threat);
+            float upClamp = Mathf.Lerp(18f, 28f, threat);
+            Quaternion targetHeadRot = headBaseRot * Quaternion.Euler(
+                Mathf.Clamp(pitch, -downClamp, upClamp),
+                Mathf.Clamp(yaw, -yawClamp, yawClamp),
+                -Mathf.Clamp(yaw * 0.14f, 0f - 5f, 5f));
+            head.localRotation = Quaternion.Slerp(head.localRotation, targetHeadRot, dt * Mathf.Lerp(3f, 10f, threat));
+
+            Vector3 headLocalDir = head.InverseTransformDirection(toTarget.normalized);
+            Vector3 pupilOffset = new Vector3(
+                Mathf.Clamp(headLocalDir.x, -0.85f, 0.85f) * 0.026f,
+                Mathf.Clamp(headLocalDir.y, -0.75f, 0.75f) * 0.020f,
+                Mathf.Clamp(headLocalDir.z, -0.4f, 1f) * 0.006f);
+            leftPupil.localPosition = Vector3.Lerp(leftPupil.localPosition, leftPupilBaseLocalPos + pupilOffset, dt * 12f);
+            rightPupil.localPosition = Vector3.Lerp(rightPupil.localPosition, rightPupilBaseLocalPos + pupilOffset, dt * 12f);
+
+            if (leftBrow != null && rightBrow != null)
+            {
+                float browTwitch = Mathf.Sin((Time.time * 1.7f) + faceSeed) * Mathf.Lerp(1f, 3f, threat);
+                leftBrow.localRotation = leftBrowBaseLocalRot * Quaternion.Euler(0f, 0f, -browTwitch);
+                rightBrow.localRotation = rightBrowBaseLocalRot * Quaternion.Euler(0f, 0f, browTwitch);
+            }
+
+            float jawNoise = Mathf.Sin((Time.time * Mathf.Lerp(1.2f, 5.6f, threat)) + (faceSeed * 0.35f)) * 0.5f + 0.5f;
+            float mouthOpen = 0.018f + (threat * 0.06f) + (jawNoise * threat * 0.018f);
+            if (mouthVoid != null)
+            {
+                mouthVoid.localScale = new Vector3(
+                    mouthVoidBaseLocalScale.x,
+                    mouthVoidBaseLocalScale.y + mouthOpen,
+                    mouthVoidBaseLocalScale.z);
+            }
+            if (upperTeeth != null)
+                upperTeeth.localPosition = upperTeethBaseLocalPos + new Vector3(0f, mouthOpen * 0.18f, 0f);
+            if (lowerTeeth != null)
+                lowerTeeth.localPosition = lowerTeethBaseLocalPos + new Vector3(0f, mouthOpen * -0.22f, 0f);
+        }
+
+        Vector3 GetFaceLookTarget()
+        {
+            if (killAttackActive)
+                return killAttackFocusPoint;
+
+            bool playerVisibleThreat = player != null &&
+                                      !IsPlayerHidden() &&
+                                      (state == State.Chase || stablePlayerVisible || (Time.time - lastSeenPlayerTime) <= 0.35f);
+            if (playerVisibleThreat)
+                return GetPlayerClosestBodyPoint(head != null ? head.position : transform.position);
+
+            if (state == State.Investigate && hasInvestigateTarget)
+                return investigateTargetPos + Vector3.up * 1.5f;
+
+            if ((state == State.Search || wholeHouseSearchMode) && lastSeenPlayerTime > -998f)
+                return lastSeenPlayerPos + Vector3.up * 1.55f;
+
+            if (IsAgentReady())
+            {
+                if (agent.hasPath)
+                    return agent.steeringTarget + Vector3.up * 1.45f;
+                if (agent.desiredVelocity.sqrMagnitude > 0.01f)
+                    return transform.position + (agent.desiredVelocity.normalized * 4f) + (Vector3.up * 1.45f);
+            }
+
+            float idleYaw = Mathf.Sin((Time.time * 0.75f) + faceSeed) * idleLookAroundMaxAngle;
+            float idlePitch = Mathf.Cos((Time.time * 0.42f) + (faceSeed * 0.31f)) * 8f;
+            Vector3 idleDirection = Quaternion.Euler(idlePitch, idleYaw, 0f) * transform.forward;
+            return (head != null ? head.position : transform.position + Vector3.up * 1.6f) + (idleDirection * 4f);
         }
 
         Vector3 GetAnchoredLimbPosition(Vector3 baseLocalPos, Quaternion baseRot, Quaternion animatedRot, float localLength)
