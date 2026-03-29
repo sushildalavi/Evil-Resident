@@ -4,9 +4,9 @@ using Sushil.Systems;
 
 namespace Sushil.AI
 {
-    public class StalkerKillZone : MonoBehaviour
+    public class ResidentKillZone : MonoBehaviour
     {
-        const float MaxRuntimeWorldKillRadius = 1.15f;
+        const float MaxRuntimeWorldKillRadius = 0.96f;
 
         [Header("Safety")]
         public float armDelay = 0.75f;
@@ -14,13 +14,13 @@ namespace Sushil.AI
 
         bool killed;
         float armedAt;
-        StalkerAI stalkerAI;
+        ResidentAI residentAI;
         SphereCollider killTrigger;
         readonly Collider[] overlapHits = new Collider[16];
 
         void Awake()
         {
-            stalkerAI = GetComponentInParent<StalkerAI>();
+            residentAI = GetComponentInParent<ResidentAI>();
             killTrigger = GetComponent<SphereCollider>();
             armedAt = Time.time + armDelay;
         }
@@ -72,7 +72,7 @@ namespace Sushil.AI
             if ((closestPoint - center).sqrMagnitude > radius * radius)
                 return;
 
-            if (onlyKillDuringChase && stalkerAI != null && stalkerAI.state != StalkerAI.State.Chase)
+            if (onlyKillDuringChase && residentAI != null && residentAI.state != ResidentAI.State.Chase)
                 return;
 
             var death = other.GetComponentInParent<PlayerDeath>();
@@ -82,18 +82,28 @@ namespace Sushil.AI
 
                 var hide = death.GetComponent<PlayerHide>();
                 if (hide != null && hide.IsHidden) return;
+                Vector3 targetContact = GetTargetContactPoint(other, death.transform, closestPoint);
+                if (!IsWithinKillVerticalTolerance(center, targetContact))
+                    return;
+                if (residentAI != null && !residentAI.IsCloseKillReachable(targetContact, Vector3.Distance(center, targetContact)))
+                    return;
 
                 killed = true;
-                death.Kill("Stalker one-shot (trigger)");
+                death.Kill("Resident one-shot (trigger)");
                 return;
             }
 
             var rohit = other.GetComponentInParent<RohitFPSController>();
             if (rohit == null) return;
             if (rohit.isHidden) return;
+            Vector3 rohitContact = GetTargetContactPoint(other, rohit.transform, closestPoint);
+            if (!IsWithinKillVerticalTolerance(center, rohitContact))
+                return;
+            if (residentAI != null && !residentAI.IsCloseKillReachable(rohitContact, Vector3.Distance(center, rohitContact)))
+                return;
 
             killed = true;
-            StalkerAI.KillRohitController(rohit, "Stalker one-shot (trigger)");
+            ResidentAI.KillRohitController(rohit, "Resident one-shot (trigger)");
         }
 
         Vector3 GetKillCenter()
@@ -109,13 +119,41 @@ namespace Sushil.AI
                 Mathf.Abs(transform.lossyScale.z));
 
             float colliderWorldRadius = killTrigger.radius * Mathf.Max(0.01f, maxScale);
-            float maxKillRadius = IsSahilTestNewLevel() ? 0.95f : MaxRuntimeWorldKillRadius;
+            float maxKillRadius = IsSahilTestNewLevel() ? 0.88f : MaxRuntimeWorldKillRadius;
             return Mathf.Min(colliderWorldRadius, maxKillRadius);
+        }
+
+        Vector3 GetTargetContactPoint(Collider hitCollider, Transform targetRoot, Vector3 fallbackPoint)
+        {
+            if (hitCollider != null && hitCollider.enabled)
+                return hitCollider.ClosestPoint(GetKillCenter());
+
+            if (targetRoot == null)
+                return fallbackPoint;
+
+            var controller = targetRoot.GetComponent<CharacterController>();
+            if (controller != null)
+                return controller.bounds.ClosestPoint(GetKillCenter());
+
+            var bodyCollider = targetRoot.GetComponent<Collider>();
+            if (bodyCollider != null && bodyCollider.enabled)
+                return bodyCollider.ClosestPoint(GetKillCenter());
+
+            return fallbackPoint;
         }
 
         bool IsSahilTestNewLevel()
         {
             return SceneManager.GetActiveScene().path == "Assets/Sahil/Test/NewLevel.unity";
+        }
+
+        bool IsWithinKillVerticalTolerance(Vector3 center, Vector3 closestPoint)
+        {
+            float allowedGap = 1.35f;
+            if (residentAI != null)
+                allowedGap = Mathf.Max(0.35f, residentAI.killVerticalTolerance);
+
+            return Mathf.Abs(center.y - closestPoint.y) <= allowedGap;
         }
     }
 }

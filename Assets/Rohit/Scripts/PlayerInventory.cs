@@ -9,10 +9,17 @@ public class PlayerInventory : MonoBehaviour
 
     // 🔥 FUSE COUNT SYSTEM
     public int fuseCount = 0;
+    public int TotalFusesCollected { get; private set; }
 
     void Awake()
     {
         instance = this;
+    }
+
+    void OnDestroy()
+    {
+        if (instance == this)
+            instance = null;
     }
 
     // 🔑 KEY SYSTEM (UNCHANGED)
@@ -34,11 +41,13 @@ public class PlayerInventory : MonoBehaviour
     public bool HasCircle => collectedKeys.Contains(KeyType.Circle);
     public bool HasRectangle => collectedKeys.Contains(KeyType.Rectangle);
     public bool HasSquare => collectedKeys.Contains(KeyType.Square);
+    public int FuseCount => fuseCount;
 
     // ⚡ FUSE FUNCTIONS
     public void PickUpFuse()
     {
         fuseCount++;
+        TotalFusesCollected++;
         Debug.Log("Picked up Fuse. Total: " + fuseCount);
     }
 

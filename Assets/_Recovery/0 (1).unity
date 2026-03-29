@@ -2646,7 +2646,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8212839126718544149, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
       propertyPath: m_Name
-      value: Stalker
+      value: Resident
       objectReference: {fileID: 0}
     - target: {fileID: 8855339063735690731, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
       propertyPath: sightRange
@@ -7835,7 +7835,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f2b6d5673d064218ba0d779839d7d2ba, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.StalkerRohitNoiseBridge
+  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.ResidentRohitNoiseBridge
   playerController: {fileID: 0}
   throwRock: {fileID: 0}
   playerCharacterController: {fileID: 0}

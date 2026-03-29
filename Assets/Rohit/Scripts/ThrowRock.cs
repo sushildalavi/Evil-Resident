@@ -39,7 +39,7 @@ public class ThrowRock : MonoBehaviour
         Rigidbody rb = rock.GetComponent<Rigidbody>();
         if (rb == null) return;
 
-        // Always configure thrown rock impact noise so stalker distraction stays reliable,
+        // Always configure thrown rock impact noise so resident distraction stays reliable,
         // even if prefab instances have stale inspector values.
         ThrowableNoise.ConfigureOnObject(
             rock,

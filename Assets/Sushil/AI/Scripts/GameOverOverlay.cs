@@ -225,13 +225,11 @@ namespace Sushil.Systems
         static string BuildReasonText(string reason)
         {
             if (string.IsNullOrWhiteSpace(reason))
-                return "The Stalker caught you.";
+                return "The Resident caught you.";
 
             string lower = reason.ToLowerInvariant();
-            if (lower.Contains("stalker"))
-                return "The Stalker caught you.";
-            if (lower.Contains("watcher"))
-                return "The Watcher caught you.";
+            if (lower.Contains("resident"))
+                return "The Resident caught you.";
 
             return reason;
         }

@@ -95,7 +95,7 @@ public class RohitFPSController : MonoBehaviour
             promptText.gameObject.SetActive(false);
 
         if (keyHudText != null)
-            keyHudText.gameObject.SetActive(true);
+            keyHudText.gameObject.SetActive(!CollectibleStatusHUD.Exists);
 
         if (cameraTransform != null)
         {
@@ -580,7 +580,14 @@ public class RohitFPSController : MonoBehaviour
 
     void UpdateKeyHud()
     {
-        if (keyHudText == null || inventory == null) return;
+        if (keyHudText != null && CollectibleStatusHUD.Exists)
+        {
+            if (keyHudText.gameObject.activeSelf)
+                keyHudText.gameObject.SetActive(false);
+            return;
+        }
+
+        if (keyHudText == null || inventory == null || !keyHudText.gameObject.activeInHierarchy) return;
 
         string circle = inventory.HasCircle ? "<color=green>[O]</color>" : "<color=red>[O]</color>";
         string rectangle = inventory.HasRectangle ? "<color=green>[R]</color>" : "<color=red>[R]</color>";
