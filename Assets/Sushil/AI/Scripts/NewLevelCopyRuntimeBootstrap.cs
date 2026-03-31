@@ -8,7 +8,6 @@ namespace Sushil.AI
 {
     public class NewLevelCopyRuntimeBootstrap : MonoBehaviour
     {
-        const string NewLevelScenePath = "Assets/Sahil/Test/NewLevel.unity";
         const string NewLevelCopyScenePath = "Assets/Sushil/NewLevel Copy.unity";
 
         static NewLevelCopyRuntimeBootstrap instance;
@@ -66,7 +65,10 @@ namespace Sushil.AI
 
         static bool IsTargetScene(Scene scene)
         {
-            return scene.path == NewLevelScenePath || scene.path == NewLevelCopyScenePath;
+            // Restrict runtime rebakes to the dedicated copy scene.
+            // Rebuilding NewLevel at load bakes doors in the closed state and can
+            // disconnect room interiors until dynamic links happen to bridge them.
+            return scene.path == NewLevelCopyScenePath;
         }
 
         IEnumerator RebuildSceneNavMesh(Scene scene)

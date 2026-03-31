@@ -10,31 +10,16 @@ namespace Sushil.AI
     {
         NavMeshLink squareFuseCorridorNavLink;
 
-        // Rebuilds the NavMesh at runtime so the narrow corridor gap gets coverage,
-        // then adds a NavMeshLink as a fallback.
-        // The scene's binary NavMesh was baked with agentRadius=0.5 which leaves zero
-        // walkable area in the 1m-wide corridor.  BuildNavMesh() uses the project-level
-        // Humanoid agent settings (agentRadius=0.35), producing a 0.30m strip of
-        // NavMesh through the corridor so the agent can walk through naturally.
+        // Adds a NavMeshLink to bridge the square-fuse corridor gap.
+        // Do not rebuild the full NavMesh here: NewLevel contains interactive doors,
+        // and rebuilding at scene start captures them in the closed state which can
+        // disconnect room interiors from hallways.
         // Call this from Start() when running in the Sahil/Test/NewLevel scene.
         public void EnsureSquareFuseCorridorNavLink()
         {
             if (agent == null) return;
 
-            // Step 1: Rebuild NavMesh with the project agent radius (0.35) so the
-            // corridor gap actually has walkable NavMesh.
-            var surface = Object.FindFirstObjectByType<NavMeshSurface>();
-            if (surface != null)
-            {
-                surface.BuildNavMesh();
-                Debug.Log("[ResidentAI] NavMesh rebuilt at runtime (agentRadius=0.35) for corridor access.");
-            }
-            else
-            {
-                Debug.LogWarning("[ResidentAI] No NavMeshSurface found – corridor may still be impassable.");
-            }
-
-            // Step 2: Add a NavMeshLink as a belt-and-suspenders backup for any
+            // Add a NavMeshLink as a belt-and-suspenders backup for any
             // remaining gap between the approach-side and room-side NavMesh islands.
             if (squareFuseCorridorNavLink != null) return;
 
