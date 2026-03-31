@@ -273,6 +273,64 @@ namespace Sushil.AI
             return player.position + Vector3.up * 0.9f;
         }
 
+        bool IsPlayerOccupyingSquareFuseRoom()
+        {
+            if (player == null)
+                return false;
+
+            if (IsSquareFuseRoomZone(player.position) || IsSquareFuseInteriorSide(player.position))
+                return true;
+
+            Vector3 forward = player.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude > 0.001f)
+                forward.Normalize();
+            else
+                forward = Vector3.forward;
+
+            if (playerCharacterController != null && IsSquareFuseRoomBounds(playerCharacterController.bounds, forward))
+                return true;
+
+            if (playerPrimaryCollider != null &&
+                playerPrimaryCollider.enabled &&
+                IsSquareFuseRoomBounds(playerPrimaryCollider.bounds, forward))
+                return true;
+
+            Vector3 forwardProbe = player.position + Vector3.up * 1.35f + forward * 0.75f;
+            return IsSquareFuseRoomZone(forwardProbe) || IsSquareFuseInteriorSide(forwardProbe);
+        }
+
+        bool IsSquareFuseRoomBounds(Bounds bounds, Vector3 forward)
+        {
+            Vector3 center = bounds.center;
+            Vector3 extents = bounds.extents;
+            float lowY = bounds.min.y + Mathf.Min(0.18f, extents.y);
+            float midY = center.y;
+            float highY = bounds.max.y - Mathf.Min(0.12f, extents.y);
+
+            Vector3[] samples =
+            {
+                center,
+                new Vector3(center.x, lowY, center.z),
+                new Vector3(center.x, highY, center.z),
+                center + forward * 0.45f,
+                center + forward * 0.9f,
+                center - forward * 0.2f,
+                new Vector3(bounds.max.x, lowY, bounds.max.z),
+                new Vector3(bounds.min.x, lowY, bounds.min.z),
+                new Vector3(bounds.max.x, midY, bounds.min.z),
+                new Vector3(bounds.min.x, midY, bounds.max.z)
+            };
+
+            for (int i = 0; i < samples.Length; i++)
+            {
+                if (IsSquareFuseRoomZone(samples[i]) || IsSquareFuseInteriorSide(samples[i]))
+                    return true;
+            }
+
+            return false;
+        }
+
         bool IsSahilTestNewLevel()
         {
             return SceneManager.GetActiveScene().path == "Assets/Sahil/Test/NewLevel.unity";

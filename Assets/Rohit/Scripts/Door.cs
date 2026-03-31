@@ -35,15 +35,19 @@ public class Door : MonoBehaviour, IInteractable
     public bool aiBypassLock = false;
 
     private bool isOpen = false;
+    private bool wasUnlockedByKey = false;
     private Quaternion closedLocalRotation;
     private Vector3 closedLocalPosition;
     private float currentOpenAngle;
     private AudioSource audioSource;
+    private Transform doorPanel;
     private Collider[] cachedColliders;
     private NavMeshObstacle navObstacle;
     private NavMeshLink navLinkForwardBack;
     private NavMeshLink navLinkLeftRight;
+    private Transform runtimeNavLinkRoot;
     private bool isBlockingNow;
+    private Vector3 traversalCenterLocal;
 
     void Start()
     {
@@ -57,10 +61,11 @@ public class Door : MonoBehaviour, IInteractable
         audioSource = GetComponent<AudioSource>();
         currentOpenAngle = 0f;
         // Only toggle the actual moving panel colliders; keep nearby frame/wall colliders untouched.
-        Transform panel = transform.Find("DoorPanel");
-        cachedColliders = panel != null
-            ? panel.GetComponentsInChildren<Collider>(true)
+        doorPanel = transform.Find("DoorPanel");
+        cachedColliders = doorPanel != null
+            ? doorPanel.GetComponentsInChildren<Collider>(true)
             : GetComponentsInChildren<Collider>(true);
+        CacheTraversalGeometry();
         navObstacle = GetComponent<NavMeshObstacle>();
         if (autoAddNavObstacle && navObstacle == null)
         {
@@ -89,6 +94,7 @@ public class Door : MonoBehaviour, IInteractable
 
     public bool IsOpen => isOpen;
     public bool IsLocked => isLocked;
+    public bool WasUnlockedByKey => wasUnlockedByKey;
 
     public string GetPrompt(RohitFPSController player)
     {
@@ -96,7 +102,7 @@ public class Door : MonoBehaviour, IInteractable
 
         if (!isLocked) return "Press E to Open Door";
 
-        PlayerInventory inventory = player.GetComponent<PlayerInventory>();
+        PlayerInventory inventory = player != null ? player.GetComponent<PlayerInventory>() : null;
         if (inventory != null && inventory.HasKey(requiredKey))
             return $"Press E to Unlock ({requiredKey} Key)";
 
@@ -113,10 +119,11 @@ public class Door : MonoBehaviour, IInteractable
             return;
         }
 
-        PlayerInventory inventory = player.GetComponent<PlayerInventory>();
+        PlayerInventory inventory = player != null ? player.GetComponent<PlayerInventory>() : null;
         if (inventory != null && inventory.HasKey(requiredKey))
         {
             isLocked = false;
+            wasUnlockedByKey = true;
             OpenDoor();
             PlaySound(unlockSound);
             Debug.Log($"Unlocked door with {requiredKey} Key!");
@@ -149,6 +156,33 @@ public class Door : MonoBehaviour, IInteractable
 
         OpenDoor();
         return true;
+    }
+
+    public Vector3 GetDoorwayCenter()
+    {
+        Quaternion closedWorldRotation = GetClosedWorldRotation();
+        Vector3 closedWorldPosition = GetClosedWorldPosition();
+        return closedWorldPosition + (closedWorldRotation * traversalCenterLocal);
+    }
+
+    public Vector3 GetDoorwayForward()
+    {
+        Vector3 forward = GetClosedWorldRotation() * Vector3.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.001f)
+            forward = transform.forward;
+        forward.y = 0f;
+        return forward.sqrMagnitude > 0.001f ? forward.normalized : Vector3.forward;
+    }
+
+    public Vector3 GetDoorwayRight()
+    {
+        Vector3 right = GetClosedWorldRotation() * Vector3.right;
+        right.y = 0f;
+        if (right.sqrMagnitude < 0.001f)
+            right = transform.right;
+        right.y = 0f;
+        return right.sqrMagnitude > 0.001f ? right.normalized : Vector3.right;
     }
 
     void SyncDoorBlockingForCurrentAngle()
@@ -193,11 +227,14 @@ public class Door : MonoBehaviour, IInteractable
         float depth = Mathf.Max(0.4f, navLinkDepth);
         float width = Mathf.Max(0.4f, navLinkWidth);
         int agentType = ResolveAgentTypeId();
+        EnsureRuntimeNavLinkRoot();
+        if (runtimeNavLinkRoot == null) return;
 
         if (navLinkForwardBack == null)
         {
-            navLinkForwardBack = GetComponent<NavMeshLink>();
-            if (navLinkForwardBack == null) navLinkForwardBack = gameObject.AddComponent<NavMeshLink>();
+            navLinkForwardBack = runtimeNavLinkRoot.GetComponent<NavMeshLink>();
+            if (navLinkForwardBack == null)
+                navLinkForwardBack = runtimeNavLinkRoot.gameObject.AddComponent<NavMeshLink>();
         }
         ConfigureLink(navLinkForwardBack, Vector3.back * depth, Vector3.forward * depth, width, agentType);
 
@@ -209,7 +246,7 @@ public class Door : MonoBehaviour, IInteractable
 
         if (navLinkLeftRight == null)
         {
-            NavMeshLink[] all = GetComponents<NavMeshLink>();
+            NavMeshLink[] all = runtimeNavLinkRoot.GetComponents<NavMeshLink>();
             for (int i = 0; i < all.Length; i++)
             {
                 if (all[i] != null && all[i] != navLinkForwardBack)
@@ -218,7 +255,8 @@ public class Door : MonoBehaviour, IInteractable
                     break;
                 }
             }
-            if (navLinkLeftRight == null) navLinkLeftRight = gameObject.AddComponent<NavMeshLink>();
+            if (navLinkLeftRight == null)
+                navLinkLeftRight = runtimeNavLinkRoot.gameObject.AddComponent<NavMeshLink>();
         }
         ConfigureLink(navLinkLeftRight, Vector3.left * depth, Vector3.right * depth, width, agentType);
     }
@@ -246,6 +284,7 @@ public class Door : MonoBehaviour, IInteractable
     void SyncRuntimeNavLink()
     {
         if (!autoAddRuntimeNavLink) return;
+        SyncRuntimeNavLinkRootPose();
 
         bool shouldEnable = isOpen && (!isLocked || aiBypassLock);
         if (navLinkForwardBack != null && navLinkForwardBack.enabled)
@@ -270,6 +309,79 @@ public class Door : MonoBehaviour, IInteractable
     {
         if (clip != null && audioSource != null)
             audioSource.PlayOneShot(clip);
+    }
+
+    void CacheTraversalGeometry()
+    {
+        bool hasBounds = false;
+        Bounds combined = new Bounds();
+
+        if (cachedColliders != null)
+        {
+            for (int i = 0; i < cachedColliders.Length; i++)
+            {
+                Collider c = cachedColliders[i];
+                if (c == null) continue;
+                if (!hasBounds)
+                {
+                    combined = c.bounds;
+                    hasBounds = true;
+                }
+                else
+                {
+                    combined.Encapsulate(c.bounds);
+                }
+            }
+        }
+
+        if (hasBounds)
+        {
+            traversalCenterLocal = transform.InverseTransformPoint(combined.center);
+            return;
+        }
+
+        traversalCenterLocal = doorPanel != null ? doorPanel.localPosition : Vector3.zero;
+    }
+
+    Quaternion GetClosedWorldRotation()
+    {
+        return transform.parent != null
+            ? transform.parent.rotation * closedLocalRotation
+            : closedLocalRotation;
+    }
+
+    Vector3 GetClosedWorldPosition()
+    {
+        return transform.parent != null
+            ? transform.parent.TransformPoint(closedLocalPosition)
+            : closedLocalPosition;
+    }
+
+    void EnsureRuntimeNavLinkRoot()
+    {
+        if (runtimeNavLinkRoot == null)
+        {
+            string rootName = $"{gameObject.name}_RuntimeNavLinkRoot";
+            GameObject rootObject = new GameObject(rootName);
+            Transform parent = transform.parent;
+            if (parent != null)
+                rootObject.transform.SetParent(parent, false);
+            runtimeNavLinkRoot = rootObject.transform;
+        }
+
+        SyncRuntimeNavLinkRootPose();
+    }
+
+    void SyncRuntimeNavLinkRootPose()
+    {
+        if (runtimeNavLinkRoot == null) return;
+
+        Vector3 forward = GetDoorwayForward();
+        if (forward.sqrMagnitude < 0.001f)
+            forward = Vector3.forward;
+
+        runtimeNavLinkRoot.position = GetDoorwayCenter();
+        runtimeNavLinkRoot.rotation = Quaternion.LookRotation(forward, Vector3.up);
     }
 
 }

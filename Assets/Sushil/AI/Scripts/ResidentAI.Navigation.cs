@@ -2,11 +2,69 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AI;
+using Unity.AI.Navigation;
 
 namespace Sushil.AI
 {
     public partial class ResidentAI
     {
+        NavMeshLink squareFuseCorridorNavLink;
+
+        // Rebuilds the NavMesh at runtime so the narrow corridor gap gets coverage,
+        // then adds a NavMeshLink as a fallback.
+        // The scene's binary NavMesh was baked with agentRadius=0.5 which leaves zero
+        // walkable area in the 1m-wide corridor.  BuildNavMesh() uses the project-level
+        // Humanoid agent settings (agentRadius=0.35), producing a 0.30m strip of
+        // NavMesh through the corridor so the agent can walk through naturally.
+        // Call this from Start() when running in the Sahil/Test/NewLevel scene.
+        public void EnsureSquareFuseCorridorNavLink()
+        {
+            if (agent == null) return;
+
+            // Step 1: Rebuild NavMesh with the project agent radius (0.35) so the
+            // corridor gap actually has walkable NavMesh.
+            var surface = Object.FindFirstObjectByType<NavMeshSurface>();
+            if (surface != null)
+            {
+                surface.BuildNavMesh();
+                Debug.Log("[ResidentAI] NavMesh rebuilt at runtime (agentRadius=0.35) for corridor access.");
+            }
+            else
+            {
+                Debug.LogWarning("[ResidentAI] No NavMeshSurface found – corridor may still be impassable.");
+            }
+
+            // Step 2: Add a NavMeshLink as a belt-and-suspenders backup for any
+            // remaining gap between the approach-side and room-side NavMesh islands.
+            if (squareFuseCorridorNavLink != null) return;
+
+            if (!TrySampleSquareFuseBridgePoint(0, out var approachPoint))
+            {
+                Debug.LogWarning("[ResidentAI] SquareFuse NavLink: no NavMesh near approach anchor.");
+                return;
+            }
+            if (!TrySampleSquareFuseBridgePoint(2, out var roomPoint))
+            {
+                Debug.LogWarning("[ResidentAI] SquareFuse NavLink: no NavMesh near room anchor.");
+                return;
+            }
+
+            GameObject linkGO = new GameObject("SquareFuseCorridorNavLink");
+            Vector3 center = (approachPoint + roomPoint) * 0.5f;
+            linkGO.transform.position = center;
+
+            squareFuseCorridorNavLink = linkGO.AddComponent<NavMeshLink>();
+            squareFuseCorridorNavLink.startPoint = approachPoint - center;
+            squareFuseCorridorNavLink.endPoint   = roomPoint - center;
+            squareFuseCorridorNavLink.width          = 1.35f;
+            squareFuseCorridorNavLink.bidirectional  = true;
+            squareFuseCorridorNavLink.autoUpdate     = true;
+            squareFuseCorridorNavLink.activated      = true;
+            squareFuseCorridorNavLink.costModifier   = -1f;
+            squareFuseCorridorNavLink.agentTypeID    = agent.agentTypeID;
+            Debug.Log($"[ResidentAI] SquareFuse runtime link active: {approachPoint} -> {roomPoint} (width {squareFuseCorridorNavLink.width:F2}).");
+        }
+
         bool UpdateRoamStallState(ref Vector3 lastPosition, ref float stallTimer)
         {
             if (!IsAgentReady())
@@ -17,7 +75,19 @@ namespace Sushil.AI
                            (!agent.hasPath || (moved < 0.03f && agent.velocity.sqrMagnitude < 0.08f * 0.08f));
             stallTimer = stalled ? stallTimer + Time.deltaTime : 0f;
             lastPosition = transform.position;
-            return stallTimer >= Mathf.Max(0.25f, roamStuckRepathSeconds);
+
+            float threshold = Mathf.Max(0.25f, roamStuckRepathSeconds);
+            if (stallTimer < threshold)
+                return false;
+
+            if (TryResolveDoorThresholdStall())
+            {
+                stallTimer = 0f;
+                lastPosition = transform.position;
+                return false;
+            }
+
+            return true;
         }
 
         bool TryGetNearbyWallNormal(float checkDistance, out Vector3 wallNormal)
@@ -146,7 +216,21 @@ namespace Sushil.AI
             if (TrySetDestination(fallbackDestination))
                 return;
 
-            agent.SetDestination(fallbackDestination);
+            if (IsSquareFuseTraverseContext(fallbackDestination) && !HasSquareFuseRuntimeBridge())
+            {
+                if (TrySampleSquareFuseBridgePoint(2, out var interiorPoint) && agent.SetDestination(interiorPoint))
+                    return;
+                if (TrySampleSquareFuseBridgePoint(1, out var doorwayPoint) && agent.SetDestination(doorwayPoint))
+                    return;
+            }
+
+            if (NavMesh.SamplePosition(fallbackDestination, out var sampledFallback, Mathf.Max(destinationSampleRadius, 2.8f), NavMesh.AllAreas))
+            {
+                agent.SetDestination(sampledFallback.position);
+                return;
+            }
+
+            agent.ResetPath();
         }
 
         bool IsInStairTraversalContext()
@@ -197,6 +281,584 @@ namespace Sushil.AI
             return true;
         }
 
+        bool IsTightPassageContext(Vector3 worldPos)
+        {
+            if (IsSquareFuseTightNavigationZone(worldPos) || IsSquareFuseTightNavigationZone(transform.position))
+                return true;
+            if (IsOpenDoorwayContext(worldPos) || IsOpenDoorwayContext(transform.position))
+                return true;
+
+            Vector3 travelDir = worldPos - transform.position;
+            travelDir.y = 0f;
+            if (travelDir.sqrMagnitude < 0.04f && !TryGetTravelDirection(out travelDir))
+                travelDir = transform.forward;
+            travelDir.y = 0f;
+            if (travelDir.sqrMagnitude < 0.001f)
+                travelDir = Vector3.forward;
+            travelDir.Normalize();
+
+            Vector3 right = Vector3.Cross(Vector3.up, travelDir);
+            right.y = 0f;
+            if (right.sqrMagnitude < 0.001f)
+                right = transform.right;
+            right.y = 0f;
+            if (right.sqrMagnitude < 0.001f)
+                right = Vector3.right;
+            right.Normalize();
+
+            Vector3[] samples =
+            {
+                transform.position,
+                Vector3.Lerp(transform.position, worldPos, 0.5f),
+                worldPos
+            };
+
+            float sideProbeDistance = Mathf.Max(0.42f, enforcedAgentRadius + 0.18f);
+            float ceilingProbeDistance = Mathf.Max(0.42f, enforcedAgentHeight - 1.2f);
+            for (int i = 0; i < samples.Length; i++)
+            {
+                Vector3 origin = samples[i] + Vector3.up * 0.9f;
+                bool leftBlocked = Physics.Raycast(origin, -right, out RaycastHit leftHit, sideProbeDistance, blockingGeometryMask, QueryTriggerInteraction.Ignore) &&
+                                   IsHardBlockingCollider(leftHit.collider);
+                bool rightBlocked = Physics.Raycast(origin, right, out RaycastHit rightHit, sideProbeDistance, blockingGeometryMask, QueryTriggerInteraction.Ignore) &&
+                                    IsHardBlockingCollider(rightHit.collider);
+                bool lowCeiling = Physics.Raycast(origin - Vector3.up * 0.25f, Vector3.up, out RaycastHit ceilingHit, ceilingProbeDistance, blockingGeometryMask, QueryTriggerInteraction.Ignore) &&
+                                  IsHardBlockingCollider(ceilingHit.collider);
+
+                if ((leftBlocked && rightBlocked) || (lowCeiling && (leftBlocked || rightBlocked)))
+                    return true;
+            }
+
+            return false;
+        }
+
+        bool IsSquareFuseCorridorZone(Vector3 worldPos)
+        {
+            return worldPos.x >= 3.75f && worldPos.x <= 6.75f &&
+                   worldPos.y >= -0.25f && worldPos.y <= 2.85f &&
+                   worldPos.z >= -22.85f && worldPos.z <= -18.05f;
+        }
+
+        bool IsSquareFuseApproachZone(Vector3 worldPos)
+        {
+            return worldPos.x >= 3.0f && worldPos.x <= 7.2f &&
+                   worldPos.y >= -0.25f && worldPos.y <= 2.95f &&
+                   worldPos.z >= -22.95f && worldPos.z <= -16.2f;
+        }
+
+        bool IsSquareFuseRoomZone(Vector3 worldPos)
+        {
+            return worldPos.x >= 4.35f && worldPos.x <= 10.95f &&
+                   worldPos.y >= -0.25f && worldPos.y <= 2.35f &&
+                   worldPos.z >= -23.6f && worldPos.z <= -19.15f;
+        }
+
+        bool IsSquareFuseTightNavigationZone(Vector3 worldPos)
+        {
+            return IsSquareFuseCorridorZone(worldPos) || IsSquareFuseRoomZone(worldPos);
+        }
+
+        bool IsSquareFuseTraverseContext(Vector3 desired)
+        {
+            return IsSquareFuseApproachZone(transform.position) ||
+                   IsSquareFuseApproachZone(desired) ||
+                   IsSquareFuseRoomZone(transform.position) ||
+                   IsSquareFuseRoomZone(desired);
+        }
+
+        bool TryGetSquareFusePortal(out Vector3 center, out Vector3 roomNormal)
+        {
+            center = transform.position;
+            roomNormal = Vector3.zero;
+            if (!TrySampleSquareFuseBridgePoint(0, out var hallPoint) ||
+                !TrySampleSquareFuseBridgePoint(2, out var roomPoint))
+                return false;
+
+            Vector3 across = roomPoint - hallPoint;
+            across.y = 0f;
+            if (across.sqrMagnitude < 0.01f)
+                return false;
+
+            roomNormal = across.normalized;
+            center = Vector3.Lerp(hallPoint, roomPoint, 0.5f);
+            center.y = Mathf.Min(hallPoint.y, roomPoint.y);
+            return true;
+        }
+
+        float GetSquareFusePortalSignedDistance(Vector3 worldPos)
+        {
+            if (!TryGetSquareFusePortal(out var portalCenter, out var portalNormal))
+                return 0f;
+
+            Vector3 offset = worldPos - portalCenter;
+            offset.y = 0f;
+            return Vector3.Dot(offset, portalNormal);
+        }
+
+        bool IsSquareFuseInteriorSide(Vector3 worldPos, float tolerance = 0.08f)
+        {
+            if (!IsSquareFuseTraverseContext(worldPos) && !IsSquareFuseRoomZone(worldPos))
+                return false;
+
+            return GetSquareFusePortalSignedDistance(worldPos) >= -Mathf.Abs(tolerance);
+        }
+
+        bool IsSquareFusePortalSeparated(Vector3 a, Vector3 b, float threshold = 0.14f)
+        {
+            if (!TryGetSquareFusePortal(out _, out _))
+                return false;
+
+            float sideA = GetSquareFusePortalSignedDistance(a);
+            float sideB = GetSquareFusePortalSignedDistance(b);
+            return sideA >= threshold && sideB <= -threshold;
+        }
+
+        bool IsSquareFusePortalContext(Vector3 worldPos)
+        {
+            return IsSquareFuseTraverseContext(worldPos) || IsSquareFuseRoomZone(worldPos);
+        }
+
+        bool IsSquareFuseDoorwayThresholdZone(Vector3 worldPos, float portalDepth = 1.15f)
+        {
+            if (!IsSquareFusePortalContext(worldPos))
+                return false;
+
+            if (!TryGetSquareFusePortal(out _, out _))
+                return IsSquareFuseCorridorZone(worldPos);
+
+            return Mathf.Abs(GetSquareFusePortalSignedDistance(worldPos)) <= Mathf.Abs(portalDepth);
+        }
+
+        bool IsSquareFusePortalTraversalActive(Vector3 target)
+        {
+            if (!HasSquareFuseRuntimeBridge())
+                return false;
+
+            bool currentRelevant = IsSquareFusePortalContext(transform.position);
+            bool targetRelevant = IsSquareFusePortalContext(target);
+            if (!currentRelevant && !targetRelevant)
+                return false;
+
+            bool currentInside = IsSquareFuseInteriorSide(transform.position, 0.12f) || IsSquareFuseRoomZone(transform.position);
+            bool targetInside = IsSquareFuseInteriorSide(target, 0.12f) || IsSquareFuseRoomZone(target);
+            if (currentInside != targetInside)
+                return true;
+
+            return IsSquareFuseDoorwayThresholdZone(transform.position) ||
+                   IsSquareFuseDoorwayThresholdZone(target);
+        }
+
+        bool HasSquareFuseRuntimeBridge()
+        {
+            return squareFuseCorridorNavLink != null &&
+                   squareFuseCorridorNavLink.isActiveAndEnabled &&
+                   squareFuseCorridorNavLink.activated;
+        }
+
+        float GetSquareFuseBridgeWarpDistance(Vector3 desired)
+        {
+            const float shortWarpDistance = 1.45f;
+            const float longWarpDistance = 2.85f;
+
+            if (!IsSquareFuseTraverseContext(desired) || !TryGetSquareFusePortal(out _, out _))
+                return shortWarpDistance;
+
+            float residentSide = GetSquareFusePortalSignedDistance(transform.position);
+            float desiredSide = GetSquareFusePortalSignedDistance(desired);
+            bool crossingPortal =
+                (residentSide <= 0.08f && desiredSide >= 0.08f) ||
+                (residentSide >= -0.08f && desiredSide <= -0.08f);
+
+            if (crossingPortal)
+                return longWarpDistance;
+
+            if (IsSquareFuseRoomZone(desired) && !IsSquareFuseInteriorSide(transform.position, 0.12f))
+                return longWarpDistance;
+
+            return shortWarpDistance;
+        }
+
+        public bool IsSquareFuseKillBlocked(Vector3 residentWorldPos, Vector3 targetWorldPos)
+        {
+            bool playerOrTargetInRoom = IsPlayerOccupyingSquareFuseRoom() ||
+                                        IsSquareFuseRoomZone(targetWorldPos) ||
+                                        IsSquareFuseInteriorSide(targetWorldPos, 0.14f);
+            if (!playerOrTargetInRoom)
+                return false;
+
+            if (!IsSquareFusePortalContext(residentWorldPos) &&
+                !IsSquareFusePortalContext(targetWorldPos))
+                return false;
+
+            if (IsSquareFusePortalSeparated(targetWorldPos, residentWorldPos, 0.08f))
+                return true;
+
+            const float residentKillEntryDepth = 1.6f;
+            float residentDepth = GetSquareFusePortalSignedDistance(residentWorldPos);
+            float targetDepth = GetSquareFusePortalSignedDistance(targetWorldPos);
+            return targetDepth >= -0.05f && residentDepth < residentKillEntryDepth;
+        }
+
+        bool TryGetSquareFuseBridgeAnchor(int index, out Vector3 anchor)
+        {
+            switch (index)
+            {
+                case 0:
+                    anchor = new Vector3(5.465f, 0.729f, -18.833f);
+                    return true;
+                case 1:
+                    // Use a walkable doorway center, not the FuseBox wall position.
+                    anchor = new Vector3(6.180f, 0.700f, -20.020f);
+                    return true;
+                case 2:
+                    anchor = new Vector3(6.950f, 0.625f, -21.100f);
+                    return true;
+                case 3:
+                    anchor = new Vector3(8.379f, 0.625f, -21.165f);
+                    return true;
+                default:
+                    anchor = transform.position;
+                    return false;
+            }
+        }
+
+        bool TrySampleSquareFuseBridgePoint(int index, out Vector3 point)
+        {
+            point = transform.position;
+            if (!TryGetSquareFuseBridgeAnchor(index, out var anchor))
+                return false;
+
+            float sampleRadius = index == 1 ? 0.9f : 1.35f;
+            if (NavMesh.SamplePosition(anchor, out var hit, sampleRadius, NavMesh.AllAreas))
+            {
+                point = hit.position;
+                return true;
+            }
+
+            anchor.y = transform.position.y;
+            if (NavMesh.SamplePosition(anchor, out hit, sampleRadius + 0.55f, NavMesh.AllAreas))
+            {
+                point = hit.position;
+                return true;
+            }
+
+            return false;
+        }
+
+        int GetClosestSquareFuseBridgeIndex(Vector3 worldPos)
+        {
+            float bestSqr = float.MaxValue;
+            int bestIndex = 0;
+
+            for (int i = 0; i < 4; i++)
+            {
+                if (!TrySampleSquareFuseBridgePoint(i, out var point))
+                    continue;
+
+                float sqr = (point - worldPos).sqrMagnitude;
+                if (sqr < bestSqr)
+                {
+                    bestSqr = sqr;
+                    bestIndex = i;
+                }
+            }
+
+            return bestIndex;
+        }
+
+        int GetDesiredSquareFuseBridgeIndex(Vector3 desired)
+        {
+            if (IsSquareFuseRoomZone(desired))
+                return 2;
+
+            return GetClosestSquareFuseBridgeIndex(desired);
+        }
+
+        bool TryResolveSquareFuseCorridorBridgeDestination(Vector3 desired, out Vector3 resolved, out bool preferWarp)
+        {
+            resolved = desired;
+            preferWarp = false;
+            if (!IsSquareFuseTraverseContext(desired) || agent == null)
+                return false;
+            if (HasSquareFuseRuntimeBridge())
+                return false;
+
+            NavMeshPath directPath = new NavMeshPath();
+            bool hasDirectPath =
+                NavMesh.CalculatePath(transform.position, desired, NavMesh.AllAreas, directPath) &&
+                directPath.status != NavMeshPathStatus.PathInvalid;
+            if (hasDirectPath && directPath.status == NavMeshPathStatus.PathComplete)
+                return false;
+
+            bool residentInside = IsSquareFuseInteriorSide(transform.position, 0.12f) || IsSquareFuseRoomZone(transform.position);
+            bool desiredInside = IsSquareFuseInteriorSide(desired, 0.12f) || IsSquareFuseRoomZone(desired);
+            if (residentInside == desiredInside &&
+                !IsSquareFusePortalSeparated(desired, transform.position, 0.08f))
+                return false;
+
+            float warpDistanceLimit = GetSquareFuseBridgeWarpDistance(desired);
+
+            int currentIndex = GetClosestSquareFuseBridgeIndex(transform.position);
+            int desiredIndex = GetDesiredSquareFuseBridgeIndex(desired);
+            if (currentIndex == desiredIndex)
+            {
+                if (!TrySampleSquareFuseBridgePoint(desiredIndex, out var samePoint))
+                    return false;
+                float distToSame = Vector3.Distance(transform.position, samePoint);
+                if (distToSame <= 0.3f)
+                    return false;
+
+                NavMeshPath samePath = new NavMeshPath();
+                bool hasSamePath =
+                    NavMesh.CalculatePath(transform.position, samePoint, NavMesh.AllAreas, samePath) &&
+                    samePath.status != NavMeshPathStatus.PathInvalid;
+
+                resolved = samePoint;
+                preferWarp = distToSame <= warpDistanceLimit &&
+                             (!hasSamePath || samePath.status != NavMeshPathStatus.PathComplete);
+                return true;
+            }
+
+            int step = desiredIndex > currentIndex ? 1 : -1;
+
+            // If the resident hasn't reached the current anchor yet, navigate or warp to it first.
+            // This fixes the case where the corridor entrance is a NavMesh gap (baked at radius 0.5
+            // but only ~1m wide): the closest anchor is #0 but the path to it is broken, while the
+            // next anchor (#1) is 2.48m away — too far for warp — so the resident was permanently stuck.
+            if (TrySampleSquareFuseBridgePoint(currentIndex, out var currentAnchorPoint))
+            {
+                float distToCurrent = Vector3.Distance(transform.position, currentAnchorPoint);
+                if (distToCurrent > 0.3f)
+                {
+                    NavMeshPath toCurrentPath = new NavMeshPath();
+                    bool hasToCurrentPath =
+                        NavMesh.CalculatePath(transform.position, currentAnchorPoint, NavMesh.AllAreas, toCurrentPath) &&
+                        toCurrentPath.status != NavMeshPathStatus.PathInvalid;
+
+                    if (hasToCurrentPath && toCurrentPath.status == NavMeshPathStatus.PathComplete)
+                    {
+                        resolved = currentAnchorPoint;
+                        return true;
+                    }
+
+                    if (distToCurrent <= warpDistanceLimit &&
+                        (!hasToCurrentPath || toCurrentPath.status != NavMeshPathStatus.PathComplete))
+                    {
+                        resolved = currentAnchorPoint;
+                        preferWarp = true;
+                        return true;
+                    }
+                }
+            }
+
+            int immediateIndex = currentIndex + step;
+            if (immediateIndex >= 0 &&
+                immediateIndex < 4 &&
+                TrySampleSquareFuseBridgePoint(immediateIndex, out var immediatePoint))
+            {
+                float distToImmediate = Vector3.Distance(transform.position, immediatePoint);
+                if (distToImmediate > 0.3f)
+                {
+                    NavMeshPath immediatePath = new NavMeshPath();
+                    bool hasImmediatePath =
+                        NavMesh.CalculatePath(transform.position, immediatePoint, NavMesh.AllAreas, immediatePath) &&
+                        immediatePath.status != NavMeshPathStatus.PathInvalid;
+                    if (hasImmediatePath && immediatePath.status == NavMeshPathStatus.PathComplete)
+                    {
+                        resolved = immediatePoint;
+                        return true;
+                    }
+
+                    if (distToImmediate <= warpDistanceLimit &&
+                        (!hasImmediatePath || immediatePath.status != NavMeshPathStatus.PathComplete))
+                    {
+                        resolved = immediatePoint;
+                        preferWarp = true;
+                        return true;
+                    }
+                }
+            }
+
+            NavMeshPath bridgePath = new NavMeshPath();
+            for (int i = currentIndex + step; step > 0 ? i <= desiredIndex : i >= desiredIndex; i += step)
+            {
+                if (!TrySampleSquareFuseBridgePoint(i, out var candidate))
+                    continue;
+                float distToCandidate = Vector3.Distance(transform.position, candidate);
+                if (distToCandidate <= 0.3f)
+                    continue;
+
+                bool hasBridgePath =
+                    NavMesh.CalculatePath(transform.position, candidate, NavMesh.AllAreas, bridgePath) &&
+                    bridgePath.status != NavMeshPathStatus.PathInvalid;
+                if (!hasBridgePath)
+                {
+                    if (distToCandidate <= warpDistanceLimit)
+                    {
+                        resolved = candidate;
+                        preferWarp = true;
+                        return true;
+                    }
+
+                    continue;
+                }
+
+                resolved = candidate;
+                preferWarp = bridgePath.status != NavMeshPathStatus.PathComplete &&
+                             distToCandidate <= warpDistanceLimit;
+                return true;
+            }
+
+            return false;
+        }
+
+        void TryCompleteSquareFuseOffMeshLink()
+        {
+            if (!IsAgentReady() || !agent.isOnOffMeshLink)
+                return;
+
+            OffMeshLinkData linkData = agent.currentOffMeshLinkData;
+            Vector3 start = linkData.startPos;
+            Vector3 end = linkData.endPos;
+            if (!IsSquareFusePortalContext(start) && !IsSquareFusePortalContext(end))
+                return;
+
+            Vector3 intendedDestination = agent.hasPath ? agent.destination : transform.position;
+            if (state == State.Chase && player != null)
+                intendedDestination = player.position;
+
+            if (!NavMesh.SamplePosition(end, out var endHit, 1.0f, NavMesh.AllAreas))
+                return;
+
+            agent.Warp(endHit.position);
+            transform.position = endHit.position;
+            agent.nextPosition = endHit.position;
+            lastSafePosition = endHit.position;
+            hasSafePosition = true;
+            ignoreAntiClipUntilTime = Time.time + 0.35f;
+            agent.CompleteOffMeshLink();
+            ReissuePrimaryDestination(intendedDestination);
+        }
+
+        bool TryUseSquareFuseCorridorBridge(Vector3 desired, bool allowWarp)
+        {
+            if (!IsAgentReady())
+                return false;
+
+            if (!TryResolveSquareFuseCorridorBridgeDestination(desired, out var bridgeDestination, out bool preferWarp))
+                return false;
+
+            if (preferWarp)
+            {
+                if (IsSquareFuseTraverseContext(desired))
+                    return agent.SetDestination(bridgeDestination);
+
+                if (!allowWarp)
+                    return false;
+
+                if (!NavMesh.SamplePosition(bridgeDestination, out var warpHit, 0.9f, NavMesh.AllAreas))
+                    return false;
+
+                agent.Warp(warpHit.position);
+                transform.position = warpHit.position;
+                agent.nextPosition = warpHit.position;
+                lastSafePosition = warpHit.position;
+                hasSafePosition = true;
+                ignoreAntiClipUntilTime = Time.time + 0.35f;
+                if (TrySetDestination(desired))
+                    return true;
+
+                if (IsSquareFuseTraverseContext(desired))
+                {
+                    if (TrySampleSquareFuseBridgePoint(2, out var interiorPoint) && agent.SetDestination(interiorPoint))
+                        return true;
+                    if (TrySampleSquareFuseBridgePoint(1, out var doorwayPoint) && agent.SetDestination(doorwayPoint))
+                        return true;
+                }
+
+                if (NavMesh.SamplePosition(desired, out var sampledDesired, Mathf.Max(destinationSampleRadius, 2.8f), NavMesh.AllAreas))
+                    return agent.SetDestination(sampledDesired.position);
+
+                agent.ResetPath();
+                return false;
+            }
+
+            return agent.SetDestination(bridgeDestination);
+        }
+
+        bool TryResolveSquareFusePortalTraversalDestination(Vector3 desired, out Vector3 resolved)
+        {
+            resolved = desired;
+            if (!HasSquareFuseRuntimeBridge())
+                return false;
+            if (!IsSquareFusePortalContext(transform.position) && !IsSquareFusePortalContext(desired))
+                return false;
+            if (!TryGetSquareFusePortal(out var center, out var forward))
+                return false;
+
+            Vector3 right = Vector3.Cross(Vector3.up, forward);
+            right.y = 0f;
+            if (right.sqrMagnitude < 0.001f)
+                right = Vector3.right;
+            right.Normalize();
+
+            float[] depths = { 0.45f, 0.9f, 1.35f, 1.8f, 2.25f };
+            float[] widths = { 0f, 0.3f, -0.3f, 0.55f, -0.55f, 0.85f, -0.85f };
+            int preferredSide = GetPreferredDoorTraversalSide(center, forward, desired);
+            NavMeshPath path = new NavMeshPath();
+
+            bool found = false;
+            float bestScore = float.MaxValue;
+            Vector3 bestPoint = desired;
+
+            for (int side = -1; side <= 1; side += 2)
+            {
+                for (int d = 0; d < depths.Length; d++)
+                {
+                    for (int w = 0; w < widths.Length; w++)
+                    {
+                        Vector3 probe = center + forward * (depths[d] * side) + right * widths[w];
+                        float sampleRadius = 0.7f + (depths[d] * 0.1f);
+                        if (!NavMesh.SamplePosition(probe, out var hit, sampleRadius, NavMesh.AllAreas))
+                            continue;
+
+                        Vector3 hitOffset = hit.position - center;
+                        hitOffset.y = 0f;
+                        if (Vector3.Dot(hitOffset, forward) * side < 0.12f)
+                            continue;
+                        if (!IsDestinationAllowed(hit.position) || IsBodyIntersectingBlocking(hit.position))
+                            continue;
+                        if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, path) ||
+                            path.status != NavMeshPathStatus.PathComplete)
+                            continue;
+                        if (!IsPathAllowed(path))
+                            continue;
+
+                        float pathLength = GetPathLength(path);
+                        float score = Vector3.SqrMagnitude(hit.position - desired) +
+                                      (Mathf.Abs(widths[w]) * 0.2f) +
+                                      (pathLength * 0.08f) -
+                                      (depths[d] * 0.22f);
+                        if (side != preferredSide)
+                            score += 1.8f;
+
+                        if (score < bestScore)
+                        {
+                            bestScore = score;
+                            bestPoint = hit.position;
+                            found = true;
+                        }
+                    }
+                }
+            }
+
+            if (!found)
+                return false;
+
+            resolved = bestPoint;
+            return true;
+        }
+
         IEnumerator IdleLookAround(float duration, float maxAngle)
         {
             duration = Mathf.Max(0f, duration);
@@ -243,6 +905,19 @@ namespace Sushil.AI
                 return;
             }
 
+            // Doorway nudges help with flat room transitions, but on stairs they can
+            // fight the normal chase path and repeatedly push the resident into the
+            // landing/railing edge case instead of letting the NavMesh settle.
+            bool stairOrElevatedTraversal =
+                IsInStairTraversalContext() ||
+                IsCurrentlyOnElevatedPath() ||
+                Mathf.Abs(assistTarget.y - transform.position.y) > 0.35f;
+            if (stairOrElevatedTraversal)
+            {
+                chaseStuckTimer = 0f;
+                return;
+            }
+
             float distToTarget = Vector3.Distance(transform.position, assistTarget);
             if (distToTarget > doorwayAssistRange || distToTarget <= killDistance)
             {
@@ -263,7 +938,7 @@ namespace Sushil.AI
             chaseStuckTimer = 0f;
 
             bool assisted = false;
-            bool nearOpenDoor = TryGetNearbyOpenDoor(out var openDoor, 4.5f);
+            bool nearOpenDoor = TryGetNearbyOpenDoor(out var openDoor, 4.5f, assistTarget, preferUnlockedKeyDoors: true);
             if (nearOpenDoor)
             {
                 assisted = TryAdvanceThroughOpenDoor(openDoor, assistTarget);
@@ -276,6 +951,41 @@ namespace Sushil.AI
                 if (!assisted && doorwayWarpAssist)
                     TryDoorwayWarpAdvance(assistTarget);
             }
+
+            if (!assisted && TryUseSquareFuseCorridorBridge(assistTarget, allowWarp: false))
+                return;
+        }
+
+        bool TryResolveDoorThresholdStall()
+        {
+            if (!IsAgentReady() || agent.pathPending || !agent.hasPath)
+                return false;
+
+            if (agent.remainingDistance <= Mathf.Max(0.4f, agent.stoppingDistance + 0.15f))
+                return false;
+
+            Vector3 targetPos = agent.destination;
+            float doorRange = Mathf.Max(2.6f, unlockedKeyDoorTraverseRange);
+            bool hasOpenDoor = TryGetNearbyOpenDoor(out var openDoor, doorRange, targetPos, preferUnlockedKeyDoors: true);
+            if (hasOpenDoor)
+            {
+                if (TryAdvanceThroughOpenDoor(openDoor, targetPos))
+                    return true;
+
+                if (doorwayWarpAssist && TryWarpThroughOpenDoor(openDoor, targetPos))
+                    return true;
+            }
+
+            if (TryUseSquareFuseCorridorBridge(targetPos, allowWarp: false))
+                return true;
+
+            if (TryResolvePartialPathAdvance(targetPos, out var partialAdvance))
+                return TrySetDestination(partialAdvance);
+
+            if (TryResolveProgressiveDestination(targetPos, out var progressiveAdvance))
+                return TrySetDestination(progressiveAdvance);
+
+            return false;
         }
 
         bool TryDoorwayAssistAdvance(Vector3 targetPos)
@@ -363,7 +1073,7 @@ namespace Sushil.AI
             }
         }
 
-        bool TryGetNearbyOpenDoor(out Door door, float range)
+        bool TryGetOpenDoorwayContext(Vector3 worldPos, out Door door)
         {
             door = null;
             if (cachedDoors == null || cachedDoors.Length == 0)
@@ -371,24 +1081,93 @@ namespace Sushil.AI
             if (cachedDoors == null || cachedDoors.Length == 0)
                 return false;
 
-            float bestSqr = float.MaxValue;
+            for (int i = 0; i < cachedDoors.Length; i++)
+            {
+                Door candidate = cachedDoors[i];
+                if (candidate == null || !candidate.gameObject.activeInHierarchy || !candidate.IsOpen)
+                    continue;
+
+                Vector3 center = candidate.GetDoorwayCenter();
+                if (Mathf.Abs(worldPos.y - center.y) > 2.4f)
+                    continue;
+
+                Vector3 forward = candidate.GetDoorwayForward();
+                Vector3 right = candidate.GetDoorwayRight();
+                if (forward.sqrMagnitude < 0.001f || right.sqrMagnitude < 0.001f)
+                    continue;
+
+                Vector3 offset = worldPos - center;
+                offset.y = 0f;
+
+                float forwardDistance = Mathf.Abs(Vector3.Dot(offset, forward));
+                float rightDistance = Mathf.Abs(Vector3.Dot(offset, right));
+                float depthAllowance = Mathf.Max(0.95f, candidate.navLinkDepth + 0.55f);
+                float widthAllowance = Mathf.Max(0.55f, (candidate.navLinkWidth * 0.5f) + 0.18f);
+
+                if (forwardDistance > depthAllowance || rightDistance > widthAllowance)
+                    continue;
+
+                door = candidate;
+                return true;
+            }
+
+            return false;
+        }
+
+        bool IsOpenDoorwayContext(Vector3 worldPos)
+        {
+            return TryGetOpenDoorwayContext(worldPos, out _);
+        }
+
+        bool TryGetNearbyOpenDoor(out Door door, float range, Vector3 towardTarget, bool preferUnlockedKeyDoors)
+        {
+            door = null;
+            if (cachedDoors == null || cachedDoors.Length == 0)
+                cachedDoors = FindObjectsByType<Door>(FindObjectsSortMode.None);
+            if (cachedDoors == null || cachedDoors.Length == 0)
+                return false;
+
+            float bestScore = float.MaxValue;
             float rangeSqr = Mathf.Max(0.6f, range) * Mathf.Max(0.6f, range);
             Vector3 p = transform.position;
             p.y = 0f;
+            Vector3 targetFlat = towardTarget;
+            targetFlat.y = 0f;
+            Vector3 towardDir = targetFlat - p;
+            bool hasTargetDir = towardDir.sqrMagnitude > 0.01f;
+            if (hasTargetDir)
+                towardDir.Normalize();
 
             for (int i = 0; i < cachedDoors.Length; i++)
             {
                 Door d = cachedDoors[i];
-                if (!d.gameObject.activeInHierarchy) continue;
+                if (d == null || !d.gameObject.activeInHierarchy) continue;
                 if (!d.IsOpen) continue;
 
-                Vector3 dpos = d.transform.position;
+                Vector3 dpos = d.GetDoorwayCenter();
                 dpos.y = 0f;
                 float sqr = (dpos - p).sqrMagnitude;
                 if (sqr > rangeSqr) continue;
-                if (sqr < bestSqr)
+
+                float score = sqr;
+                if (preferUnlockedKeyDoors && d.WasUnlockedByKey)
+                    score -= 4f;
+
+                if (hasTargetDir)
                 {
-                    bestSqr = sqr;
+                    Vector3 toDoor = dpos - p;
+                    if (toDoor.sqrMagnitude > 0.001f)
+                    {
+                        float alignmentPenalty = 1f - Mathf.Clamp01(Vector3.Dot(toDoor.normalized, towardDir));
+                        score += alignmentPenalty * 5f;
+                    }
+
+                    score += Vector3.Distance(dpos, targetFlat) * 0.12f;
+                }
+
+                if (score < bestScore)
+                {
+                    bestScore = score;
                     door = d;
                 }
             }
@@ -396,32 +1175,304 @@ namespace Sushil.AI
             return door != null;
         }
 
-        bool TryWarpThroughOpenDoor(Door door, Vector3 targetPos)
+        float GetFlatDistanceToSegment(Vector3 point, Vector3 a, Vector3 b)
         {
-            if (door == null || !IsAgentReady()) return false;
-            Vector3 center = door.transform.position;
-            float[] radii = { 0.9f, 1.3f, 1.7f };
+            point.y = 0f;
+            a.y = 0f;
+            b.y = 0f;
+
+            Vector3 ab = b - a;
+            float denom = ab.sqrMagnitude;
+            if (denom <= 0.0001f)
+                return Vector3.Distance(point, a);
+
+            float t = Mathf.Clamp01(Vector3.Dot(point - a, ab) / denom);
+            Vector3 closest = a + (ab * t);
+            return Vector3.Distance(point, closest);
+        }
+
+        int GetPreferredDoorTraversalSide(Vector3 center, Vector3 forward, Vector3 desired)
+        {
+            Vector3 desiredOffset = desired - center;
+            desiredOffset.y = 0f;
+            float desiredDot = Vector3.Dot(desiredOffset, forward);
+            if (Mathf.Abs(desiredDot) > 0.2f)
+                return desiredDot >= 0f ? 1 : -1;
+
+            Vector3 selfOffset = transform.position - center;
+            selfOffset.y = 0f;
+            float selfDot = Vector3.Dot(selfOffset, forward);
+            if (Mathf.Abs(selfDot) > 0.2f)
+                return selfDot >= 0f ? -1 : 1;
+
+            return 1;
+        }
+
+        bool TryGetBestDoorTraversalPoint(Door door, Vector3 desired, bool favorDesiredSide, bool requireCompletePath, out Vector3 point, out float traversalScore)
+        {
+            point = desired;
+            traversalScore = 0f;
+            if (door == null)
+                return false;
+
+            Vector3 center = door.GetDoorwayCenter();
+            Vector3 forward = door.GetDoorwayForward();
+            Vector3 right = door.GetDoorwayRight();
+            if (forward.sqrMagnitude < 0.001f || right.sqrMagnitude < 0.001f)
+                return false;
+
+            float shallowDepth = Mathf.Clamp(unlockedKeyDoorTraverseRange * 0.42f, 0.8f, 1.45f);
+            float mediumDepth = Mathf.Clamp(unlockedKeyDoorTraverseRange * 0.68f, shallowDepth + 0.2f, 2.15f);
+            float deepDepth = Mathf.Clamp(unlockedKeyDoorTraverseRange, mediumDepth + 0.25f, 3.35f);
+            float[] depths = { shallowDepth, mediumDepth, deepDepth };
+            float[] widths = { 0f, 0.38f, -0.38f, 0.7f, -0.7f, 1.0f, -1.0f };
+
+            int preferredSide = GetPreferredDoorTraversalSide(center, forward, desired);
+            NavMeshPath path = requireCompletePath ? new NavMeshPath() : null;
+
+            bool found = false;
+            float bestScore = float.MaxValue;
+            Vector3 bestPoint = center;
+            float bestTraversalScore = 0f;
+
+            for (int side = -1; side <= 1; side += 2)
+            {
+                float sideOpenScore = 0f;
+                bool sideFound = false;
+                float sideBestScore = float.MaxValue;
+                Vector3 sideBestPoint = center;
+
+                for (int d = 0; d < depths.Length; d++)
+                {
+                    for (int w = 0; w < widths.Length; w++)
+                    {
+                        Vector3 probe = center + forward * (depths[d] * side) + right * widths[w];
+                        float sampleRadius = 0.9f + (depths[d] * 0.1f);
+                        if (!NavMesh.SamplePosition(probe, out var hit, sampleRadius, NavMesh.AllAreas))
+                            continue;
+
+                        Vector3 hitOffset = hit.position - center;
+                        hitOffset.y = 0f;
+                        if (Vector3.Dot(hitOffset, forward) * side < 0.18f)
+                            continue;
+                        if (!IsDestinationAllowed(hit.position) || IsBodyIntersectingBlocking(hit.position))
+                            continue;
+
+                        float pathLength = 0f;
+                        if (requireCompletePath)
+                        {
+                            if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, path) ||
+                                path.status != NavMeshPathStatus.PathComplete)
+                                continue;
+                            if (!IsPathAllowed(path))
+                                continue;
+
+                            pathLength = GetPathLength(path);
+                        }
+
+                        float openness = Mathf.Max(0.15f, 1f + (depths[d] * 0.9f) - (Mathf.Abs(widths[w]) * 0.18f));
+                        sideOpenScore += openness;
+
+                        float score = Vector3.SqrMagnitude(hit.position - desired) -
+                                      (depths[d] * 0.55f) +
+                                      (Mathf.Abs(widths[w]) * 0.24f) +
+                                      (pathLength * 0.08f);
+                        if (favorDesiredSide && side != preferredSide)
+                            score += 2.4f;
+
+                        if (score < sideBestScore)
+                        {
+                            sideBestScore = score;
+                            sideBestPoint = hit.position;
+                            sideFound = true;
+                        }
+                    }
+                }
+
+                if (!sideFound)
+                    continue;
+
+                float finalScore = sideBestScore - (sideOpenScore * 0.12f);
+                if (favorDesiredSide && side != preferredSide)
+                    finalScore += 1.25f;
+
+                if (finalScore < bestScore)
+                {
+                    bestScore = finalScore;
+                    bestPoint = sideBestPoint;
+                    bestTraversalScore = sideOpenScore;
+                    found = true;
+                }
+            }
+
+            if (!found)
+                return false;
+
+            point = bestPoint;
+            traversalScore = bestTraversalScore;
+            return true;
+        }
+
+        bool TryResolveOpenDoorTraversalDestination(Vector3 desired, bool preferUnlockedKeyDoors, bool favorDesiredSide, out Vector3 resolved)
+        {
+            resolved = desired;
+            if (cachedDoors == null || cachedDoors.Length == 0)
+                cachedDoors = FindObjectsByType<Door>(FindObjectsSortMode.None);
+            if (cachedDoors == null || cachedDoors.Length == 0)
+                return false;
+
+            Vector3 fromFlat = transform.position;
+            fromFlat.y = 0f;
+            Vector3 desiredFlat = desired;
+            desiredFlat.y = 0f;
+            float desiredDoorRange = Mathf.Max(2.6f, unlockedKeyDoorTraverseRange + 1.8f);
+            float pathDoorRange = Mathf.Max(1.2f, agent != null ? agent.radius * 3.2f : 1.4f);
+
             float bestScore = float.MaxValue;
             bool found = false;
-            Vector3 best = center;
+            Vector3 best = desired;
 
-            var path = new NavMeshPath();
-            for (int r = 0; r < radii.Length; r++)
+            for (int i = 0; i < cachedDoors.Length; i++)
             {
-                float rad = radii[r];
-                for (int i = 0; i < 12; i++)
+                Door door = cachedDoors[i];
+                if (door == null || !door.gameObject.activeInHierarchy)
+                    continue;
+                if (!door.IsOpen || door.IsLocked)
+                    continue;
+
+                Vector3 center = door.GetDoorwayCenter();
+                Vector3 centerFlat = center;
+                centerFlat.y = 0f;
+                float distToDesired = Vector3.Distance(centerFlat, desiredFlat);
+                float distToSegment = GetFlatDistanceToSegment(centerFlat, fromFlat, desiredFlat);
+                if (distToDesired > desiredDoorRange && distToSegment > pathDoorRange)
+                    continue;
+
+                if (!TryGetBestDoorTraversalPoint(door, desired, favorDesiredSide, requireCompletePath: true, out var candidate, out float traversalScore))
+                    continue;
+
+                float score = Vector3.SqrMagnitude(candidate - desired) +
+                              (distToDesired * 0.3f) +
+                              (distToSegment * 0.85f) -
+                              (traversalScore * 0.18f);
+                if (preferUnlockedKeyDoors && door.WasUnlockedByKey)
+                    score -= 4.5f;
+
+                if (score < bestScore)
                 {
-                    float ang = (Mathf.PI * 2f * i) / 12f;
-                    Vector3 candidate = center + new Vector3(Mathf.Cos(ang) * rad, 0f, Mathf.Sin(ang) * rad);
-                    if (!NavMesh.SamplePosition(candidate, out var hit, 0.8f, NavMesh.AllAreas))
+                    bestScore = score;
+                    best = candidate;
+                    found = true;
+                }
+            }
+
+            if (!found)
+                return false;
+
+            resolved = best;
+            return true;
+        }
+
+        bool TryResolvePartialPathAdvance(Vector3 desired, out Vector3 resolved)
+        {
+            resolved = desired;
+            if (agent == null)
+                return false;
+
+            NavMeshPath partialPath = new NavMeshPath();
+            if (!NavMesh.CalculatePath(transform.position, desired, NavMesh.AllAreas, partialPath))
+                return false;
+            if (partialPath.status != NavMeshPathStatus.PathPartial || partialPath.corners == null || partialPath.corners.Length < 2)
+                return false;
+
+            NavMeshPath completePath = new NavMeshPath();
+            for (int i = partialPath.corners.Length - 1; i >= 1; i--)
+            {
+                Vector3 baseCorner = partialPath.corners[i];
+                Vector3 towardDesired = desired - baseCorner;
+                towardDesired.y = 0f;
+                Vector3[] probes =
+                {
+                    baseCorner,
+                    towardDesired.sqrMagnitude > 0.01f ? baseCorner + towardDesired.normalized * 0.45f : baseCorner,
+                    towardDesired.sqrMagnitude > 0.01f ? baseCorner - towardDesired.normalized * 0.3f : baseCorner
+                };
+
+                for (int p = 0; p < probes.Length; p++)
+                {
+                    if (!NavMesh.SamplePosition(probes[p], out var hit, 1.2f, NavMesh.AllAreas))
                         continue;
-                    if (!IsDestinationAllowed(hit.position))
+                    if (Vector3.Distance(transform.position, hit.position) < 0.4f)
+                        continue;
+                    if (!IsDestinationAllowed(hit.position) || IsBodyIntersectingBlocking(hit.position))
+                        continue;
+                    if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, completePath) ||
+                        completePath.status != NavMeshPathStatus.PathComplete)
+                        continue;
+                    if (!IsPathAllowed(completePath))
+                        continue;
+
+                    resolved = hit.position;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        bool TryResolveProgressiveDestination(Vector3 desired, out Vector3 resolved)
+        {
+            resolved = desired;
+            if (agent == null)
+                return false;
+
+            Vector3 from = transform.position;
+            Vector3 flatToDesired = desired - from;
+            flatToDesired.y = 0f;
+            if (flatToDesired.sqrMagnitude < 1.2f * 1.2f)
+                return false;
+            if (Mathf.Abs(desired.y - from.y) > 0.55f)
+                return false;
+
+            Vector3 forward = flatToDesired.normalized;
+            Vector3 right = Vector3.Cross(Vector3.up, forward);
+            if (right.sqrMagnitude < 0.001f)
+                right = transform.right;
+            right.y = 0f;
+            if (right.sqrMagnitude < 0.001f)
+                right = Vector3.right;
+            right.Normalize();
+
+            float[] fractions = { 0.94f, 0.82f, 0.7f, 0.58f, 0.46f, 0.34f, 0.24f };
+            float[] widths = { 0f, 0.45f, -0.45f, 0.9f, -0.9f };
+
+            NavMeshPath path = new NavMeshPath();
+            float bestScore = float.MaxValue;
+            bool found = false;
+            Vector3 best = desired;
+
+            for (int f = 0; f < fractions.Length; f++)
+            {
+                for (int w = 0; w < widths.Length; w++)
+                {
+                    Vector3 probe = Vector3.Lerp(from, desired, fractions[f]) + right * widths[w];
+                    probe.y = Mathf.Lerp(from.y, desired.y, fractions[f]);
+                    float sampleRadius = 1.0f + (Mathf.Abs(widths[w]) * 0.2f);
+                    if (!NavMesh.SamplePosition(probe, out var hit, sampleRadius, NavMesh.AllAreas))
+                        continue;
+                    if (Vector3.Distance(transform.position, hit.position) < 0.45f)
+                        continue;
+                    if (!IsDestinationAllowed(hit.position) || IsBodyIntersectingBlocking(hit.position))
                         continue;
                     if (!NavMesh.CalculatePath(transform.position, hit.position, NavMesh.AllAreas, path) ||
                         path.status != NavMeshPathStatus.PathComplete)
                         continue;
+                    if (!IsPathAllowed(path))
+                        continue;
 
-                    float score = Vector3.SqrMagnitude(hit.position - targetPos);
+                    float score = Vector3.SqrMagnitude(hit.position - desired) -
+                                  (fractions[f] * 6.5f) +
+                                  (Mathf.Abs(widths[w]) * 0.18f);
                     if (score < bestScore)
                     {
                         bestScore = score;
@@ -431,68 +1482,32 @@ namespace Sushil.AI
                 }
             }
 
-            if (!found) return false;
+            if (!found)
+                return false;
+
+            resolved = best;
+            return true;
+        }
+
+        bool TryWarpThroughOpenDoor(Door door, Vector3 targetPos)
+        {
+            if (door == null || !IsAgentReady()) return false;
+            if (!TryGetBestDoorTraversalPoint(door, targetPos, favorDesiredSide: true, requireCompletePath: false, out var best, out _))
+                return false;
 
             agent.Warp(best);
             transform.position = best;
             agent.nextPosition = best;
             agent.ResetPath();
             ignoreAntiClipUntilTime = Time.time + 0.35f;
-            return TrySetDestination(targetPos);
+            return TrySetDestination(targetPos) || TrySetDestination(best);
         }
 
         bool TryAdvanceThroughOpenDoor(Door door, Vector3 targetPos)
         {
             if (door == null || !IsAgentReady()) return false;
-
-            Vector3 from = transform.position;
-            Vector3 toTarget = targetPos - from;
-            toTarget.y = 0f;
-            if (toTarget.sqrMagnitude < 0.01f) return false;
-            toTarget.Normalize();
-
-            Vector3 center = door.transform.position;
-            Vector3 forward = door.transform.forward;
-            Vector3 right = door.transform.right;
-            float[] depths = { 0.4f, 0.9f, 1.3f };
-            float[] widths = { 0f, 0.45f, -0.45f, 0.8f, -0.8f };
-            var path = new NavMeshPath();
-
-            float bestScore = float.MaxValue;
-            bool found = false;
-            Vector3 best = center;
-
-            for (int d = 0; d < depths.Length; d++)
-            {
-                for (int w = 0; w < widths.Length; w++)
-                {
-                    for (int side = -1; side <= 1; side += 2)
-                    {
-                        Vector3 probe = center + forward * (depths[d] * side) + right * widths[w];
-                        if (!NavMesh.SamplePosition(probe, out var hit, 0.9f, NavMesh.AllAreas))
-                            continue;
-                        if (!NavMesh.CalculatePath(from, hit.position, NavMesh.AllAreas, path) ||
-                            path.status != NavMeshPathStatus.PathComplete)
-                            continue;
-
-                        Vector3 dir = hit.position - from;
-                        dir.y = 0f;
-                        if (dir.sqrMagnitude < 0.02f) continue;
-                        float heading = 1f - Mathf.Clamp01(Vector3.Dot(dir.normalized, toTarget));
-                        float goalDist = Vector3.SqrMagnitude(hit.position - targetPos);
-                        float score = heading * 12f + goalDist;
-
-                        if (score < bestScore)
-                        {
-                            bestScore = score;
-                            best = hit.position;
-                            found = true;
-                        }
-                    }
-                }
-            }
-
-            if (!found) return false;
+            if (!TryGetBestDoorTraversalPoint(door, targetPos, favorDesiredSide: true, requireCompletePath: true, out var best, out _))
+                return false;
             return TrySetDestination(best);
         }
 
@@ -515,6 +1530,100 @@ namespace Sushil.AI
             bool opened = door.TryOpenForAI();
             if (opened)
                 nextDoorOpenTime = Time.time + Mathf.Max(0.05f, autoDoorOpenCooldown);
+        }
+
+        bool ShouldBiasToUnlockedKeyDoorRoom()
+        {
+            if (cachedDoors == null || cachedDoors.Length == 0)
+                cachedDoors = FindObjectsByType<Door>(FindObjectsSortMode.None);
+            if (cachedDoors == null || cachedDoors.Length == 0)
+                return false;
+
+            for (int i = 0; i < cachedDoors.Length; i++)
+            {
+                Door door = cachedDoors[i];
+                if (door == null || !door.gameObject.activeInHierarchy)
+                    continue;
+                if (!door.IsOpen || door.IsLocked || !door.WasUnlockedByKey)
+                    continue;
+
+                return Random.value < unlockedKeyDoorBiasChance;
+            }
+
+            return false;
+        }
+
+        bool TryGetUnlockedKeyDoorRoomTarget(out Vector3 point)
+        {
+            point = transform.position;
+            if (cachedDoors == null || cachedDoors.Length == 0)
+                cachedDoors = FindObjectsByType<Door>(FindObjectsSortMode.None);
+            if (cachedDoors == null || cachedDoors.Length == 0)
+                return false;
+
+            int startIndex = Random.Range(0, cachedDoors.Length);
+            float roomDepth = Mathf.Max(1.35f, unlockedKeyDoorTraverseRange * 0.72f);
+            float bestScore = float.MaxValue;
+            bool found = false;
+            Vector3 best = point;
+
+            for (int offset = 0; offset < cachedDoors.Length; offset++)
+            {
+                Door door = cachedDoors[(startIndex + offset) % cachedDoors.Length];
+                if (door == null || !door.gameObject.activeInHierarchy)
+                    continue;
+                if (!door.IsOpen || door.IsLocked || !door.WasUnlockedByKey)
+                    continue;
+
+                Vector3 center = door.GetDoorwayCenter();
+                Vector3 forward = door.GetDoorwayForward();
+                if (forward.sqrMagnitude < 0.001f)
+                    continue;
+
+                if (TryGetBestDoorTraversalPoint(door, center, favorDesiredSide: false, requireCompletePath: true, out var interiorPoint, out float traversalScore))
+                {
+                    float score = Vector3.SqrMagnitude(interiorPoint - transform.position) - (traversalScore * 0.25f);
+                    if (score < bestScore)
+                    {
+                        bestScore = score;
+                        best = interiorPoint;
+                        found = true;
+                    }
+                    continue;
+                }
+
+                Vector3 candidateA = center + forward * roomDepth;
+                Vector3 candidateB = center - forward * roomDepth;
+                if ((TryGetRandomRoamPoint(candidateA, unlockedKeyDoorBiasRadius, out var candidatePointA) ||
+                     ResolveReachableDestination(candidateA, out candidatePointA)))
+                {
+                    float scoreA = Vector3.SqrMagnitude(candidatePointA - transform.position);
+                    if (scoreA < bestScore)
+                    {
+                        bestScore = scoreA;
+                        best = candidatePointA;
+                        found = true;
+                    }
+                }
+
+                if ((TryGetRandomRoamPoint(candidateB, unlockedKeyDoorBiasRadius, out var candidatePointB) ||
+                     ResolveReachableDestination(candidateB, out candidatePointB)))
+                {
+                    float scoreB = Vector3.SqrMagnitude(candidatePointB - transform.position);
+                    if (scoreB < bestScore)
+                    {
+                        bestScore = scoreB;
+                        best = candidatePointB;
+                        found = true;
+                    }
+                }
+            }
+
+            if (!found)
+                return false;
+
+            point = best;
+            return true;
         }
 
         bool TryGetRandomInspectPoint(out Transform point)
@@ -873,6 +1982,12 @@ namespace Sushil.AI
             if (!IsAgentReady()) { generalStuckPosInit = false; return; }
             if (killAttackActive)  { generalStuckPosInit = false; return; }
             if (IsInStairTraversalContext()) { generalStuckPosInit = false; generalStuckTimer = 0f; return; }
+            if (IsSquareFusePortalTraversalActive(agent.hasPath ? agent.destination : transform.position))
+            {
+                generalStuckPosInit = false;
+                generalStuckTimer = 0f;
+                return;
+            }
             if (agent.pathPending) return;
             if (!agent.hasPath)    { generalStuckPosInit = false; return; }
             if (agent.remainingDistance < 1.2f) { generalStuckPosInit = false; return; }
@@ -936,10 +2051,16 @@ namespace Sushil.AI
 
         bool TrySetDestination(Vector3 destination)
         {
+            return TrySetDestination(destination, out _);
+        }
+
+        bool TrySetDestination(Vector3 destination, out Vector3 resolvedDestination)
+        {
+            resolvedDestination = destination;
             if (!IsAgentReady()) return false;
-            if (!ResolveReachableDestination(destination, out Vector3 resolved))
+            if (!ResolveReachableDestination(destination, out resolvedDestination))
                 return false;
-            return agent.SetDestination(resolved);
+            return agent.SetDestination(resolvedDestination);
         }
 
         bool ResolveReachableDestination(Vector3 desired, out Vector3 resolved)
@@ -961,6 +2082,36 @@ namespace Sushil.AI
                 (!strictGeometryValidation || IsPathAllowed(path)))
             {
                 resolved = desired;
+                return true;
+            }
+
+            if (TryResolveOpenDoorTraversalDestination(desired, preferUnlockedKeyDoors: true, favorDesiredSide: true, out var doorResolved))
+            {
+                resolved = doorResolved;
+                return true;
+            }
+
+            if (TryResolveSquareFusePortalTraversalDestination(desired, out var squareFusePortalResolved))
+            {
+                resolved = squareFusePortalResolved;
+                return true;
+            }
+
+            if (TryResolveSquareFuseCorridorBridgeDestination(desired, out var squareFuseBridgeResolved, out _))
+            {
+                resolved = squareFuseBridgeResolved;
+                return true;
+            }
+
+            if (TryResolvePartialPathAdvance(desired, out var partialResolved))
+            {
+                resolved = partialResolved;
+                return true;
+            }
+
+            if (TryResolveProgressiveDestination(desired, out var progressiveResolved))
+            {
+                resolved = progressiveResolved;
                 return true;
             }
 
@@ -1003,6 +2154,8 @@ namespace Sushil.AI
         {
             if (!keepAgentSnappedToNavMesh || agent == null || !agent.enabled) return;
             if (IsInStairTraversalContext()) return;
+            if (IsSquareFusePortalTraversalActive(agent.hasPath ? agent.destination : transform.position))
+                return;
             if (Time.time < nextNavStabilizeAt) return;
             nextNavStabilizeAt = Time.time + 0.15f;
 
@@ -1047,11 +2200,19 @@ namespace Sushil.AI
         {
             if (agent == null || !agent.enabled) return;
 
+            bool stairProfile = ShouldUseStairNavigationProfile();
+            Vector3 navTarget = agent.hasPath ? agent.destination : transform.position;
+            bool tightPassageProfile = IsTightPassageContext(navTarget);
+            bool squareFuseTight = IsSquareFuseTightNavigationZone(transform.position) || IsSquareFuseTightNavigationZone(navTarget);
             float targetRadius = enforcedAgentRadius;
-            if (ShouldUseStairNavigationProfile())
-                targetRadius = Mathf.Min(enforcedAgentRadius, 0.22f);
+            if (stairProfile || tightPassageProfile)
+                targetRadius = Mathf.Min(enforcedAgentRadius, squareFuseTight ? 0.16f : tightPassageProfile ? 0.2f : 0.22f);
 
             float targetHeight = enforcedAgentHeight;
+            if (tightPassageProfile)
+                targetHeight = Mathf.Min(enforcedAgentHeight, squareFuseTight ? 1.62f : 1.76f);
+            else if (stairProfile)
+                targetHeight = Mathf.Min(enforcedAgentHeight, 1.9f);
             bool radiusMatches = Mathf.Abs(agent.radius - targetRadius) <= 0.005f;
             bool heightMatches = Mathf.Abs(agent.height - targetHeight) <= 0.01f;
             bool cachedMatches = Mathf.Abs(currentNavigationRadius - targetRadius) <= 0.005f;
@@ -1087,12 +2248,13 @@ namespace Sushil.AI
             float stairBlend      = GetStairBlend();
             bool  elevatedPath    = IsCurrentlyOnElevatedPath();
             bool  onStairs        = stairBlend >= 0.24f || elevatedPath;
+            bool  tightPassage    = IsTightPassageContext(agent.destination);
 
             // Only activate the assist when on stairs OR traversing an elevated path.
             // Previously we required stairBlend >= 0.24, but mid-staircase the forward
             // probe often returns 0 (agent already elevated, next step same height as
             // current position). Using path corners as the fallback detection catches this.
-            if (!onStairs)
+            if (!onStairs && !tightPassage)
             {
                 stairTraverseStuckTimer = 0f;
                 return;
@@ -1116,7 +2278,10 @@ namespace Sushil.AI
 
             Vector3 current = transform.position;
 
-            if (Time.time < nextStairTraverseAssistAt || stairTraverseStuckTimer < stairTraverseStallSeconds)
+            float assistThreshold = tightPassage
+                ? Mathf.Max(0.12f, stairTraverseStallSeconds * 0.75f)
+                : stairTraverseStallSeconds;
+            if (Time.time < nextStairTraverseAssistAt || stairTraverseStuckTimer < assistThreshold)
                 return;
 
             stairTraverseStuckTimer = 0f;
@@ -1127,6 +2292,37 @@ namespace Sushil.AI
             // sees agent.destination == corner, and when the agent arrives there it thinks
             // the whole trip is done — picking a fresh random point instead of continuing.
             Vector3 originalDestination = agent.destination;
+            bool squareFuseTraverse =
+                IsSquareFuseTraverseContext(originalDestination) ||
+                IsSquareFuseTraverseContext(current);
+
+            if (tightPassage && TryResolveProgressiveDestination(originalDestination, out Vector3 progressiveTarget))
+            {
+                if (squareFuseTraverse)
+                {
+                    TrySetDestination(progressiveTarget);
+                    return;
+                }
+
+                if (NavMesh.SamplePosition(progressiveTarget, out var progressiveHit, 1.0f, NavMesh.AllAreas))
+                {
+                    float advanceDistance = Vector3.Distance(current, progressiveHit.position);
+                    if (advanceDistance <= Mathf.Max(0.9f, stairTraverseProbeDistance * 1.35f))
+                    {
+                        agent.Warp(progressiveHit.position);
+                        transform.position = progressiveHit.position;
+                        agent.nextPosition = progressiveHit.position;
+                        lastSafePosition = progressiveHit.position;
+                        hasSafePosition = true;
+                        ignoreAntiClipUntilTime = Time.time + 0.35f;
+                        ReissuePrimaryDestination(originalDestination);
+                        return;
+                    }
+                }
+
+                TrySetDestination(progressiveTarget);
+                return;
+            }
 
             Vector3 nudgeTarget;
             bool foundNudge = TryFindStairPathCornerRecoveryTarget(current, out nudgeTarget) ||
@@ -1143,6 +2339,12 @@ namespace Sushil.AI
             // while the active target is above the Resident.
             if (NavMesh.SamplePosition(nudgeTarget, out var warpHit, 1.2f, NavMesh.AllAreas))
             {
+                if (squareFuseTraverse)
+                {
+                    TrySetDestination(nudgeTarget);
+                    return;
+                }
+
                 float warpDistance = Vector3.Distance(current, warpHit.position);
                 if (warpDistance > Mathf.Max(0.95f, stairTraverseProbeDistance * 1.45f))
                     return;
@@ -1319,6 +2521,13 @@ namespace Sushil.AI
                 return;
             }
 
+            if (IsSquareFusePortalTraversalActive(agent.hasPath ? agent.destination : current))
+            {
+                lastSafePosition = current;
+                hasSafePosition = true;
+                return;
+            }
+
             float clipProbeRadius = antiClipProbeRadius;
             bool insideBlocking = IsInsideBlockingGeometry(current, clipProbeRadius);
             bool bodyInsideBlocking = IsBodyIntersectingBlocking(current);
@@ -1429,6 +2638,8 @@ namespace Sushil.AI
                 // can falsely hit overhead floor geometry in stairwells and reject valid paths.
                 if (Mathf.Abs(corners[i + 1].y - corners[i].y) > 0.18f)
                     continue;
+                if (IsTightPassageContext((corners[i] + corners[i + 1]) * 0.5f))
+                    continue;
 
                 if (IsSegmentBlocked(corners[i], corners[i + 1]))
                     return false;
@@ -1476,12 +2687,18 @@ namespace Sushil.AI
 
             bool elevatedTargetContext = IsElevatedTargetContext(position);
             bool closeChaseEntryContext = IsCloseChaseEntryContext(position);
+            bool tightPassageContext = IsTightPassageContext(position);
+            bool squareFuseTight = IsSquareFuseTightNavigationZone(position);
             float effectiveWallClearance = elevatedTargetContext
                 ? Mathf.Max(0.12f, destinationWallClearance * 0.45f)
                 : closeChaseEntryContext
                     ? Mathf.Max(0.14f, destinationWallClearance * 0.55f)
-                    : destinationWallClearance;
-            Vector3 probe = position + Vector3.up * 1.0f;
+                    : tightPassageContext
+                        ? squareFuseTight
+                            ? Mathf.Max(0.04f, destinationWallClearance * 0.14f)
+                            : Mathf.Max(0.08f, destinationWallClearance * 0.28f)
+                        : destinationWallClearance;
+            Vector3 probe = position + Vector3.up * (squareFuseTight ? 0.6f : tightPassageContext ? 0.75f : 1.0f);
             int count = Physics.OverlapSphereNonAlloc(
                 probe,
                 Mathf.Max(0.05f, effectiveWallClearance),
@@ -1605,11 +2822,60 @@ namespace Sushil.AI
             return length;
         }
 
+        bool IsDirectKillLineBlocked(Vector3 from, Vector3 to)
+        {
+            Vector3 dir = to - from;
+            float len = dir.magnitude;
+            if (len <= 0.12f)
+                return false;
+
+            dir /= len;
+            const float inset = 0.05f;
+            from += dir * inset;
+            to -= dir * inset;
+            len = Vector3.Distance(from, to);
+            if (len <= 0.02f)
+                return false;
+
+            if (!Physics.Linecast(from, to, out RaycastHit hit, blockingGeometryMask, QueryTriggerInteraction.Ignore))
+                return false;
+
+            if (hit.distance <= 0.04f || hit.distance >= len - 0.04f)
+                return false;
+
+            return IsHardBlockingCollider(hit.collider);
+        }
+
+        public bool IsKillContactClear(Vector3 sourcePoint, Vector3 targetPoint)
+        {
+            return !IsDirectKillLineBlocked(sourcePoint, targetPoint);
+        }
+
         public bool IsCloseKillReachable(Vector3 targetPoint, float directDistance)
         {
             if (!NavMesh.SamplePosition(transform.position, out var selfHit, 1.5f, NavMesh.AllAreas))
                 return false;
             if (!NavMesh.SamplePosition(targetPoint, out var targetHit, 1.5f, NavMesh.AllAreas))
+                return false;
+            if (IsSquareFuseKillBlocked(selfHit.position, targetHit.position))
+                return false;
+
+            if (IsPlayerOccupyingSquareFuseRoom() &&
+                !IsSquareFuseInteriorSide(transform.position) &&
+                (IsSquareFuseTraverseContext(player != null ? player.position : targetHit.position) ||
+                 IsSquareFuseTraverseContext(targetHit.position)))
+                return false;
+
+            if (IsSquareFusePortalSeparated(targetHit.position, selfHit.position))
+                return false;
+
+            bool selfInSquareFuseRoom = IsSquareFuseRoomZone(selfHit.position);
+            bool targetInSquareFuseRoom = IsSquareFuseRoomZone(targetHit.position);
+            if (IsSquareFuseTraverseContext(targetHit.position) &&
+                selfInSquareFuseRoom != targetInSquareFuseRoom)
+                return false;
+
+            if (IsDirectKillLineBlocked(GetResidentThreatPoint(0.5f), targetPoint))
                 return false;
 
             NavMeshPath closePath = new NavMeshPath();
@@ -1688,11 +2954,17 @@ namespace Sushil.AI
             if (residentCapsule == null) return false;
             bool elevatedTargetContext = IsElevatedTargetContext(worldPos);
             bool closeChaseEntryContext = IsCloseChaseEntryContext(worldPos);
+            bool tightPassageContext = IsTightPassageContext(worldPos);
+            bool squareFuseTight = IsSquareFuseTightNavigationZone(worldPos);
             float penetrationThreshold = elevatedTargetContext
                 ? Mathf.Max(0.12f, antiClipPenetrationEpsilon * 2.5f)
                 : closeChaseEntryContext
                     ? Mathf.Max(0.04f, antiClipPenetrationEpsilon * 1.4f)
-                    : Mathf.Max(0.001f, antiClipPenetrationEpsilon);
+                    : tightPassageContext
+                        ? squareFuseTight
+                            ? Mathf.Max(0.085f, antiClipPenetrationEpsilon * 2.2f)
+                            : Mathf.Max(0.06f, antiClipPenetrationEpsilon * 1.8f)
+                        : Mathf.Max(0.001f, antiClipPenetrationEpsilon);
 
             float radius = 0.35f;
             float height = 2.0f;
@@ -1700,18 +2972,20 @@ namespace Sushil.AI
             {
                 float xzScale = Mathf.Max(0.01f, Mathf.Max(Mathf.Abs(transform.lossyScale.x), Mathf.Abs(transform.lossyScale.z)));
                 float yScale = Mathf.Max(0.01f, Mathf.Abs(transform.lossyScale.y));
-                float radiusScale = elevatedTargetContext ? 0.76f : closeChaseEntryContext ? 0.88f : 0.92f;
+                float radiusScale = elevatedTargetContext ? 0.76f : closeChaseEntryContext ? 0.88f : squareFuseTight ? 0.5f : tightPassageContext ? 0.64f : 0.92f;
+                float heightScale = squareFuseTight ? 0.66f : tightPassageContext ? 0.78f : 0.98f;
                 radius = Mathf.Max(0.12f, residentCapsule.radius * xzScale * radiusScale);
-                height = Mathf.Max(radius * 2f + 0.01f, residentCapsule.height * yScale * 0.98f);
+                height = Mathf.Max(radius * 2f + 0.01f, residentCapsule.height * yScale * heightScale);
             }
             else if (agent != null)
             {
-                float radiusScale = elevatedTargetContext ? 0.76f : closeChaseEntryContext ? 0.88f : 0.92f;
+                float radiusScale = elevatedTargetContext ? 0.76f : closeChaseEntryContext ? 0.88f : squareFuseTight ? 0.5f : tightPassageContext ? 0.64f : 0.92f;
+                float heightScale = squareFuseTight ? 0.66f : tightPassageContext ? 0.78f : 0.98f;
                 radius = Mathf.Max(0.12f, agent.radius * radiusScale);
-                height = Mathf.Max(radius * 2f + 0.01f, agent.height * 0.98f);
+                height = Mathf.Max(radius * 2f + 0.01f, agent.height * heightScale);
             }
 
-            Vector3 center = worldPos + Vector3.up * Mathf.Max(0.2f, antiClipCheckHeight);
+            Vector3 center = worldPos + Vector3.up * Mathf.Max(0.14f, squareFuseTight ? antiClipCheckHeight * 0.5f : tightPassageContext ? antiClipCheckHeight * 0.72f : antiClipCheckHeight);
             float half = Mathf.Max(0.01f, (height * 0.5f) - radius);
             Vector3 p1 = center + Vector3.up * half;
             Vector3 p2 = center - Vector3.up * half;

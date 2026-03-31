@@ -7,6 +7,7 @@ using UnityEngine.UI;
 public class CollectibleStatusHUD : MonoBehaviour
 {
     const float RefreshInterval = 0.35f;
+    const float HudScale = 0.82f;
     const float RootPadding = 14f;
     const float KeyTokenWidth = 92f;
     const float KeyTokenHeight = 58f;
@@ -106,6 +107,9 @@ public class CollectibleStatusHUD : MonoBehaviour
 
     void Update()
     {
+        if (!EnsureUIBuilt())
+            return;
+
         if (Time.unscaledTime >= nextRefreshAt)
             RefreshTargets();
 
@@ -118,18 +122,70 @@ public class CollectibleStatusHUD : MonoBehaviour
         nextRefreshAt = 0f;
     }
 
+    bool EnsureUIBuilt()
+    {
+        if (HasValidUI())
+            return true;
+
+        if (TryRestoreUIReferences())
+            return true;
+
+        if (transform.Find("CollectibleRoot") != null)
+            return false;
+
+        BuildUI();
+        return HasValidUI();
+    }
+
+    bool HasValidUI()
+    {
+        return canvas != null &&
+               rootRect != null &&
+               keySection != null &&
+               keySection.root != null &&
+               keySection.tokenHost != null &&
+               fuseSection != null &&
+               fuseSection.root != null &&
+               fuseSection.tokenHost != null;
+    }
+
+    bool TryRestoreUIReferences()
+    {
+        canvas = GetComponent<Canvas>();
+        rootRect = FindDirectChild<RectTransform>(transform, "CollectibleRoot");
+        if (canvas == null || rootRect == null)
+            return false;
+
+        titleText = FindDirectChild<Text>(rootRect, "Title");
+        subtitleText = FindDirectChild<Text>(rootRect, "Subtitle");
+        rootGlow = FindDirectChild<Image>(rootRect, "RootGlow");
+        keySection = RestoreSectionView("Keys");
+        fuseSection = RestoreSectionView("Fuses");
+        if (keySection == null || fuseSection == null)
+            return false;
+
+        RestoreKeyTokens();
+        RestoreFuseTokens();
+        return HasValidUI();
+    }
+
     void BuildUI()
     {
-        canvas = gameObject.AddComponent<Canvas>();
+        canvas = GetComponent<Canvas>();
+        if (canvas == null)
+            canvas = gameObject.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
         canvas.sortingOrder = short.MaxValue - 36;
 
-        var scaler = gameObject.AddComponent<CanvasScaler>();
+        var scaler = GetComponent<CanvasScaler>();
+        if (scaler == null)
+            scaler = gameObject.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
         scaler.matchWidthOrHeight = 0.5f;
-        gameObject.AddComponent<GraphicRaycaster>();
+        if (GetComponent<GraphicRaycaster>() == null)
+            gameObject.AddComponent<GraphicRaycaster>();
 
         rootRect = CreatePanel("CollectibleRoot", transform, new Color(0.04f, 0.05f, 0.09f, 0.94f));
         rootRect.anchorMin = new Vector2(0f, 1f);
@@ -137,6 +193,7 @@ public class CollectibleStatusHUD : MonoBehaviour
         rootRect.pivot = new Vector2(0f, 1f);
         rootRect.anchoredPosition = new Vector2(22f, -22f);
         rootRect.sizeDelta = new Vector2(468f, 232f);
+        rootRect.localScale = Vector3.one * HudScale;
 
         AddOutline(rootRect.gameObject, new Color(0f, 0f, 0f, 0.55f), new Vector2(1f, -1f));
         AddShadow(rootRect.gameObject, new Color(0f, 0f, 0f, 0.60f), new Vector2(4f, -4f));
@@ -174,6 +231,9 @@ public class CollectibleStatusHUD : MonoBehaviour
 
     void RefreshTargets()
     {
+        if (!EnsureUIBuilt())
+            return;
+
         nextRefreshAt = Time.unscaledTime + RefreshInterval;
 
         PlayerInventory inventory = GetInventory();
@@ -195,6 +255,9 @@ public class CollectibleStatusHUD : MonoBehaviour
 
     void UpdateVisibility()
     {
+        if (!EnsureUIBuilt())
+            return;
+
         bool hasCollectibles = targetKeyCount > 0 || targetFuseCount > 0;
         if (rootRect != null)
             rootRect.gameObject.SetActive(hasCollectibles);
@@ -205,7 +268,7 @@ public class CollectibleStatusHUD : MonoBehaviour
 
     void UpdateVisuals()
     {
-        if (rootRect == null || !rootRect.gameObject.activeSelf) return;
+        if (!EnsureUIBuilt() || rootRect == null || !rootRect.gameObject.activeSelf) return;
 
         PlayerInventory inventory = GetInventory();
         int collectedKeys = inventory != null ? inventory.KeyCount : 0;
@@ -398,6 +461,9 @@ public class CollectibleStatusHUD : MonoBehaviour
 
     void BuildKeyTokens()
     {
+        if (keySection == null || keySection.tokenHost == null)
+            return;
+
         keyTokens.Clear();
 
         for (int i = 0; i < KeyOrder.Length; i++)
@@ -459,6 +525,9 @@ public class CollectibleStatusHUD : MonoBehaviour
 
     void RebuildFuseTokens(int count)
     {
+        if (fuseSection == null || fuseSection.tokenHost == null)
+            return;
+
         for (int i = 0; i < fuseTokens.Count; i++)
         {
             if (fuseTokens[i].root != null)
@@ -756,6 +825,94 @@ public class CollectibleStatusHUD : MonoBehaviour
         Outline outline = target.AddComponent<Outline>();
         outline.effectColor = color;
         outline.effectDistance = distance;
+    }
+
+    SectionView RestoreSectionView(string name)
+    {
+        RectTransform rect = FindDirectChild<RectTransform>(rootRect, name);
+        if (rect == null)
+            return null;
+
+        Image summaryPlate = FindDirectChild<Image>(rect, "SummaryPlate");
+        return new SectionView
+        {
+            root = rect,
+            accentBar = FindDirectChild<Image>(rect, "AccentBar"),
+            headerTint = FindDirectChild<Image>(rect, "HeaderTint"),
+            summaryPlate = summaryPlate,
+            titleText = FindDirectChild<Text>(rect, "Title"),
+            summaryText = summaryPlate != null ? FindDirectChild<Text>(summaryPlate.rectTransform, "Summary") : null,
+            detailText = FindDirectChild<Text>(rect, "Detail"),
+            tokenHost = FindDirectChild<RectTransform>(rect, "TokenHost")
+        };
+    }
+
+    void RestoreKeyTokens()
+    {
+        keyTokens.Clear();
+        if (keySection == null || keySection.tokenHost == null)
+            return;
+
+        for (int i = 0; i < KeyOrder.Length; i++)
+        {
+            KeyType keyType = KeyOrder[i];
+            RectTransform token = FindDirectChild<RectTransform>(keySection.tokenHost, $"{keyType}Token");
+            if (token == null)
+                continue;
+
+            keyTokens.Add(new KeyTokenView
+            {
+                keyType = keyType,
+                root = token,
+                plate = token.GetComponent<Image>(),
+                halo = FindDirectChild<Image>(token, "Halo"),
+                face = FindDirectChild<Image>(token, "Face"),
+                spine = FindDirectChild<Image>(token, "Spine"),
+                gloss = FindDirectChild<Image>(token, "Gloss"),
+                head = FindDirectChild<Text>(token, "Head"),
+                shaft = FindDirectChild<Image>(token, "Shaft"),
+                toothA = FindDirectChild<Image>(token, "ToothA"),
+                toothB = FindDirectChild<Image>(token, "ToothB"),
+                labelPlate = FindDirectChild<Image>(token, "LabelPlate"),
+                label = FindDirectChild<Text>(token, "Label")
+            });
+        }
+    }
+
+    void RestoreFuseTokens()
+    {
+        fuseTokens.Clear();
+        if (fuseSection == null || fuseSection.tokenHost == null)
+            return;
+
+        for (int i = 0; i < fuseSection.tokenHost.childCount; i++)
+        {
+            RectTransform token = fuseSection.tokenHost.GetChild(i) as RectTransform;
+            if (token == null || !token.name.StartsWith("Fuse_"))
+                continue;
+
+            fuseTokens.Add(new FuseTokenView
+            {
+                root = token,
+                plate = token.GetComponent<Image>(),
+                glow = FindDirectChild<Image>(token, "Glow"),
+                face = FindDirectChild<Image>(token, "Face"),
+                body = FindDirectChild<Image>(token, "Body"),
+                core = FindDirectChild<Image>(token, "Core"),
+                capTop = FindDirectChild<Image>(token, "CapTop"),
+                capBottom = FindDirectChild<Image>(token, "CapBottom"),
+                spark = FindDirectChild<Image>(token, "Spark")
+            });
+        }
+    }
+
+    static T FindDirectChild<T>(Transform parent, string name) where T : Component
+    {
+        if (parent == null)
+            return null;
+
+        Transform child = parent.Find(name);
+        return child != null ? child.GetComponent<T>() : null;
     }
 
     static string GetKeyHeadGlyph(KeyType keyType)
