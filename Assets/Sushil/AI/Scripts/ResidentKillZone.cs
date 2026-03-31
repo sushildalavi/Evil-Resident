@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Sushil.Systems;
@@ -7,6 +8,7 @@ namespace Sushil.AI
     public class ResidentKillZone : MonoBehaviour
     {
         const float MaxRuntimeWorldKillRadius = 0.96f;
+        const string TriggerKillReason = "Resident one-shot (trigger)";
 
         [Header("Safety")]
         public float armDelay = 0.75f;
@@ -82,54 +84,51 @@ namespace Sushil.AI
 
                 var hide = death.GetComponent<PlayerHide>();
                 if (hide != null && hide.IsHidden) return;
-                Vector3 targetContact = GetTargetContactPoint(other, death.transform, closestPoint);
-                if (!IsWithinKillVerticalTolerance(center, targetContact))
-                    return;
-                if (residentAI != null && residentAI.IsSquareFuseKillBlocked(center, targetContact))
-                    return;
-                if (residentAI != null && !residentAI.IsKillContactClear(center, targetContact))
-                    return;
-                if (residentAI != null && !residentAI.IsCloseKillReachable(targetContact, Vector3.Distance(center, targetContact)))
-                    return;
-
-                if (residentAI != null)
-                {
-                    if (!residentAI.TryKillTarget(death.gameObject, "Resident one-shot (trigger)"))
-                        return;
-                }
-                else
-                {
-                    death.Kill("Resident one-shot (trigger)");
-                }
-
-                killed = true;
+                TryKillCharacter(other, death.transform, death.gameObject, closestPoint, center, () => death.Kill(TriggerKillReason));
                 return;
             }
 
             var rohit = other.GetComponentInParent<RohitFPSController>();
-            if (rohit == null) return;
-            if (rohit.isHidden) return;
-            Vector3 rohitContact = GetTargetContactPoint(other, rohit.transform, closestPoint);
-            if (!IsWithinKillVerticalTolerance(center, rohitContact))
-                return;
-            if (residentAI != null && residentAI.IsSquareFuseKillBlocked(center, rohitContact))
-                return;
-            if (residentAI != null && !residentAI.IsKillContactClear(center, rohitContact))
-                return;
-            if (residentAI != null && !residentAI.IsCloseKillReachable(rohitContact, Vector3.Distance(center, rohitContact)))
+            if (rohit == null || rohit.isHidden) return;
+
+            TryKillCharacter(other, rohit.transform, rohit.gameObject, closestPoint, center, () => ResidentAI.KillRohitController(rohit, TriggerKillReason));
+        }
+
+        void TryKillCharacter(Collider hitCollider, Transform targetRoot, GameObject targetObject, Vector3 fallbackPoint, Vector3 killCenter, Action fallbackKill)
+        {
+            Vector3 targetContact = GetTargetContactPoint(hitCollider, targetRoot, fallbackPoint, killCenter);
+            if (!CanKillTargetAtContact(killCenter, targetContact))
                 return;
 
-            if (residentAI != null)
-            {
-                if (!residentAI.TryKillTarget(rohit.gameObject, "Resident one-shot (trigger)"))
-                    return;
-            }
-            else
-            {
-                ResidentAI.KillRohitController(rohit, "Resident one-shot (trigger)");
-            }
+            if (!TryExecuteKill(targetObject, fallbackKill))
+                return;
 
             killed = true;
+        }
+
+        bool CanKillTargetAtContact(Vector3 killCenter, Vector3 targetContact)
+        {
+            if (!IsWithinKillVerticalTolerance(killCenter, targetContact))
+                return false;
+
+            if (residentAI == null)
+                return true;
+
+            if (residentAI.IsSquareFuseKillBlocked(killCenter, targetContact))
+                return false;
+            if (!residentAI.IsKillContactClear(killCenter, targetContact))
+                return false;
+
+            return residentAI.IsCloseKillReachable(targetContact, Vector3.Distance(killCenter, targetContact));
+        }
+
+        bool TryExecuteKill(GameObject targetObject, Action fallbackKill)
+        {
+            if (residentAI != null)
+                return residentAI.TryKillTarget(targetObject, TriggerKillReason);
+
+            fallbackKill?.Invoke();
+            return true;
         }
 
         Vector3 GetKillCenter()
@@ -149,21 +148,21 @@ namespace Sushil.AI
             return Mathf.Min(colliderWorldRadius, maxKillRadius);
         }
 
-        Vector3 GetTargetContactPoint(Collider hitCollider, Transform targetRoot, Vector3 fallbackPoint)
+        Vector3 GetTargetContactPoint(Collider hitCollider, Transform targetRoot, Vector3 fallbackPoint, Vector3 killCenter)
         {
             if (hitCollider != null && hitCollider.enabled)
-                return hitCollider.ClosestPoint(GetKillCenter());
+                return hitCollider.ClosestPoint(killCenter);
 
             if (targetRoot == null)
                 return fallbackPoint;
 
             var controller = targetRoot.GetComponent<CharacterController>();
             if (controller != null)
-                return controller.bounds.ClosestPoint(GetKillCenter());
+                return controller.bounds.ClosestPoint(killCenter);
 
             var bodyCollider = targetRoot.GetComponent<Collider>();
             if (bodyCollider != null && bodyCollider.enabled)
-                return bodyCollider.ClosestPoint(GetKillCenter());
+                return bodyCollider.ClosestPoint(killCenter);
 
             return fallbackPoint;
         }

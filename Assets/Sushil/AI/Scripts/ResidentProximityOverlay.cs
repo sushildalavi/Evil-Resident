@@ -8,6 +8,7 @@ namespace Sushil.Systems
     public class ResidentProximityOverlay : MonoBehaviour
     {
         static ResidentProximityOverlay instance;
+        const string HiddenStateText = "";
 
         [Header("Distance")]
         public float detectDistance = 18f;
@@ -30,7 +31,6 @@ namespace Sushil.Systems
         public float heartbeatTextMinAlpha = 0.12f;
         public float heartbeatTextMaxAlpha = 0.65f;
 
-        Canvas canvas;
         Image pulseImage;
         Text heartbeatText;
         Text subText;
@@ -61,26 +61,14 @@ namespace Sushil.Systems
             instance = this;
             BuildUI();
             ResolveReferences(true);
-            SetAlpha(0f, 0f, string.Empty);
+            ClearOverlay();
         }
 
         void Update()
         {
-            if (!enableScreenPulse)
+            if (ShouldSuppressOverlay())
             {
-                SetAlpha(0f, 0f, string.Empty);
-                return;
-            }
-
-            if (StartScreenOverlay.IsShowing || PauseOverlay.IsPaused || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing)
-            {
-                SetAlpha(0f, 0f, string.Empty);
-                return;
-            }
-
-            if (IsPlayerHidden())
-            {
-                SetAlpha(0f, 0f, string.Empty);
+                ClearOverlay();
                 return;
             }
 
@@ -92,7 +80,7 @@ namespace Sushil.Systems
 
             if (player == null || residents == null || residents.Length == 0)
             {
-                SetAlpha(0f, 0f, string.Empty);
+                ClearOverlay();
                 return;
             }
 
@@ -110,7 +98,7 @@ namespace Sushil.Systems
                     return;
                 }
 
-                SetAlpha(0f, 0f, string.Empty);
+                ClearOverlay();
                 return;
             }
 
@@ -144,6 +132,21 @@ namespace Sushil.Systems
 
             float baseline = 0.08f + 0.12f * (0.5f + 0.5f * Mathf.Sin(t * speed * 0.55f));
             return Mathf.Clamp01(baseline + envelope * (0.8f + beatAccentStrength));
+        }
+
+        bool ShouldSuppressOverlay()
+        {
+            return !enableScreenPulse ||
+                   StartScreenOverlay.IsShowing ||
+                   PauseOverlay.IsPaused ||
+                   GameOverOverlay.IsShowing ||
+                   EscapeOverlay.IsShowing ||
+                   IsPlayerHidden();
+        }
+
+        void ClearOverlay()
+        {
+            SetAlpha(0f, 0f, HiddenStateText);
         }
 
         void ResolveReferences(bool force)
@@ -266,9 +269,9 @@ namespace Sushil.Systems
 
         void BuildUI()
         {
-            canvas = gameObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = short.MaxValue - 10;
+            var overlayCanvas = gameObject.AddComponent<Canvas>();
+            overlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            overlayCanvas.sortingOrder = short.MaxValue - 10;
 
             var scaler = gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -278,7 +281,7 @@ namespace Sushil.Systems
             gameObject.AddComponent<GraphicRaycaster>();
 
             GameObject pulseObj = new GameObject("Pulse");
-            pulseObj.transform.SetParent(canvas.transform, false);
+            pulseObj.transform.SetParent(transform, false);
             pulseImage = pulseObj.AddComponent<Image>();
             pulseImage.color = new Color(pulseColor.r, pulseColor.g, pulseColor.b, 0f);
             RectTransform pulseRect = pulseImage.rectTransform;
@@ -289,51 +292,60 @@ namespace Sushil.Systems
 
             if (!showHeartbeatText) return;
 
-            GameObject textObj = new GameObject("HeartbeatText");
-            textObj.transform.SetParent(canvas.transform, false);
-            heartbeatText = textObj.AddComponent<Text>();
-            heartbeatText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            heartbeatText.fontSize = 46;
-            heartbeatText.fontStyle = FontStyle.Normal;
-            heartbeatText.alignment = TextAnchor.LowerCenter;
-            heartbeatText.text = heartbeatLabel;
-            heartbeatText.resizeTextForBestFit = true;
-            heartbeatText.resizeTextMinSize = 20;
-            heartbeatText.resizeTextMaxSize = 46;
-            heartbeatText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            heartbeatText.verticalOverflow = VerticalWrapMode.Truncate;
-            heartbeatText.color = new Color(0.92f, 0.88f, 0.88f, 0f);
+            heartbeatText = CreateStatusText(
+                "HeartbeatText",
+                46,
+                20,
+                46,
+                heartbeatLabel,
+                new Color(0.92f, 0.88f, 0.88f, 0f),
+                new Vector2(40f, 54f),
+                new Vector2(-40f, 142f),
+                true);
 
-            var shadow = textObj.AddComponent<Shadow>();
-            shadow.effectColor = new Color(0f, 0f, 0f, 0.9f);
-            shadow.effectDistance = new Vector2(3f, -3f);
+            subText = CreateStatusText(
+                "HeartbeatSubText",
+                26,
+                14,
+                26,
+                HiddenStateText,
+                new Color(0.85f, 0.8f, 0.8f, 0f),
+                new Vector2(40f, 26f),
+                new Vector2(-40f, 72f));
+        }
 
-            RectTransform textRect = heartbeatText.rectTransform;
+        Text CreateStatusText(string objectName, int fontSize, int minSize, int maxSize, string content, Color color, Vector2 offsetMin, Vector2 offsetMax, bool addShadow = false)
+        {
+            GameObject textObj = new GameObject(objectName);
+            textObj.transform.SetParent(transform, false);
+
+            Text text = textObj.AddComponent<Text>();
+            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.fontSize = fontSize;
+            text.fontStyle = FontStyle.Normal;
+            text.alignment = TextAnchor.LowerCenter;
+            text.text = content;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = minSize;
+            text.resizeTextMaxSize = maxSize;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.color = color;
+
+            RectTransform textRect = text.rectTransform;
             textRect.anchorMin = new Vector2(0f, 0f);
             textRect.anchorMax = new Vector2(1f, 0f);
-            textRect.offsetMin = new Vector2(40f, 54f);
-            textRect.offsetMax = new Vector2(-40f, 142f);
+            textRect.offsetMin = offsetMin;
+            textRect.offsetMax = offsetMax;
 
-            GameObject subObj = new GameObject("HeartbeatSubText");
-            subObj.transform.SetParent(canvas.transform, false);
-            subText = subObj.AddComponent<Text>();
-            subText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            subText.fontSize = 26;
-            subText.fontStyle = FontStyle.Normal;
-            subText.alignment = TextAnchor.LowerCenter;
-            subText.text = string.Empty;
-            subText.resizeTextForBestFit = true;
-            subText.resizeTextMinSize = 14;
-            subText.resizeTextMaxSize = 26;
-            subText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            subText.verticalOverflow = VerticalWrapMode.Truncate;
-            subText.color = new Color(0.85f, 0.8f, 0.8f, 0f);
+            if (addShadow)
+            {
+                var shadow = textObj.AddComponent<Shadow>();
+                shadow.effectColor = new Color(0f, 0f, 0f, 0.9f);
+                shadow.effectDistance = new Vector2(3f, -3f);
+            }
 
-            RectTransform subRect = subText.rectTransform;
-            subRect.anchorMin = new Vector2(0f, 0f);
-            subRect.anchorMax = new Vector2(1f, 0f);
-            subRect.offsetMin = new Vector2(40f, 26f);
-            subRect.offsetMax = new Vector2(-40f, 72f);
+            return text;
         }
 
         void SetAlpha(float screenAlpha, float textAlpha, string stateText)

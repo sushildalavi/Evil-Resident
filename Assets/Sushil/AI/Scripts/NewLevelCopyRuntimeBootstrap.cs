@@ -32,7 +32,6 @@ namespace Sushil.AI
             }
 
             instance = this;
-            DontDestroyOnLoad(gameObject);
             SceneManager.sceneLoaded += OnSceneLoaded;
         }
 

@@ -15,7 +15,6 @@ namespace Sushil.Systems
         public Color pointerColor = new Color(1f, 0.82f, 0.42f, 1f);
         public Color dangerColor = new Color(1f, 0.28f, 0.28f, 1f);
 
-        Canvas canvas;
         RectTransform root;
         RectTransform indicatorRect;
         RectTransform arrowRect;
@@ -58,19 +57,17 @@ namespace Sushil.Systems
 
         void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
-            ResolveReferences();
-            ResetSmoothing();
+            RefreshState();
         }
 
         void Start()
         {
-            ResolveReferences();
-            ResetSmoothing();
+            RefreshState();
         }
 
         void Update()
         {
-            if (StartScreenOverlay.IsShowing || PauseOverlay.IsPaused || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing)
+            if (ShouldHidePointer())
             {
                 SetVisible(false);
                 return;
@@ -190,6 +187,20 @@ namespace Sushil.Systems
             }
         }
 
+        void RefreshState()
+        {
+            ResolveReferences();
+            ResetSmoothing();
+        }
+
+        bool ShouldHidePointer()
+        {
+            return StartScreenOverlay.IsShowing ||
+                   PauseOverlay.IsPaused ||
+                   GameOverOverlay.IsShowing ||
+                   EscapeOverlay.IsShowing;
+        }
+
         void ResetSmoothing()
         {
             smoothPos = Vector2.zero;
@@ -219,9 +230,9 @@ namespace Sushil.Systems
 
         void BuildUI()
         {
-            canvas = gameObject.AddComponent<Canvas>();
-            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = short.MaxValue - 3;
+            var overlayCanvas = gameObject.AddComponent<Canvas>();
+            overlayCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            overlayCanvas.sortingOrder = short.MaxValue - 3;
 
             var scaler = gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
@@ -252,20 +263,8 @@ namespace Sushil.Systems
             arrowRect.anchoredPosition = new Vector2(0f, 10f);
             arrowRect.sizeDelta = new Vector2(58f, 58f);
 
-            arrowText = arrowRect.gameObject.AddComponent<Text>();
-            arrowText.font = OverlayTypography.GetFont(54);
-            arrowText.fontSize = 54;
-            arrowText.alignment = TextAnchor.MiddleCenter;
-            arrowText.text = "▲";
-            arrowText.color = pointerColor;
-            arrowText.resizeTextForBestFit = true;
-            arrowText.resizeTextMinSize = 24;
-            arrowText.resizeTextMaxSize = 58;
-            arrowText.raycastTarget = false;
-
-            var arrowOutline = arrowRect.gameObject.AddComponent<Outline>();
-            arrowOutline.effectColor = new Color(0f, 0f, 0f, 0.92f);
-            arrowOutline.effectDistance = new Vector2(2f, -2f);
+            arrowText = CreatePointerText(arrowRect.gameObject, 54, "▲", pointerColor, 24, 58);
+            AddOutline(arrowRect.gameObject, new Color(0f, 0f, 0f, 0.92f), new Vector2(2f, -2f));
 
             RectTransform infoRect = new GameObject("Info", typeof(RectTransform)).GetComponent<RectTransform>();
             infoRect.SetParent(indicatorRect, false);
@@ -275,20 +274,30 @@ namespace Sushil.Systems
             infoRect.anchoredPosition = new Vector2(0f, -18f);
             infoRect.sizeDelta = new Vector2(80f, 24f);
 
-            infoText = infoRect.gameObject.AddComponent<Text>();
-            infoText.font = OverlayTypography.GetFont(18);
-            infoText.fontSize = 18;
-            infoText.alignment = TextAnchor.MiddleCenter;
-            infoText.text = "0m";
-            infoText.color = pointerColor;
-            infoText.resizeTextForBestFit = true;
-            infoText.resizeTextMinSize = 12;
-            infoText.resizeTextMaxSize = 20;
-            infoText.raycastTarget = false;
+            infoText = CreatePointerText(infoRect.gameObject, 18, "0m", pointerColor, 12, 20);
+            AddOutline(infoRect.gameObject, new Color(0f, 0f, 0f, 0.88f), new Vector2(2f, -2f));
+        }
 
-            var infoOutline = infoRect.gameObject.AddComponent<Outline>();
-            infoOutline.effectColor = new Color(0f, 0f, 0f, 0.88f);
-            infoOutline.effectDistance = new Vector2(2f, -2f);
+        Text CreatePointerText(GameObject owner, int fontSize, string content, Color color, int minSize, int maxSize)
+        {
+            Text text = owner.AddComponent<Text>();
+            text.font = OverlayTypography.GetFont(fontSize);
+            text.fontSize = fontSize;
+            text.alignment = TextAnchor.MiddleCenter;
+            text.text = content;
+            text.color = color;
+            text.resizeTextForBestFit = true;
+            text.resizeTextMinSize = minSize;
+            text.resizeTextMaxSize = maxSize;
+            text.raycastTarget = false;
+            return text;
+        }
+
+        void AddOutline(GameObject owner, Color color, Vector2 distance)
+        {
+            var outline = owner.AddComponent<Outline>();
+            outline.effectColor = color;
+            outline.effectDistance = distance;
         }
     }
 }

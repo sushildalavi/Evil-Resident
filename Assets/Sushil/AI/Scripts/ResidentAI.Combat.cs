@@ -24,22 +24,20 @@ namespace Sushil.AI
                 return false;
 
             if (death != null && !death.isDead)
-            {
-                killTriggered = true;
-                if (killAttackRoutine != null) StopCoroutine(killAttackRoutine);
-                killAttackRoutine = StartCoroutine(PerformKillAttack(target.transform, death, null, reason));
-                return true;
-            }
+                return StartKillAttack(targetTransform, death, null, reason);
 
             if (rohit != null)
-            {
-                killTriggered = true;
-                if (killAttackRoutine != null) StopCoroutine(killAttackRoutine);
-                killAttackRoutine = StartCoroutine(PerformKillAttack(target.transform, null, rohit, reason));
-                return true;
-            }
+                return StartKillAttack(targetTransform, null, rohit, reason);
 
             return false;
+        }
+
+        bool StartKillAttack(Transform targetTransform, PlayerDeath death, RohitFPSController rohit, string reason)
+        {
+            killTriggered = true;
+            if (killAttackRoutine != null) StopCoroutine(killAttackRoutine);
+            killAttackRoutine = StartCoroutine(PerformKillAttack(targetTransform, death, rohit, reason));
+            return true;
         }
 
         IEnumerator PerformKillAttack(Transform targetTransform, PlayerDeath death, RohitFPSController rohit, string reason)
@@ -61,37 +59,29 @@ namespace Sushil.AI
                 agent.ResetPath();
             }
 
-            while (Time.time < killAttackImpactAt)
-            {
-                if (targetTransform != null)
-                    killAttackFocusPoint = targetTransform.position;
-                UpdateKillAttackFacing();
-                yield return null;
-            }
-
-            while (Time.time < killAttackHitAt)
-            {
-                if (targetTransform != null)
-                    killAttackFocusPoint = targetTransform.position;
-                UpdateKillAttackFacing();
-                yield return null;
-            }
+            yield return AdvanceKillAttackUntil(targetTransform, killAttackImpactAt);
+            yield return AdvanceKillAttackUntil(targetTransform, killAttackHitAt);
 
             if (death != null && !death.isDead)
                 death.Kill(reason);
             else if (rohit != null)
                 KillRohitController(rohit, reason);
 
-            while (Time.time < killAttackEndAt)
+            yield return AdvanceKillAttackUntil(targetTransform, killAttackEndAt);
+
+            killAttackActive = false;
+            killAttackRoutine = null;
+        }
+
+        IEnumerator AdvanceKillAttackUntil(Transform targetTransform, float endTime)
+        {
+            while (Time.time < endTime)
             {
                 if (targetTransform != null)
                     killAttackFocusPoint = targetTransform.position;
                 UpdateKillAttackFacing();
                 yield return null;
             }
-
-            killAttackActive = false;
-            killAttackRoutine = null;
         }
 
         public static void KillRohitController(RohitFPSController rohit, string reason)

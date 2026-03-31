@@ -173,20 +173,9 @@ namespace Sushil.AI
                 {
                     if (rb == null) continue;
                     GameObject obj = rb.gameObject;
-                    int id = obj.GetInstanceID();
-                    if (configuredProjectileIds.Contains(id)) continue;
-
                     if (!LooksLikeThrownRock(obj, rockPrefabName, throwPos)) continue;
-
-                    ThrowableNoise.ConfigureOnObject(
-                        obj,
-                        impactNoiseIntensity,
-                        impactMinSpeed,
-                        projectileLifeSeconds,
-                        impactNoiseType);
-
-                    configuredProjectileIds.Add(id);
-                    yield break;
+                    if (TryConfigureProjectileNoise(obj))
+                        yield break;
                 }
 
                 elapsed += Time.deltaTime;
@@ -202,21 +191,27 @@ namespace Sushil.AI
                 Rigidbody rb = allRigidbodies[i];
                 if (rb == null) continue;
                 GameObject obj = rb.gameObject;
-                if (obj == null) continue;
                 if (!LooksLikeRockCandidate(obj)) continue;
-
-                int id = obj.GetInstanceID();
-                if (configuredProjectileIds.Contains(id)) continue;
-
-                ThrowableNoise.ConfigureOnObject(
-                    obj,
-                    impactNoiseIntensity,
-                    impactMinSpeed,
-                    projectileLifeSeconds,
-                    impactNoiseType);
-
-                configuredProjectileIds.Add(id);
+                TryConfigureProjectileNoise(obj);
             }
+        }
+
+        bool TryConfigureProjectileNoise(GameObject obj)
+        {
+            if (obj == null) return false;
+
+            int id = obj.GetInstanceID();
+            if (configuredProjectileIds.Contains(id)) return false;
+
+            ThrowableNoise.ConfigureOnObject(
+                obj,
+                impactNoiseIntensity,
+                impactMinSpeed,
+                projectileLifeSeconds,
+                impactNoiseType);
+
+            configuredProjectileIds.Add(id);
+            return true;
         }
 
         bool LooksLikeRockCandidate(GameObject candidate)
