@@ -619,22 +619,32 @@ public class RohitFPSController : MonoBehaviour
         Transform effectiveHiddenCameraPoint = hideObject != null ? hideObject.GetEffectiveHiddenCameraPoint() : null;
         if (effectiveHiddenCameraPoint != null && cameraTransform != null)
         {
-            // Keep camera pivot on player axis: move player so the existing camera local offset lands on the target point.
-            Vector3 cameraDelta = effectiveHiddenCameraPoint.position - cameraTransform.position;
-            transform.position += cameraDelta;
-            cameraTransform.rotation = Quaternion.Euler(
-                effectiveHiddenCameraPoint.eulerAngles.x,
-                oppositeYaw,
-                0f
-            );
             transform.rotation = Quaternion.Euler(0f, oppositeYaw, 0f);
-            xRotation = NormalizePitch(cameraTransform.localEulerAngles.x);
+
+            // Keep camera attached to player pivot so hidden yaw rotates in-place (no orbit/radius).
+            float hiddenCamY = cameraTransform.localPosition.y;
+            if (hasDefaultCameraPose)
+                hiddenCamY = defaultCameraLocalPos.y;
+            cameraTransform.localPosition = new Vector3(0f, hiddenCamY, 0f);
+
+            Vector3 localCamOffset = cameraTransform.localPosition;
+            Vector3 worldCamOffset = transform.TransformVector(localCamOffset);
+            transform.position = effectiveHiddenCameraPoint.position - worldCamOffset;
+
+            xRotation = NormalizePitch(effectiveHiddenCameraPoint.eulerAngles.x);
+            cameraTransform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
         }
         else
         {
             transform.rotation = Quaternion.Euler(0f, oppositeYaw, 0f);
             if (cameraTransform != null)
-                cameraTransform.rotation = Quaternion.Euler(xRotation, oppositeYaw, 0f);
+            {
+                float hiddenCamY = cameraTransform.localPosition.y;
+                if (hasDefaultCameraPose)
+                    hiddenCamY = defaultCameraLocalPos.y;
+                cameraTransform.localPosition = new Vector3(0f, hiddenCamY, 0f);
+                cameraTransform.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+            }
         }
 
         horizontalVelocity = Vector3.zero;
