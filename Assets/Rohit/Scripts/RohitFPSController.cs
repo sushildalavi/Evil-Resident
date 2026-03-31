@@ -616,11 +616,14 @@ public class RohitFPSController : MonoBehaviour
         }
         controller.enabled = true;
 
-        if (hideObject != null && hideObject.hiddenCameraPoint != null && cameraTransform != null)
+        Transform effectiveHiddenCameraPoint = hideObject != null ? hideObject.GetEffectiveHiddenCameraPoint() : null;
+        if (effectiveHiddenCameraPoint != null && cameraTransform != null)
         {
-            cameraTransform.position = hideObject.hiddenCameraPoint.position;
+            // Keep camera pivot on player axis: move player so the existing camera local offset lands on the target point.
+            Vector3 cameraDelta = effectiveHiddenCameraPoint.position - cameraTransform.position;
+            transform.position += cameraDelta;
             cameraTransform.rotation = Quaternion.Euler(
-                hideObject.hiddenCameraPoint.eulerAngles.x,
+                effectiveHiddenCameraPoint.eulerAngles.x,
                 oppositeYaw,
                 0f
             );

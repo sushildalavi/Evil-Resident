@@ -9,6 +9,48 @@ public class HideableObject : MonoBehaviour, IInteractable
     [Header("Camera Override (Optional)")]
     public Transform hiddenCameraPoint;
 
+    Transform FindPoint(string relativePath)
+    {
+        return transform.Find(relativePath);
+    }
+
+    public Transform GetEffectiveHidePoint()
+    {
+        if (hidePoint != null)
+            return hidePoint;
+
+        Transform named = FindPoint("Points/HidePoint");
+        if (named != null)
+            return named;
+
+        return transform;
+    }
+
+    public Transform GetEffectiveHiddenCameraPoint()
+    {
+        if (hiddenCameraPoint != null)
+            return hiddenCameraPoint;
+
+        Transform named = FindPoint("Points/HiddenCameraPoint");
+        if (named != null)
+            return named;
+
+        // Fallback keeps camera inside container instead of player head height outside.
+        return GetEffectiveHidePoint();
+    }
+
+    public Vector3 GetEffectiveExitPosition()
+    {
+        if (exitPoint != null)
+            return exitPoint.position;
+
+        Transform named = FindPoint("Points/ExitPoint");
+        if (named != null)
+            return named.position;
+
+        return transform.position + transform.forward * 2f;
+    }
+
     public KeyCode GetInteractKey() => KeyCode.F;
 
     public string GetPrompt(RohitFPSController player)
@@ -24,17 +66,12 @@ public class HideableObject : MonoBehaviour, IInteractable
     {
         if (!player.isHidden)
         {
-            Transform targetHidePoint = hidePoint != null ? hidePoint : transform;
+            Transform targetHidePoint = GetEffectiveHidePoint();
             player.HideAt(targetHidePoint, this);
         }
         else if (player.currentHideObject == this)
         {
-            Vector3 exitPos;
-            if (exitPoint != null)
-                exitPos = exitPoint.position;
-            else
-                exitPos = transform.position + transform.forward * 2f;
-
+            Vector3 exitPos = GetEffectiveExitPosition();
             exitPos = player.ResolveSafeExitPosition(this, exitPos);
             player.ExitHide(exitPos);
         }
