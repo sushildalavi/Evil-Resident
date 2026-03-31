@@ -8,7 +8,8 @@ namespace Sushil.AI
 {
     public class NewLevelCopyRuntimeBootstrap : MonoBehaviour
     {
-        const string TargetSceneName = "NewLevel Copy";
+        const string NewLevelScenePath = "Assets/Sahil/Test/NewLevel.unity";
+        const string NewLevelCopyScenePath = "Assets/Sushil/NewLevel Copy.unity";
 
         static NewLevelCopyRuntimeBootstrap instance;
         int lastRebuiltSceneHandle = int.MinValue;
@@ -57,10 +58,15 @@ namespace Sushil.AI
 
         void TryScheduleForScene(Scene scene)
         {
-            if (!scene.IsValid() || !scene.isLoaded || scene.name != TargetSceneName)
+            if (!scene.IsValid() || !scene.isLoaded || !IsTargetScene(scene))
                 return;
 
             StartCoroutine(RebuildSceneNavMesh(scene));
+        }
+
+        static bool IsTargetScene(Scene scene)
+        {
+            return scene.path == NewLevelScenePath || scene.path == NewLevelCopyScenePath;
         }
 
         IEnumerator RebuildSceneNavMesh(Scene scene)

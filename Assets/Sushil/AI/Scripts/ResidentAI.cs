@@ -30,6 +30,9 @@ namespace Sushil.AI
         [Range(0f, 1f)] public float lastNoiseRoomBiasChance = 0.6f;
         public float lastNoiseRoomBiasDuration = 25f;
         public float lastNoiseRoomRadius = 10f;
+        [Range(0f, 1f)] public float unlockedKeyDoorBiasChance = 0.58f;
+        public float unlockedKeyDoorBiasRadius = 5.5f;
+        public float unlockedKeyDoorTraverseRange = 3.6f;
         public bool allowMultiFloorRoam = true;
         [Range(0f, 1f)] public float multiFloorRoamChance = 0.55f;
         public float multiFloorRoamHeight = 7f;
@@ -376,7 +379,7 @@ namespace Sushil.AI
             minWallClearance = 0.45f;
             destinationRetrySamples = 16;
             destinationRetryRadius = 4.0f;
-            enforcedAgentRadius = 0.34f;
+            enforcedAgentRadius = 0.30f;
             enforcedAgentHeight = 2.0f;
             enableDoorwayAssist = true;
             doorwayWarpAssist = false;
@@ -421,6 +424,9 @@ namespace Sushil.AI
             allowMultiFloorRoam = true;
             roamSampleAttempts = Mathf.Max(roamSampleAttempts, 28);
             freeRoamRadius = Mathf.Max(freeRoamRadius, 60f);
+            unlockedKeyDoorBiasChance = Mathf.Max(unlockedKeyDoorBiasChance, 0.58f);
+            unlockedKeyDoorBiasRadius = Mathf.Max(unlockedKeyDoorBiasRadius, 5.5f);
+            unlockedKeyDoorTraverseRange = Mathf.Max(unlockedKeyDoorTraverseRange, 3.6f);
             searchRadius = Mathf.Max(searchRadius, 6.5f);
             multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.55f);
             multiFloorRoamHeight = Mathf.Max(multiFloorRoamHeight, 7f);
@@ -469,6 +475,9 @@ namespace Sushil.AI
                 closeAwarenessDistance = Mathf.Max(closeAwarenessDistance, 4.8f);
                 closeAwarenessVerticalTolerance = Mathf.Clamp(closeAwarenessVerticalTolerance, 1.35f, 1.55f);
                 proximityChaseVerticalTolerance = Mathf.Clamp(proximityChaseVerticalTolerance, 2.25f, 2.5f);
+                // Add a runtime NavMeshLink so the resident can walk through the narrow
+                // corridor (x=4.5–5.5) that is too tight to bake NavMesh at radius 0.5.
+                EnsureSquareFuseCorridorNavLink();
             }
             // Keep hard geometry validation enabled so chase logic cannot cut through walls.
             validatePathAgainstGeometry = true;
@@ -612,6 +621,7 @@ namespace Sushil.AI
             playerFlat.y = 0f;
             float contactDistanceToPlayer = Vector3.Distance(residentContactPoint, playerContactPoint);
             float playerVerticalSeparation = Mathf.Abs(playerContactPoint.y - residentContactPoint.y);
+            bool squareFuseKillBlocked = IsSquareFuseKillBlocked(residentContactPoint, playerContactPoint);
 
             bool lethalContact =
                 contactDistanceToPlayer <= Mathf.Max(0.95f, killDistance * 0.92f) ||
@@ -619,6 +629,7 @@ namespace Sushil.AI
             bool chaseOrSightThreat = state == State.Chase || rawCanSee || stablePlayerVisible || proximityChaseAllowed;
 
             if (!killTriggered &&
+                !squareFuseKillBlocked &&
                 !isHiddenNow &&
                 playerVerticalSeparation <= Mathf.Max(0.4f, killVerticalTolerance) &&
                 contactDistanceToPlayer <= killDistance + 0.05f &&
@@ -798,8 +809,14 @@ namespace Sushil.AI
                 Vector3 targetPos;
                 if (useFreeRoamPatrol || patrolPoints.Count == 0)
                 {
-                    bool useNoiseRoom = ShouldBiasToLastNoiseRoom();
-                    if (useNoiseRoom &&
+                    bool useUnlockedDoorRoom = ShouldBiasToUnlockedKeyDoorRoom();
+                    bool useNoiseRoom = !useUnlockedDoorRoom && ShouldBiasToLastNoiseRoom();
+                    if (useUnlockedDoorRoom &&
+                        TryGetUnlockedKeyDoorRoomTarget(out targetPos))
+                    {
+                        // Prefer rooms behind doors the player has already unlocked.
+                    }
+                    else if (useNoiseRoom &&
                         TryGetRandomRoamPoint(lastNoisePos, lastNoiseRoomRadius, out targetPos))
                     {
                         // Intentionally patrol near last heard player noise.
@@ -864,9 +881,13 @@ namespace Sushil.AI
             if (!TrySetDestination(target)) { ChangeState(State.Patrol); yield break; }
 
             while (state == State.Investigate && IsAgentReady() && agent.pathPending) yield return null;
+            Vector3 lastInvestigatePos = transform.position;
+            float investigateStallTimer = 0f;
             while (state == State.Investigate && IsAgentReady() &&
                    !HasReachedDestination(0.35f))
             {
+                if (UpdateRoamStallState(ref lastInvestigatePos, ref investigateStallTimer))
+                    break;
                 if (stablePlayerVisible || ShouldForceProximityChase(IsPlayerHidden()))
                 {
                     lastSeenPlayerPos = player.position;
@@ -971,7 +992,14 @@ namespace Sushil.AI
                 }
 
                 // Normal wandering around the noise center
-                if (searchingWholeHouse)
+                Vector3 unlockedDoorRoomPoint = transform.position;
+                bool usedUnlockedDoorRoom = ShouldBiasToUnlockedKeyDoorRoom() &&
+                                            TryGetUnlockedKeyDoorRoomTarget(out unlockedDoorRoomPoint);
+                if (usedUnlockedDoorRoom)
+                {
+                    TrySetDestination(unlockedDoorRoomPoint);
+                }
+                else if (searchingWholeHouse)
                 {
                     Vector3 searchCenter = (Random.value < lostSightLastKnownBias)
                         ? wholeHouseSearchLastKnownPos
@@ -1062,7 +1090,8 @@ namespace Sushil.AI
                     Vector3 chaseTarget = canSee
                         ? player.position
                         : lastSeenPlayerPos;
-                    bool moved = TrySetDestination(chaseTarget);
+                    bool moved = TrySetDestination(chaseTarget) ||
+                                 TryUseSquareFuseCorridorBridge(chaseTarget, allowWarp: false);
                     if (!moved)
                     {
                         // Fallback for doorway edge-cases: push to nearest valid nav point near target.

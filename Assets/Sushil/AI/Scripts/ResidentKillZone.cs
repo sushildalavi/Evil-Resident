@@ -85,11 +85,24 @@ namespace Sushil.AI
                 Vector3 targetContact = GetTargetContactPoint(other, death.transform, closestPoint);
                 if (!IsWithinKillVerticalTolerance(center, targetContact))
                     return;
+                if (residentAI != null && residentAI.IsSquareFuseKillBlocked(center, targetContact))
+                    return;
+                if (residentAI != null && !residentAI.IsKillContactClear(center, targetContact))
+                    return;
                 if (residentAI != null && !residentAI.IsCloseKillReachable(targetContact, Vector3.Distance(center, targetContact)))
                     return;
 
+                if (residentAI != null)
+                {
+                    if (!residentAI.TryKillTarget(death.gameObject, "Resident one-shot (trigger)"))
+                        return;
+                }
+                else
+                {
+                    death.Kill("Resident one-shot (trigger)");
+                }
+
                 killed = true;
-                death.Kill("Resident one-shot (trigger)");
                 return;
             }
 
@@ -99,11 +112,24 @@ namespace Sushil.AI
             Vector3 rohitContact = GetTargetContactPoint(other, rohit.transform, closestPoint);
             if (!IsWithinKillVerticalTolerance(center, rohitContact))
                 return;
+            if (residentAI != null && residentAI.IsSquareFuseKillBlocked(center, rohitContact))
+                return;
+            if (residentAI != null && !residentAI.IsKillContactClear(center, rohitContact))
+                return;
             if (residentAI != null && !residentAI.IsCloseKillReachable(rohitContact, Vector3.Distance(center, rohitContact)))
                 return;
 
+            if (residentAI != null)
+            {
+                if (!residentAI.TryKillTarget(rohit.gameObject, "Resident one-shot (trigger)"))
+                    return;
+            }
+            else
+            {
+                ResidentAI.KillRohitController(rohit, "Resident one-shot (trigger)");
+            }
+
             killed = true;
-            ResidentAI.KillRohitController(rohit, "Resident one-shot (trigger)");
         }
 
         Vector3 GetKillCenter()

@@ -11,6 +11,18 @@ namespace Sushil.AI
             if (target == null || killTriggered) return false;
 
             var death = target.GetComponentInParent<PlayerDeath>();
+            var rohit = target.GetComponentInParent<RohitFPSController>();
+            Transform targetTransform = target.transform;
+            bool isPlayerTarget = death != null ||
+                                  rohit != null ||
+                                  (player != null &&
+                                   targetTransform != null &&
+                                   (targetTransform == player || targetTransform.IsChildOf(player)));
+            Vector3 targetWorldPos = targetTransform != null ? targetTransform.position : transform.position;
+            if (isPlayerTarget &&
+                IsSquareFuseKillBlocked(transform.position, targetWorldPos))
+                return false;
+
             if (death != null && !death.isDead)
             {
                 killTriggered = true;
@@ -19,7 +31,6 @@ namespace Sushil.AI
                 return true;
             }
 
-            var rohit = target.GetComponentInParent<RohitFPSController>();
             if (rohit != null)
             {
                 killTriggered = true;
