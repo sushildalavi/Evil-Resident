@@ -17,6 +17,7 @@ namespace Sushil.Systems
         bool showing;
         Text titleText;
         Text taglineText;
+        Text riddleText;
         Text startHintText;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -123,7 +124,13 @@ namespace Sushil.Systems
             taglineText = CreateText(content, "Tagline",
                 "Collect 3 keys. Escape. Don't be seen.",
                 38, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.92f, 0.92f, 0.95f, 1f),
-                new Vector2(0.08f, 0.52f), new Vector2(0.92f, 0.64f));
+                new Vector2(0.08f, 0.56f), new Vector2(0.92f, 0.66f));
+
+            riddleText = CreateText(content, "Riddle",
+                string.Empty,
+                30, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.82f, 0.84f, 0.90f, 0.95f),
+                new Vector2(0.12f, 0.22f), new Vector2(0.88f, 0.46f), 1.15f);
+            AddTextEffects(riddleText.gameObject, new Color(0.02f, 0.04f, 0.08f, 0.95f));
 
             startHintText = CreateText(content, "StartHint",
                 "Press ENTER or SPACE to begin",
@@ -135,19 +142,23 @@ namespace Sushil.Systems
 
         void ApplySceneText()
         {
-            if (titleText == null || taglineText == null || startHintText == null)
+            if (titleText == null || taglineText == null || riddleText == null || startHintText == null)
                 return;
 
             if (SceneManager.GetActiveScene().path == "Assets/Sahil/Test/NewLevel.unity")
             {
                 titleText.text = "EVIL RESIDENT";
-                taglineText.text = "Escape from the main door";
+                taglineText.text = "Escape from the main door.";
+                riddleText.gameObject.SetActive(true);
+                riddleText.text = "Walls here do not have ears, but they might show something... ;)";
                 startHintText.text = "Press ENTER or SPACE to begin";
                 return;
             }
 
             titleText.text = "IT SAW YOU";
             taglineText.text = "Collect 3 keys. Escape. Don't be seen.";
+            riddleText.gameObject.SetActive(false);
+            riddleText.text = string.Empty;
             startHintText.text = "Press ENTER or SPACE to begin";
         }
 

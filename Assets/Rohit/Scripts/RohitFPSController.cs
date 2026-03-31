@@ -39,6 +39,11 @@ public class RohitFPSController : MonoBehaviour
     public float keyInteractDistance = 10f;
     public float keyProximityRadius = 2.5f;
     public float fuseProximityRadius = 2.5f;
+    [Tooltip("Small wall dials are easy to miss with a pure ray hit, so give them a little extra usable range.")]
+    public float puzzleWheelInteractDistance = 6.5f;
+    [Range(0.75f, 0.999f)]
+    [Tooltip("How close to the center of view a puzzle dial must be before the prompt snaps to it.")]
+    public float puzzleWheelPromptViewDot = 0.94f;
     public LayerMask interactableLayer;
     [Tooltip("Solid geometry mask used to block interaction through walls.")]
     public LayerMask interactionOcclusionMask = ~0;
@@ -319,6 +324,17 @@ public class RohitFPSController : MonoBehaviour
             return;
         }
 
+        if (TryFindNearbyPuzzleWheel(out PuzzleWheel nearbyWheel))
+        {
+            string prompt = nearbyWheel.GetPrompt(this);
+            ShowPrompt(prompt);
+
+            if (WasKeyPressed(nearbyWheel.GetInteractKey()))
+                nearbyWheel.Interact(this);
+
+            return;
+        }
+
         HidePrompt();
     }
 
@@ -326,7 +342,7 @@ public class RohitFPSController : MonoBehaviour
     {
         interactable = null;
 
-        float maxDistance = Mathf.Max(interactDistance, keyInteractDistance);
+        float maxDistance = Mathf.Max(Mathf.Max(interactDistance, keyInteractDistance), puzzleWheelInteractDistance);
         RaycastHit[] hits = Physics.RaycastAll(ray, maxDistance, ~0, QueryTriggerInteraction.Collide);
         if (hits == null || hits.Length == 0) return false;
 
@@ -345,9 +361,17 @@ public class RohitFPSController : MonoBehaviour
                 float allowedDistance = interactDistance;
                 if (candidate is KeyItem)
                     allowedDistance = Mathf.Max(interactDistance, keyInteractDistance);
+                else if (candidate is PuzzleWheel)
+                    allowedDistance = Mathf.Max(interactDistance, puzzleWheelInteractDistance);
 
                 if (hits[i].distance > allowedDistance)
                     continue;
+
+                if (IsDirectHitOnInteractable(candidate, col.transform))
+                {
+                    interactable = candidate;
+                    return true;
+                }
 
                 bool inMask = interactableLayer.value != 0 && IsLayerInMask(col.gameObject.layer, interactableLayer);
                 if (inMask)
@@ -414,6 +438,54 @@ public class RohitFPSController : MonoBehaviour
         return keyItem != null;
     }
 
+    bool TryFindNearbyPuzzleWheel(out PuzzleWheel wheel)
+    {
+        wheel = null;
+
+        if (cameraTransform == null)
+            return false;
+
+        PuzzleWheel[] allWheels = FindObjectsByType<PuzzleWheel>(FindObjectsSortMode.None);
+        if (allWheels == null || allWheels.Length == 0)
+            return false;
+
+        Vector3 origin = cameraTransform.position;
+        Vector3 forward = cameraTransform.forward;
+        float maxDistance = Mathf.Max(interactDistance, puzzleWheelInteractDistance);
+        float minViewDot = Mathf.Clamp(puzzleWheelPromptViewDot, 0.75f, 0.999f);
+        float bestScore = float.NegativeInfinity;
+
+        for (int i = 0; i < allWheels.Length; i++)
+        {
+            PuzzleWheel candidate = allWheels[i];
+            if (candidate == null || !candidate.gameObject.activeInHierarchy)
+                continue;
+
+            if (!TryGetInteractableFocusPoint(candidate, origin, out Vector3 focusPoint, out float dist))
+                continue;
+
+            if (dist > maxDistance)
+                continue;
+
+            Vector3 toTarget = (focusPoint - origin).normalized;
+            float dot = Vector3.Dot(forward, toTarget);
+            if (dot < minViewDot)
+                continue;
+
+            if (!HasLineOfSightToInteractable(candidate, maxDistance))
+                continue;
+
+            float score = (dot * 100f) - dist;
+            if (score > bestScore)
+            {
+                bestScore = score;
+                wheel = candidate;
+            }
+        }
+
+        return wheel != null;
+    }
+
     bool TryFindNearbyFuse(out FusePickup fusePickup)
     {
         fusePickup = null;
@@ -455,22 +527,101 @@ public class RohitFPSController : MonoBehaviour
         Component comp = interactable as Component;
         if (comp == null) return false;
 
-        Collider targetCollider = comp.GetComponentInChildren<Collider>();
-        if (targetCollider == null) targetCollider = comp.GetComponent<Collider>();
+        Collider targetCollider = GetPrimaryInteractableCollider(comp);
         if (targetCollider == null) return false;
 
         Vector3 origin = cameraTransform.position;
-        Vector3 target = targetCollider.bounds.center;
+        Bounds bounds = targetCollider.bounds;
+
+        Vector3 closestPoint = targetCollider.ClosestPoint(origin);
+        if (closestPoint != origin && HasLineOfSightToPoint(comp, origin, closestPoint, maxDistance))
+            return true;
+
+        Vector3 center = bounds.center;
+        if (HasLineOfSightToPoint(comp, origin, center, maxDistance))
+            return true;
+
+        float verticalOffset = bounds.extents.y * 0.6f;
+        if (verticalOffset > 0.02f)
+        {
+            if (HasLineOfSightToPoint(comp, origin, center + (Vector3.up * verticalOffset), maxDistance))
+                return true;
+            if (HasLineOfSightToPoint(comp, origin, center - (Vector3.up * verticalOffset), maxDistance))
+                return true;
+        }
+
+        float sideOffset = Mathf.Max(bounds.extents.x, bounds.extents.z) * 0.45f;
+        if (sideOffset > 0.02f)
+        {
+            Vector3 side = cameraTransform.right * sideOffset;
+            if (HasLineOfSightToPoint(comp, origin, center + side, maxDistance))
+                return true;
+            if (HasLineOfSightToPoint(comp, origin, center - side, maxDistance))
+                return true;
+        }
+
+        return false;
+    }
+
+    bool HasLineOfSightToPoint(Component comp, Vector3 origin, Vector3 target, float maxDistance)
+    {
         Vector3 dir = target - origin;
         float dist = dir.magnitude;
-        if (dist <= 0.001f || dist > maxDistance) return false;
+        if (dist <= 0.001f || dist > maxDistance)
+            return false;
 
         if (!Physics.Raycast(origin, dir.normalized, out RaycastHit hit, dist + 0.05f, interactionOcclusionMask, QueryTriggerInteraction.Ignore))
             return true;
 
         Transform ht = hit.collider != null ? hit.collider.transform : null;
-        if (ht == null) return false;
+        if (ht == null)
+            return false;
+
         return ht == comp.transform || ht.IsChildOf(comp.transform) || comp.transform.IsChildOf(ht);
+    }
+
+    bool TryGetInteractableFocusPoint(IInteractable interactable, Vector3 origin, out Vector3 focusPoint, out float distance)
+    {
+        focusPoint = Vector3.zero;
+        distance = 0f;
+
+        Component comp = interactable as Component;
+        if (comp == null)
+            return false;
+
+        Collider targetCollider = GetPrimaryInteractableCollider(comp);
+        if (targetCollider == null)
+            return false;
+
+        focusPoint = targetCollider.ClosestPoint(origin);
+        if ((focusPoint - origin).sqrMagnitude <= 0.0001f)
+            focusPoint = targetCollider.bounds.center;
+
+        distance = Vector3.Distance(origin, focusPoint);
+        return distance > 0.001f;
+    }
+
+    Collider GetPrimaryInteractableCollider(Component comp)
+    {
+        if (comp == null)
+            return null;
+
+        Collider targetCollider = comp.GetComponentInChildren<Collider>();
+        if (targetCollider == null)
+            targetCollider = comp.GetComponent<Collider>();
+        return targetCollider;
+    }
+
+    bool IsDirectHitOnInteractable(IInteractable interactable, Transform hitTransform)
+    {
+        if (interactable == null || hitTransform == null)
+            return false;
+
+        Component comp = interactable as Component;
+        if (comp == null)
+            return false;
+
+        return hitTransform == comp.transform || hitTransform.IsChildOf(comp.transform) || comp.transform.IsChildOf(hitTransform);
     }
 
     bool IsLayerInMask(int layer, LayerMask mask)
