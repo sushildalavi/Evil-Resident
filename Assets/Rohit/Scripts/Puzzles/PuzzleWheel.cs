@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using UnityEngine;
 
@@ -26,6 +27,7 @@ public class PuzzleWheel : MonoBehaviour, IInteractable
 
     [Header("Interaction")]
     [SerializeField] KeyCode interactKey = KeyCode.E;
+    [SerializeField] string dialNameOverride;
     [SerializeField] string rotatePrompt = "Press E to rotate dial";
     [SerializeField] string lockedPrompt = "The dial is locked";
     [SerializeField] AudioClip rotateSfx;
@@ -46,6 +48,8 @@ public class PuzzleWheel : MonoBehaviour, IInteractable
     static readonly int BaseColorId = Shader.PropertyToID("_BaseColor");
     static readonly int ColorId = Shader.PropertyToID("_Color");
     static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
+    const string DefaultRotatePrompt = "Press E to rotate dial";
+    const string DefaultLockedPrompt = "The dial is locked";
 
     int currentState;
     bool isAnimating;
@@ -130,7 +134,7 @@ public class PuzzleWheel : MonoBehaviour, IInteractable
     {
         if (puzzleManager != null && puzzleManager.IsSolved && puzzleManager.LockWheelsWhenSolved)
             return puzzleManager.SolvedPrompt;
-        return IsLocked ? lockedPrompt : rotatePrompt;
+        return IsLocked ? GetLockedPromptText() : GetRotatePromptText();
     }
 
     public void Interact(RohitFPSController player)
@@ -173,6 +177,64 @@ public class PuzzleWheel : MonoBehaviour, IInteractable
             if (i < blinkCount - 1 || offDuration > 0f)
                 yield return new WaitForSeconds(offDuration);
         }
+    }
+
+    string GetRotatePromptText()
+    {
+        string label = GetDialPromptName();
+        string fallback = $"Press {GetInteractKeyLabel()} to change {label} dial";
+        return ResolvePromptTemplate(rotatePrompt, DefaultRotatePrompt, fallback);
+    }
+
+    string GetLockedPromptText()
+    {
+        string label = GetDialPromptName();
+        string fallback = $"The {label} dial is locked";
+        return ResolvePromptTemplate(lockedPrompt, DefaultLockedPrompt, fallback);
+    }
+
+    string ResolvePromptTemplate(string template, string legacyDefault, string generatedDefault)
+    {
+        string resolved = string.IsNullOrWhiteSpace(template) ? legacyDefault : template.Trim();
+        if (string.Equals(resolved, legacyDefault, StringComparison.OrdinalIgnoreCase))
+            return generatedDefault;
+
+        return resolved
+            .Replace("{dial}", GetDialPromptName())
+            .Replace("{shape}", GetDialShapeName())
+            .Replace("{key}", GetInteractKeyLabel());
+    }
+
+    string GetInteractKeyLabel()
+    {
+        string keyText = interactKey.ToString().ToUpperInvariant();
+        return string.IsNullOrEmpty(keyText) ? "E" : keyText;
+    }
+
+    string GetDialPromptName()
+    {
+        string overrideName = dialNameOverride != null ? dialNameOverride.Trim() : string.Empty;
+        if (!string.IsNullOrEmpty(overrideName))
+            return overrideName.ToLowerInvariant();
+
+        string objectName = GetDialShapeName();
+        string lower = objectName.ToLowerInvariant();
+
+        if (lower.Contains("circle") || lower.Contains("blue"))
+            return "blue";
+        if (lower.Contains("rectangle") || lower.Contains("rect") || lower.Contains("green"))
+            return "green";
+        if (lower.Contains("square") || lower.Contains("red"))
+            return "red";
+
+        return lower;
+    }
+
+    string GetDialShapeName()
+    {
+        string source = gameObject != null ? gameObject.name : "dial";
+        source = string.IsNullOrWhiteSpace(source) ? "dial" : source.Trim();
+        return source.ToLowerInvariant();
     }
 
     bool TryRotateBy(int step)

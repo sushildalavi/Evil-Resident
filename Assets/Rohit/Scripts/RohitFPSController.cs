@@ -40,10 +40,12 @@ public class RohitFPSController : MonoBehaviour
     public float keyProximityRadius = 2.5f;
     public float fuseProximityRadius = 2.5f;
     [Tooltip("Small wall dials are easy to miss with a pure ray hit, so give them a little extra usable range.")]
-    public float puzzleWheelInteractDistance = 6.5f;
+    public float puzzleWheelInteractDistance = 8f;
+    [Tooltip("Player proximity radius used to keep dial prompts stable near the puzzle wall.")]
+    public float puzzleWheelProximityRadius = 3.5f;
     [Range(0.75f, 0.999f)]
     [Tooltip("How close to the center of view a puzzle dial must be before the prompt snaps to it.")]
-    public float puzzleWheelPromptViewDot = 0.94f;
+    public float puzzleWheelPromptViewDot = 0.88f;
     public LayerMask interactableLayer;
     [Tooltip("Solid geometry mask used to block interaction through walls.")]
     public LayerMask interactionOcclusionMask = ~0;
@@ -453,6 +455,8 @@ public class RohitFPSController : MonoBehaviour
         Vector3 forward = cameraTransform.forward;
         float maxDistance = Mathf.Max(interactDistance, puzzleWheelInteractDistance);
         float minViewDot = Mathf.Clamp(puzzleWheelPromptViewDot, 0.75f, 0.999f);
+        float proximityRadius = Mathf.Max(0.5f, puzzleWheelProximityRadius);
+        float proximityRadiusSqr = proximityRadius * proximityRadius;
         float bestScore = float.NegativeInfinity;
 
         for (int i = 0; i < allWheels.Length; i++)
@@ -467,6 +471,11 @@ public class RohitFPSController : MonoBehaviour
             if (dist > maxDistance)
                 continue;
 
+            Vector3 playerToWheel = candidate.transform.position - transform.position;
+            playerToWheel.y = 0f;
+            if (playerToWheel.sqrMagnitude > proximityRadiusSqr)
+                continue;
+
             Vector3 toTarget = (focusPoint - origin).normalized;
             float dot = Vector3.Dot(forward, toTarget);
             if (dot < minViewDot)
@@ -475,7 +484,7 @@ public class RohitFPSController : MonoBehaviour
             if (!HasLineOfSightToInteractable(candidate, maxDistance))
                 continue;
 
-            float score = (dot * 100f) - dist;
+            float score = (dot * 120f) - (dist * 1.75f) - playerToWheel.magnitude;
             if (score > bestScore)
             {
                 bestScore = score;
