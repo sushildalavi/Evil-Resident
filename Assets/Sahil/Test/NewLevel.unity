@@ -1011,6 +1011,10 @@ PrefabInstance:
       propertyPath: m_LocalPosition.y
       value: 0.789
       objectReference: {fileID: 0}
+    - target: {fileID: 7456921671669451235, guid: 9e6b65b9c76ba41238a22e8726ac0f6a, type: 3}
+      propertyPath: m_Enabled
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8278101798536137681, guid: 9e6b65b9c76ba41238a22e8726ac0f6a, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.598129
@@ -3142,7 +3146,7 @@ Light:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 955206510}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 12
   m_Type: 1
   m_Color: {r: 1, g: 1, b: 1, a: 1}
