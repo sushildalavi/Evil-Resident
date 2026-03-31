@@ -7,18 +7,18 @@ using UnityEngine.UI;
 public class CollectibleStatusHUD : MonoBehaviour
 {
     const float RefreshInterval = 0.35f;
-    const float HudScale = 0.82f;
-    const float RootPadding = 14f;
-    const float KeyTokenWidth = 92f;
-    const float KeyTokenHeight = 58f;
-    const float KeyTokenGap = 10f;
-    const float FuseTokenWidth = 50f;
-    const float FuseTokenHeight = 66f;
-    const float FuseTokenGap = 10f;
-    const float SectionHeaderHeight = 34f;
-    const float SectionDetailTop = 40f;
-    const float SectionTokenTop = 60f;
-    const float SectionMinWidth = 448f;
+    const float HudScale = 0.86f;
+    const float RootPadding = 18f;
+    const float KeyTokenWidth = 96f;
+    const float KeyTokenHeight = 62f;
+    const float KeyTokenGap = 12f;
+    const float FuseTokenWidth = 54f;
+    const float FuseTokenHeight = 72f;
+    const float FuseTokenGap = 12f;
+    const float SectionHeaderHeight = 36f;
+    const float SectionDetailTop = 42f;
+    const float SectionTokenTop = 62f;
+    const float SectionMinWidth = 492f;
 
     static readonly KeyType[] KeyOrder =
     {
@@ -27,12 +27,19 @@ public class CollectibleStatusHUD : MonoBehaviour
         KeyType.Square
     };
 
-    static readonly Color[] KeyAccentColors =
-    {
-        new Color(1f, 0.34f, 0.34f, 1f),
-        new Color(0.36f, 1f, 0.46f, 1f),
-        new Color(0.32f, 0.72f, 1f, 1f)
-    };
+    static readonly Color CircleKeyAccent = new Color(0.32f, 0.72f, 1f, 1f);
+    static readonly Color RectangleKeyAccent = new Color(0.36f, 1f, 0.46f, 1f);
+    static readonly Color SquareKeyAccent = new Color(1f, 0.34f, 0.34f, 1f);
+    static readonly Color RootShellColor = new Color(0.02f, 0.025f, 0.035f, 0.95f);
+    static readonly Color RootCoreColor = new Color(0.055f, 0.06f, 0.075f, 0.96f);
+    static readonly Color RootStrokeColor = new Color(0.80f, 0.84f, 0.92f, 0.07f);
+    static readonly Color HeaderBandColor = new Color(0.09f, 0.10f, 0.13f, 0.94f);
+    static readonly Color SectionBaseColor = new Color(0.055f, 0.06f, 0.075f, 0.94f);
+    static readonly Color SectionInnerColor = new Color(0.085f, 0.09f, 0.11f, 0.76f);
+    static readonly Color TokenShelfColor = new Color(0.03f, 0.035f, 0.045f, 0.92f);
+    static readonly Color TextPrimaryColor = new Color(0.96f, 0.97f, 0.99f, 0.98f);
+    static readonly Color TextSecondaryColor = new Color(0.70f, 0.75f, 0.82f, 0.88f);
+    static readonly Color TextMutedColor = new Color(0.58f, 0.63f, 0.71f, 0.82f);
 
     static readonly Color[] FuseAccentColors =
     {
@@ -187,43 +194,58 @@ public class CollectibleStatusHUD : MonoBehaviour
         if (GetComponent<GraphicRaycaster>() == null)
             gameObject.AddComponent<GraphicRaycaster>();
 
-        rootRect = CreatePanel("CollectibleRoot", transform, new Color(0.04f, 0.05f, 0.09f, 0.94f));
+        rootRect = CreatePanel("CollectibleRoot", transform, RootShellColor);
         rootRect.anchorMin = new Vector2(0f, 1f);
         rootRect.anchorMax = new Vector2(0f, 1f);
         rootRect.pivot = new Vector2(0f, 1f);
-        rootRect.anchoredPosition = new Vector2(22f, -22f);
-        rootRect.sizeDelta = new Vector2(468f, 232f);
+        rootRect.anchoredPosition = new Vector2(24f, -24f);
+        rootRect.sizeDelta = new Vector2(496f, 248f);
         rootRect.localScale = Vector3.one * HudScale;
 
-        AddOutline(rootRect.gameObject, new Color(0f, 0f, 0f, 0.55f), new Vector2(1f, -1f));
-        AddShadow(rootRect.gameObject, new Color(0f, 0f, 0f, 0.60f), new Vector2(4f, -4f));
+        AddOutline(rootRect.gameObject, new Color(0f, 0f, 0f, 0.72f), new Vector2(1f, -1f));
+        AddShadow(rootRect.gameObject, new Color(0f, 0f, 0f, 0.72f), new Vector2(6f, -6f));
 
-        rootGlow = CreateImage("RootGlow", rootRect, new Color(0.55f, 0.80f, 1f, 0.12f));
+        Image rootCore = CreateImage("RootCore", rootRect, RootCoreColor);
+        Stretch(rootCore.rectTransform, 4f, 4f, 4f, 4f);
+
+        Image topBand = CreateImage("TopBand", rootRect, HeaderBandColor);
+        SetTopStretch(topBand.rectTransform, 5f, 5f, 5f, 54f);
+
+        Image topRim = CreateImage("TopRim", rootRect, RootStrokeColor);
+        SetTopStretch(topRim.rectTransform, 10f, 11f, 10f, 1f);
+
+        Image lowerBand = CreateImage("LowerBand", rootRect, new Color(0f, 0f, 0f, 0.16f));
+        SetBottomStretch(lowerBand.rectTransform, 5f, 5f, 5f, 28f);
+
+        rootGlow = CreateImage("RootGlow", rootRect, new Color(0.42f, 0.70f, 1f, 0.10f));
         Stretch(rootGlow.rectTransform, 3f, 3f, 3f, 3f);
 
-        Image headerGlow = CreateImage("HeaderGlow", rootRect, new Color(0.35f, 0.64f, 1f, 0.12f));
-        SetTopStretch(headerGlow.rectTransform, 4f, 4f, 4f, 38f);
+        Image accentSweep = CreateImage("AccentSweep", rootRect, new Color(0.20f, 0.24f, 0.32f, 0.38f));
+        SetTopStretch(accentSweep.rectTransform, 140f, 54f, 20f, 1f);
 
-        Image headerLine = CreateImage("HeaderLine", rootRect, new Color(0.80f, 0.88f, 1f, 0.18f));
-        SetTopStretch(headerLine.rectTransform, RootPadding, 54f, 156f, 2f);
+        Image headerLine = CreateImage("HeaderLine", rootRect, new Color(0.92f, 0.95f, 1f, 0.12f));
+        SetTopStretch(headerLine.rectTransform, RootPadding, 60f, 146f, 1f);
 
-        titleText = CreateText("Title", rootRect, "OBJECTIVE TRACKER", 24, FontStyle.Bold, TextAnchor.MiddleLeft,
-            new Color(0.96f, 0.98f, 1f, 0.99f));
+        Image scanLine = CreateImage("ScanLine", rootRect, new Color(1f, 1f, 1f, 0.03f));
+        SetTopStretch(scanLine.rectTransform, 8f, 116f, 8f, 1f);
+
+        titleText = CreateText("Title", rootRect, "COLLECTIBLE STATUS", 22, FontStyle.Bold, TextAnchor.MiddleLeft,
+            TextPrimaryColor);
         SetTopLeft(titleText.rectTransform, RootPadding, 10f, 220f, 24f);
-        AddShadow(titleText.gameObject, new Color(0f, 0f, 0f, 0.75f), new Vector2(2f, -2f));
+        AddShadow(titleText.gameObject, new Color(0f, 0f, 0f, 0.82f), new Vector2(2f, -2f));
 
-        subtitleText = CreateText("Subtitle", rootRect, "RGB KEYS  |  POWER CELLS", 11, FontStyle.Bold, TextAnchor.MiddleLeft,
-            new Color(0.70f, 0.82f, 0.96f, 0.88f));
-        SetTopLeft(subtitleText.rectTransform, RootPadding, 34f, 220f, 14f);
+        subtitleText = CreateText("Subtitle", rootRect, "ACCESS KEYS  /  POWER CELLS", 11, FontStyle.Bold, TextAnchor.MiddleLeft,
+            TextSecondaryColor);
+        SetTopLeft(subtitleText.rectTransform, RootPadding, 34f, 250f, 14f);
 
-        CreateHeaderChip("ChipRed", 116f, KeyAccentColors[0]);
-        CreateHeaderChip("ChipGreen", 86f, KeyAccentColors[1]);
-        CreateHeaderChip("ChipBlue", 56f, KeyAccentColors[2]);
+        CreateHeaderChip("ChipCircle", "O", 134f, CircleKeyAccent);
+        CreateHeaderChip("ChipRectangle", "R", 96f, RectangleKeyAccent);
+        CreateHeaderChip("ChipSquare", "S", 58f, SquareKeyAccent);
 
-        keySection = CreateSection("Keys", "RGB KEYS");
+        keySection = CreateSection("Keys", "ACCESS KEYS");
         fuseSection = CreateSection("Fuses", "POWER CELLS");
-        ApplySectionAccent(keySection, new Color(0.95f, 0.52f, 0.52f, 0.92f));
-        ApplySectionAccent(fuseSection, new Color(0.56f, 0.78f, 1f, 0.90f));
+        ApplySectionAccent(keySection, new Color(0.38f, 0.70f, 1f, 0.95f));
+        ApplySectionAccent(fuseSection, new Color(1f, 0.78f, 0.34f, 0.92f));
 
         BuildKeyTokens();
         RebuildFuseTokens(3);
@@ -278,9 +300,9 @@ public class CollectibleStatusHUD : MonoBehaviour
 
         float rootPulse = 0.92f + 0.08f * Mathf.Sin(Time.unscaledTime * 1.7f);
         if (rootGlow != null)
-            rootGlow.color = new Color(0.55f, 0.80f, 1f, 0.08f + (0.03f * rootPulse));
+            rootGlow.color = new Color(0.38f, 0.68f, 1f, 0.06f + (0.03f * rootPulse));
         if (subtitleText != null)
-            subtitleText.color = new Color(0.72f, 0.84f, 0.98f, 0.76f + (0.12f * rootPulse));
+            subtitleText.color = new Color(TextSecondaryColor.r, TextSecondaryColor.g, TextSecondaryColor.b, 0.72f + (0.10f * rootPulse));
 
         if (keySection.root != null)
             keySection.root.gameObject.SetActive(targetKeyCount > 0);
@@ -315,7 +337,7 @@ public class CollectibleStatusHUD : MonoBehaviour
             KeyTokenView token = keyTokens[i];
             bool collected = inventory != null && inventory.HasKey(token.keyType);
             float pulse = 0.88f + 0.12f * Mathf.Sin((Time.unscaledTime * 3.0f) + (i * 0.7f));
-            ApplyKeyStyle(token, collected, KeyAccentColors[i], pulse);
+            ApplyKeyStyle(token, collected, GetKeyAccentColor(token.keyType), pulse);
         }
 
         for (int i = 0; i < fuseTokens.Count; i++)
@@ -340,9 +362,9 @@ public class CollectibleStatusHUD : MonoBehaviour
         SetTopLeft(titleText.rectTransform, RootPadding, 10f, rootWidth - (RootPadding * 2f), 24f);
         SetTopLeft(subtitleText.rectTransform, RootPadding, 34f, rootWidth - 180f, 14f);
 
-        float top = 60f;
-        float keyHeight = SectionTokenTop + KeyTokenHeight + 12f;
-        float fuseHeight = SectionTokenTop + FuseTokenHeight + 12f;
+        float top = 68f;
+        float keyHeight = SectionTokenTop + KeyTokenHeight + 16f;
+        float fuseHeight = SectionTokenTop + FuseTokenHeight + 16f;
 
         if (targetKeyCount > 0)
         {
@@ -363,14 +385,14 @@ public class CollectibleStatusHUD : MonoBehaviour
     {
         SetTopLeft(section.root, RootPadding, top, width, height);
         SetTopLeft(section.headerTint.rectTransform, 8f, 8f, width - 16f, SectionHeaderHeight);
-        SetTopLeft(section.titleText.rectTransform, 14f, 16f, 160f, 18f);
+        SetTopLeft(section.titleText.rectTransform, 16f, 17f, 190f, 18f);
 
         float summaryWidth = Mathf.Clamp(width * 0.34f, 156f, 212f);
         SetTopRight(section.summaryPlate.rectTransform, 12f, 12f, summaryWidth, 24f);
         Stretch(section.summaryText.rectTransform, 8f, 2f, 8f, 2f);
-        SetTopLeft(section.detailText.rectTransform, 14f, SectionDetailTop, width - 28f, 15f);
+        SetTopLeft(section.detailText.rectTransform, 16f, SectionDetailTop, width - 32f, 15f);
 
-        float tokenX = Mathf.Max(14f, (width - tokenAreaWidth) * 0.5f);
+        float tokenX = Mathf.Max(12f, (width - tokenAreaWidth) * 0.5f);
         SetTopLeft(section.tokenHost, tokenX, SectionTokenTop, tokenAreaWidth, tokenAreaHeight);
 
         float x = 0f;
@@ -394,29 +416,38 @@ public class CollectibleStatusHUD : MonoBehaviour
 
     SectionView CreateSection(string name, string title)
     {
-        RectTransform rect = CreatePanel(name, rootRect, new Color(0.10f, 0.13f, 0.19f, 0.88f));
-        AddOutline(rect.gameObject, new Color(0f, 0f, 0f, 0.45f), new Vector2(1f, -1f));
+        RectTransform rect = CreatePanel(name, rootRect, SectionBaseColor);
+        AddOutline(rect.gameObject, new Color(0f, 0f, 0f, 0.56f), new Vector2(1f, -1f));
+        AddShadow(rect.gameObject, new Color(0f, 0f, 0f, 0.28f), new Vector2(0f, -2f));
+
+        Image sectionInner = CreateImage("SectionInner", rect, SectionInnerColor);
+        Stretch(sectionInner.rectTransform, 2f, 2f, 2f, 2f);
 
         Image accentBar = CreateImage("AccentBar", rect, Color.white);
         accentBar.rectTransform.anchorMin = new Vector2(0f, 0f);
         accentBar.rectTransform.anchorMax = new Vector2(0f, 1f);
         accentBar.rectTransform.pivot = new Vector2(0f, 0.5f);
         accentBar.rectTransform.anchoredPosition = Vector2.zero;
-        accentBar.rectTransform.sizeDelta = new Vector2(4f, 0f);
+        accentBar.rectTransform.sizeDelta = new Vector2(3f, 0f);
 
-        Image headerTint = CreateImage("HeaderTint", rect, new Color(1f, 1f, 1f, 0.06f));
-        Image edgeLight = CreateImage("EdgeLight", rect, new Color(1f, 1f, 1f, 0.08f));
-        SetTopLeft(edgeLight.rectTransform, 12f, 10f, 196f, 1f);
+        Image headerTint = CreateImage("HeaderTint", rect, new Color(1f, 1f, 1f, 0.05f));
+        Image edgeLight = CreateImage("EdgeLight", rect, new Color(1f, 1f, 1f, 0.06f));
+        SetTopStretch(edgeLight.rectTransform, 12f, 10f, 12f, 1f);
 
-        Image summaryPlate = CreateImage("SummaryPlate", rect, new Color(0.16f, 0.19f, 0.26f, 0.96f));
-        AddOutline(summaryPlate.gameObject, new Color(0f, 0f, 0f, 0.30f), new Vector2(1f, -1f));
+        Image summaryPlate = CreateImage("SummaryPlate", rect, new Color(0.08f, 0.10f, 0.13f, 0.98f));
+        AddOutline(summaryPlate.gameObject, new Color(1f, 1f, 1f, 0.03f), new Vector2(1f, -1f));
 
-        Text sectionTitle = CreateText("Title", rect, title, 16, FontStyle.Bold, TextAnchor.MiddleLeft,
-            new Color(0.91f, 0.95f, 1f, 0.96f));
+        RectTransform tokenHost = CreatePanel("TokenHost", rect, TokenShelfColor);
+        AddOutline(tokenHost.gameObject, new Color(1f, 1f, 1f, 0.03f), new Vector2(1f, -1f));
+        Image tokenHostGlow = CreateImage("TokenHostGlow", tokenHost, new Color(1f, 1f, 1f, 0.03f));
+        Stretch(tokenHostGlow.rectTransform, 1f, 1f, 1f, 1f);
+
+        Text sectionTitle = CreateText("Title", rect, title, 14, FontStyle.Bold, TextAnchor.MiddleLeft,
+            TextPrimaryColor);
         AddShadow(sectionTitle.gameObject, new Color(0f, 0f, 0f, 0.7f), new Vector2(2f, -2f));
 
         Text summary = CreateText("Summary", summaryPlate.rectTransform, string.Empty, 12, FontStyle.Bold, TextAnchor.MiddleCenter,
-            new Color(0.96f, 0.98f, 1f, 0.96f));
+            TextPrimaryColor);
         summary.resizeTextForBestFit = true;
         summary.resizeTextMinSize = 8;
         summary.resizeTextMaxSize = 12;
@@ -424,18 +455,12 @@ public class CollectibleStatusHUD : MonoBehaviour
         summary.verticalOverflow = VerticalWrapMode.Truncate;
 
         Text detail = CreateText("Detail", rect, string.Empty, 11, FontStyle.Bold, TextAnchor.MiddleLeft,
-            new Color(0.78f, 0.84f, 0.92f, 0.86f));
+            TextMutedColor);
         detail.resizeTextForBestFit = true;
         detail.resizeTextMinSize = 8;
         detail.resizeTextMaxSize = 11;
         detail.horizontalOverflow = HorizontalWrapMode.Wrap;
         detail.verticalOverflow = VerticalWrapMode.Truncate;
-
-        RectTransform tokenHost = new GameObject("TokenHost", typeof(RectTransform)).GetComponent<RectTransform>();
-        tokenHost.SetParent(rect, false);
-        tokenHost.anchorMin = new Vector2(0f, 1f);
-        tokenHost.anchorMax = new Vector2(0f, 1f);
-        tokenHost.pivot = new Vector2(0f, 1f);
 
         return new SectionView
         {
@@ -454,9 +479,9 @@ public class CollectibleStatusHUD : MonoBehaviour
     {
         section.accentBar.color = accent;
         if (section.headerTint != null)
-            section.headerTint.color = new Color(accent.r, accent.g, accent.b, 0.09f);
+            section.headerTint.color = new Color(accent.r, accent.g, accent.b, 0.07f);
         if (section.summaryPlate != null)
-            section.summaryPlate.color = Color.Lerp(accent, new Color(0.08f, 0.10f, 0.16f, 0.96f), 0.68f);
+            section.summaryPlate.color = Color.Lerp(accent, new Color(0.07f, 0.08f, 0.11f, 0.98f), 0.78f);
     }
 
     void BuildKeyTokens()
@@ -469,40 +494,42 @@ public class CollectibleStatusHUD : MonoBehaviour
         for (int i = 0; i < KeyOrder.Length; i++)
         {
             KeyType keyType = KeyOrder[i];
-            RectTransform token = CreatePanel($"{keyType}Token", keySection.tokenHost, new Color(0.16f, 0.18f, 0.24f, 0.98f));
-            Image halo = CreateImage("Halo", token, new Color(1f, 1f, 1f, 0.06f));
+            Color accent = GetKeyAccentColor(keyType);
+            RectTransform token = CreatePanel($"{keyType}Token", keySection.tokenHost, new Color(0.08f, 0.09f, 0.12f, 0.98f));
+            AddOutline(token.gameObject, new Color(1f, 1f, 1f, 0.03f), new Vector2(1f, -1f));
+            Image halo = CreateImage("Halo", token, new Color(1f, 1f, 1f, 0.04f));
             Stretch(halo.rectTransform, -2f, -2f, -2f, -2f);
-            Image face = CreateImage("Face", token, new Color(0.18f, 0.21f, 0.28f, 0.96f));
+            Image face = CreateImage("Face", token, new Color(0.11f, 0.12f, 0.16f, 0.96f));
             Stretch(face.rectTransform, 3f, 3f, 3f, 3f);
 
-            Image spine = CreateImage("Spine", token, KeyAccentColors[i]);
-            SetTopLeft(spine.rectTransform, 6f, 7f, 5f, 44f);
+            Image spine = CreateImage("Spine", token, accent);
+            SetTopStretch(spine.rectTransform, 4f, 4f, 4f, 4f);
 
-            Image shadowStrip = CreateImage("ShadowStrip", token, new Color(0f, 0f, 0f, 0.22f));
-            SetBottomStretch(shadowStrip.rectTransform, 3f, 3f, 3f, 7f);
+            Image shadowStrip = CreateImage("ShadowStrip", token, new Color(0f, 0f, 0f, 0.30f));
+            SetBottomStretch(shadowStrip.rectTransform, 3f, 3f, 3f, 11f);
 
-            Image gloss = CreateImage("Gloss", token, new Color(1f, 1f, 1f, 0.10f));
-            SetTopStretch(gloss.rectTransform, 4f, 4f, 4f, 10f);
+            Image gloss = CreateImage("Gloss", token, new Color(1f, 1f, 1f, 0.06f));
+            SetTopStretch(gloss.rectTransform, 5f, 10f, 40f, 1f);
 
-            Text head = CreateText("Head", token, GetKeyHeadGlyph(keyType), 26, FontStyle.Bold, TextAnchor.MiddleCenter,
+            Text head = CreateText("Head", token, GetKeyHeadGlyph(keyType), 24, FontStyle.Bold, TextAnchor.MiddleCenter,
                 new Color(0.95f, 0.95f, 0.95f, 0.92f));
-            SetTopLeft(head.rectTransform, 9f, 8f, 24f, 22f);
+            SetTopLeft(head.rectTransform, 12f, 14f, 22f, 22f);
 
             Image shaft = CreateImage("Shaft", token, new Color(0.86f, 0.87f, 0.90f, 0.92f));
-            SetTopLeft(shaft.rectTransform, 30f, 18f, 28f, 8f);
+            SetTopLeft(shaft.rectTransform, 34f, 22f, 26f, 6f);
 
             Image toothA = CreateImage("ToothA", token, new Color(0.86f, 0.87f, 0.90f, 0.92f));
-            SetTopLeft(toothA.rectTransform, 55f, 18f, 7f, 16f);
+            SetTopLeft(toothA.rectTransform, 58f, 22f, 6f, 14f);
 
             Image toothB = CreateImage("ToothB", token, new Color(0.86f, 0.87f, 0.90f, 0.92f));
-            SetTopLeft(toothB.rectTransform, 63f, 23f, 7f, 11f);
+            SetTopLeft(toothB.rectTransform, 66f, 26f, 6f, 10f);
 
-            Image labelPlate = CreateImage("LabelPlate", token, KeyAccentColors[i]);
-            SetBottomStretch(labelPlate.rectTransform, 4f, 4f, 4f, 14f);
+            Image labelPlate = CreateImage("LabelPlate", token, accent);
+            SetBottomStretch(labelPlate.rectTransform, 4f, 4f, 4f, 16f);
 
             Text label = CreateText("Label", token, GetKeyLabel(keyType), 10, FontStyle.Bold, TextAnchor.MiddleCenter,
                 new Color(0.86f, 0.89f, 0.94f, 0.9f));
-            SetBottomStretch(label.rectTransform, 5f, 5f, 5f, 14f);
+            SetBottomStretch(label.rectTransform, 5f, 5f, 5f, 16f);
 
             keyTokens.Add(new KeyTokenView
             {
@@ -538,26 +565,27 @@ public class CollectibleStatusHUD : MonoBehaviour
 
         for (int i = 0; i < count; i++)
         {
-            RectTransform token = CreatePanel($"Fuse_{i}", fuseSection.tokenHost, new Color(0.15f, 0.17f, 0.23f, 0.98f));
-            Image glow = CreateImage("Glow", token, new Color(1f, 1f, 1f, 0.06f));
+            RectTransform token = CreatePanel($"Fuse_{i}", fuseSection.tokenHost, new Color(0.08f, 0.09f, 0.12f, 0.98f));
+            AddOutline(token.gameObject, new Color(1f, 1f, 1f, 0.03f), new Vector2(1f, -1f));
+            Image glow = CreateImage("Glow", token, new Color(1f, 1f, 1f, 0.05f));
             Stretch(glow.rectTransform, -2f, -2f, -2f, -2f);
-            Image face = CreateImage("Face", token, new Color(0.19f, 0.21f, 0.29f, 0.96f));
+            Image face = CreateImage("Face", token, new Color(0.11f, 0.12f, 0.16f, 0.96f));
             Stretch(face.rectTransform, 3f, 3f, 3f, 3f);
 
             Image body = CreateImage("Body", token, new Color(0.72f, 0.74f, 0.80f, 0.85f));
-            SetTopLeft(body.rectTransform, 14f, 15f, 18f, 30f);
+            SetTopLeft(body.rectTransform, 16f, 16f, 20f, 34f);
 
             Image core = CreateImage("Core", token, new Color(0.98f, 0.98f, 1f, 0.88f));
-            SetTopLeft(core.rectTransform, 19f, 18f, 8f, 24f);
+            SetTopLeft(core.rectTransform, 22f, 20f, 8f, 28f);
 
             Image capTop = CreateImage("CapTop", token, new Color(0.84f, 0.86f, 0.92f, 0.86f));
-            SetTopLeft(capTop.rectTransform, 10f, 9f, 26f, 8f);
+            SetTopLeft(capTop.rectTransform, 12f, 10f, 28f, 7f);
 
             Image capBottom = CreateImage("CapBottom", token, new Color(0.58f, 0.60f, 0.68f, 0.86f));
-            SetTopLeft(capBottom.rectTransform, 10f, 45f, 26f, 7f);
+            SetTopLeft(capBottom.rectTransform, 12f, 52f, 28f, 8f);
 
             Image spark = CreateImage("Spark", token, new Color(1f, 1f, 1f, 0.12f));
-            SetTopLeft(spark.rectTransform, 20f, 13f, 6f, 12f);
+            SetTopLeft(spark.rectTransform, 22f, 13f, 8f, 14f);
 
             fuseTokens.Add(new FuseTokenView
             {
@@ -577,31 +605,31 @@ public class CollectibleStatusHUD : MonoBehaviour
     void ApplyKeyStyle(KeyTokenView token, bool collected, Color accent, float pulse)
     {
         Color plateColor = collected
-            ? Color.Lerp(new Color(0.14f, 0.16f, 0.22f, 0.98f), accent, 0.18f)
-            : new Color(0.15f, 0.16f, 0.21f, 0.95f);
+            ? Color.Lerp(new Color(0.07f, 0.08f, 0.11f, 0.98f), accent, 0.16f)
+            : new Color(0.07f, 0.08f, 0.10f, 0.96f);
         Color faceColor = collected
-            ? Color.Lerp(new Color(0.22f, 0.24f, 0.30f, 0.98f), accent, 0.34f)
-            : new Color(0.20f, 0.22f, 0.28f, 0.94f);
-        Color mutedAccent = Color.Lerp(accent, new Color(0.34f, 0.37f, 0.44f, 1f), 0.72f);
+            ? Color.Lerp(new Color(0.11f, 0.13f, 0.16f, 0.98f), accent, 0.28f)
+            : new Color(0.10f, 0.11f, 0.15f, 0.95f);
+        Color mutedAccent = Color.Lerp(accent, new Color(0.26f, 0.29f, 0.35f, 1f), 0.74f);
         Color glyphColor = collected
             ? Color.Lerp(accent, Color.white, 0.18f * pulse)
-            : new Color(0.50f, 0.55f, 0.62f, 0.88f);
+            : new Color(0.46f, 0.51f, 0.58f, 0.88f);
 
         token.plate.color = plateColor;
-        token.halo.color = new Color(accent.r, accent.g, accent.b, collected ? 0.12f + (0.08f * pulse) : 0.05f);
+        token.halo.color = new Color(accent.r, accent.g, accent.b, collected ? 0.10f + (0.07f * pulse) : 0.03f);
         token.face.color = faceColor;
         token.spine.color = collected ? accent : mutedAccent;
-        token.gloss.color = new Color(1f, 1f, 1f, collected ? 0.14f + (0.05f * pulse) : 0.05f);
+        token.gloss.color = new Color(1f, 1f, 1f, collected ? 0.12f + (0.04f * pulse) : 0.03f);
         token.head.color = glyphColor;
         token.shaft.color = glyphColor;
         token.toothA.color = glyphColor;
         token.toothB.color = glyphColor;
         token.labelPlate.color = collected
-            ? Color.Lerp(accent, Color.black, 0.28f)
-            : Color.Lerp(mutedAccent, Color.black, 0.35f);
+            ? Color.Lerp(accent, Color.black, 0.42f)
+            : Color.Lerp(mutedAccent, Color.black, 0.48f);
         token.label.color = collected
             ? new Color(0.98f, 0.99f, 1f, 0.96f)
-            : new Color(0.72f, 0.76f, 0.82f, 0.86f);
+            : new Color(0.68f, 0.72f, 0.78f, 0.84f);
 
         token.face.rectTransform.localScale = collected
             ? Vector3.one * (1f + ((pulse - 0.84f) * 0.03f))
@@ -621,8 +649,8 @@ public class CollectibleStatusHUD : MonoBehaviour
         switch (state)
         {
             case FuseState.Installed:
-                plateColor = Color.Lerp(new Color(0.14f, 0.18f, 0.22f, 0.98f), accent, 0.16f);
-                faceColor = Color.Lerp(new Color(0.18f, 0.22f, 0.28f, 0.96f), accent, 0.32f);
+                plateColor = Color.Lerp(new Color(0.08f, 0.09f, 0.11f, 0.98f), accent, 0.14f);
+                faceColor = Color.Lerp(new Color(0.11f, 0.12f, 0.16f, 0.96f), accent, 0.28f);
                 bodyColor = Color.Lerp(accent, Color.white, 0.14f * pulse);
                 coreColor = Color.Lerp(Color.white, accent, 0.22f);
                 capTopColor = Color.Lerp(accent, Color.white, 0.24f);
@@ -632,8 +660,8 @@ public class CollectibleStatusHUD : MonoBehaviour
 
             case FuseState.Carried:
                 Color carryAccent = Color.Lerp(accent, new Color(1f, 0.93f, 0.62f, 1f), 0.35f);
-                plateColor = Color.Lerp(new Color(0.16f, 0.18f, 0.23f, 0.98f), carryAccent, 0.14f);
-                faceColor = Color.Lerp(new Color(0.20f, 0.22f, 0.29f, 0.96f), carryAccent, 0.22f);
+                plateColor = Color.Lerp(new Color(0.08f, 0.09f, 0.11f, 0.98f), carryAccent, 0.12f);
+                faceColor = Color.Lerp(new Color(0.11f, 0.12f, 0.16f, 0.96f), carryAccent, 0.20f);
                 bodyColor = Color.Lerp(carryAccent, Color.white, 0.10f * pulse);
                 coreColor = Color.Lerp(Color.white, carryAccent, 0.30f);
                 capTopColor = Color.Lerp(carryAccent, Color.white, 0.18f);
@@ -642,10 +670,10 @@ public class CollectibleStatusHUD : MonoBehaviour
                 break;
 
             default:
-                plateColor = new Color(0.15f, 0.16f, 0.21f, 0.95f);
-                faceColor = new Color(0.19f, 0.20f, 0.27f, 0.94f);
+                plateColor = new Color(0.07f, 0.08f, 0.10f, 0.96f);
+                faceColor = new Color(0.10f, 0.11f, 0.15f, 0.95f);
                 bodyColor = new Color(0.38f, 0.42f, 0.50f, 0.88f);
-                coreColor = new Color(0.24f, 0.26f, 0.32f, 0.82f);
+                coreColor = new Color(0.22f, 0.24f, 0.30f, 0.84f);
                 capTopColor = new Color(0.54f, 0.58f, 0.66f, 0.86f);
                 capBottomColor = new Color(0.30f, 0.34f, 0.42f, 0.90f);
                 sparkAlpha = 0.03f;
@@ -653,7 +681,7 @@ public class CollectibleStatusHUD : MonoBehaviour
         }
 
         token.plate.color = plateColor;
-        token.glow.color = new Color(accent.r, accent.g, accent.b, state == FuseState.Missing ? 0.04f : 0.10f + (0.07f * pulse));
+        token.glow.color = new Color(accent.r, accent.g, accent.b, state == FuseState.Missing ? 0.03f : 0.08f + (0.06f * pulse));
         token.face.color = faceColor;
         token.body.color = bodyColor;
         token.core.color = coreColor;
@@ -937,13 +965,32 @@ public class CollectibleStatusHUD : MonoBehaviour
         }
     }
 
-    void CreateHeaderChip(string name, float right, Color color)
+    static Color GetKeyAccentColor(KeyType keyType)
     {
-        Image chip = CreateImage(name, rootRect, color);
-        SetTopRight(chip.rectTransform, right, 18f, 22f, 7f);
+        switch (keyType)
+        {
+            case KeyType.Circle: return CircleKeyAccent;
+            case KeyType.Rectangle: return RectangleKeyAccent;
+            case KeyType.Square: return SquareKeyAccent;
+            default: return Color.white;
+        }
+    }
 
-        Image gloss = CreateImage($"{name}Gloss", chip.rectTransform, new Color(1f, 1f, 1f, 0.18f));
-        SetTopStretch(gloss.rectTransform, 1f, 1f, 1f, 2f);
+    void CreateHeaderChip(string name, string label, float right, Color color)
+    {
+        RectTransform chip = CreatePanel(name, rootRect, new Color(0.06f, 0.07f, 0.09f, 0.96f));
+        SetTopRight(chip, right, 12f, 30f, 18f);
+        AddOutline(chip.gameObject, new Color(1f, 1f, 1f, 0.03f), new Vector2(1f, -1f));
+
+        Image fill = CreateImage($"{name}Fill", chip, new Color(color.r, color.g, color.b, 0.18f));
+        Stretch(fill.rectTransform, 2f, 2f, 2f, 2f);
+
+        Image dot = CreateImage($"{name}Dot", chip, color);
+        SetTopLeft(dot.rectTransform, 5f, 5f, 8f, 8f);
+
+        Text chipLabel = CreateText($"{name}Label", chip, label, 9, FontStyle.Bold, TextAnchor.MiddleCenter,
+            TextPrimaryColor);
+        Stretch(chipLabel.rectTransform, 12f, 2f, 2f, 2f);
     }
 
     class SectionView
