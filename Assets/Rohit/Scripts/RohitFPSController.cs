@@ -58,7 +58,9 @@ public class RohitFPSController : MonoBehaviour
     Quaternion defaultCameraLocalRot;
     bool hasDefaultCameraPose;
     Vector3 preHidePosition;
+    Quaternion preHideRotation;
     bool hasPreHidePosition;
+    bool hasPreHideRotation;
     CharacterController controller;
     PlayerInventory inventory;
 
@@ -600,16 +602,36 @@ public class RohitFPSController : MonoBehaviour
     {
         preHidePosition = transform.position;
         hasPreHidePosition = true;
+        preHideRotation = transform.rotation;
+        hasPreHideRotation = true;
+        float oppositeYaw = preHideRotation.eulerAngles.y + 180f;
 
         controller.enabled = false;
-        transform.position = hidePoint.position;
+        if (hidePoint != null)
+            transform.SetPositionAndRotation(hidePoint.position, hidePoint.rotation);
+        else
+        {
+            if (hideObject != null)
+                transform.SetPositionAndRotation(hideObject.transform.position, hideObject.transform.rotation);
+        }
         controller.enabled = true;
 
         if (hideObject != null && hideObject.hiddenCameraPoint != null && cameraTransform != null)
         {
             cameraTransform.position = hideObject.hiddenCameraPoint.position;
-            cameraTransform.rotation = hideObject.hiddenCameraPoint.rotation;
+            cameraTransform.rotation = Quaternion.Euler(
+                hideObject.hiddenCameraPoint.eulerAngles.x,
+                oppositeYaw,
+                0f
+            );
+            transform.rotation = Quaternion.Euler(0f, oppositeYaw, 0f);
             xRotation = NormalizePitch(cameraTransform.localEulerAngles.x);
+        }
+        else
+        {
+            transform.rotation = Quaternion.Euler(0f, oppositeYaw, 0f);
+            if (cameraTransform != null)
+                cameraTransform.rotation = Quaternion.Euler(xRotation, oppositeYaw, 0f);
         }
 
         horizontalVelocity = Vector3.zero;
@@ -622,6 +644,8 @@ public class RohitFPSController : MonoBehaviour
     {
         controller.enabled = false;
         transform.position = exitPosition;
+        if (hasPreHideRotation)
+            transform.rotation = preHideRotation;
         controller.enabled = true;
 
         if (hasDefaultCameraPose && cameraTransform != null)
@@ -636,6 +660,7 @@ public class RohitFPSController : MonoBehaviour
         isHidden = false;
         currentHideObject = null;
         hasPreHidePosition = false;
+        hasPreHideRotation = false;
     }
 
     public Vector3 ResolveSafeExitPosition(HideableObject hideObject, Vector3 requestedExitPosition)
