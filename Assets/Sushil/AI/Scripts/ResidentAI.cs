@@ -337,6 +337,8 @@ namespace Sushil.AI
         private Vector3 lastSafePosition;
         private bool hasSafePosition;
         private Door[] cachedDoors;
+        private FuseDoor[] cachedFuseDoors;
+        private MainDoor[] cachedMainDoors;
         private float ignoreAntiClipUntilTime;
         private float visibleAccum;
         private float hiddenAccum;
@@ -387,7 +389,7 @@ namespace Sushil.AI
             doorwayAssistRange = Mathf.Max(doorwayAssistRange, 20f);
             doorwayAssistSampleRadius = Mathf.Max(doorwayAssistSampleRadius, 1.25f);
             requireClearPathForWarp = true;
-            autoOpenNearbyDoors = true;
+            autoOpenNearbyDoors = false;
             autoDoorOpenRange = Mathf.Max(autoDoorOpenRange, 2.6f);
             autoDoorOpenCooldown = Mathf.Min(autoDoorOpenCooldown, 0.15f);
             destinationWallClearance = Mathf.Max(destinationWallClearance, 0.34f);
@@ -482,12 +484,10 @@ namespace Sushil.AI
             // Keep hard geometry validation enabled so chase logic cannot cut through walls.
             validatePathAgainstGeometry = true;
             rejectDestinationsInsideBlockingGeometry = true;
-            enforceRuntimeAntiClip = allowRuntimeRecoveryWarps;
+            enforceRuntimeAntiClip = true;
             if (!allowRuntimeRecoveryWarps)
             {
                 keepAgentSnappedToNavMesh = false;
-                enforceNavMeshBoundaryAntiClip = false;
-                enableStairTraverseAssist = false;
             }
 
             // Avoid floating weirdness
@@ -549,10 +549,10 @@ namespace Sushil.AI
             }
 
             ApplyDynamicNavigationProfile();
+            ApplyStairTraverseAssist();
             if (allowRuntimeRecoveryWarps)
             {
                 StabilizeAgentOnNavMesh();
-                ApplyStairTraverseAssist();
                 TryGeneralStuckRecovery();
             }
 
@@ -641,12 +641,11 @@ namespace Sushil.AI
 
             wasPlayerHiddenLastFrame = isHiddenNow;
             UpdateMotionAnimation();
-            TryAutoOpenDoorInFront();
         }
 
         void LateUpdate()
         {
-            if (allowRuntimeRecoveryWarps)
+            if (enforceRuntimeAntiClip)
                 EnforceRuntimeNoClip();
         }
 
@@ -1284,7 +1283,7 @@ namespace Sushil.AI
                     return false;
                 }
 
-                if (PathCrossesLockedClosedDoor(path))
+                if (PathCrossesClosedDoor(path))
                     return false;
             }
 

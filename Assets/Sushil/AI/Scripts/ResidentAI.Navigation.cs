@@ -9,6 +9,7 @@ namespace Sushil.AI
     public partial class ResidentAI
     {
         NavMeshLink squareFuseCorridorNavLink;
+        Coroutine stairDestinationReissueRoutine;
 
         // Adds a NavMeshLink to bridge the square-fuse corridor gap.
         // Do not rebuild the full NavMesh here: NewLevel contains interactive doors,
@@ -216,6 +217,39 @@ namespace Sushil.AI
             }
 
             agent.ResetPath();
+        }
+
+        void QueueShortAdvanceAndReissueDestination(Vector3 shortAdvanceTarget, Vector3 primaryDestination, float delay = 0.18f)
+        {
+            if (!IsAgentReady())
+                return;
+
+            if (!TrySetDestination(shortAdvanceTarget))
+                return;
+
+            if (stairDestinationReissueRoutine != null)
+                StopCoroutine(stairDestinationReissueRoutine);
+
+            stairDestinationReissueRoutine = StartCoroutine(ReissueDestinationAfterDelay(primaryDestination, delay));
+        }
+
+        IEnumerator ReissueDestinationAfterDelay(Vector3 primaryDestination, float delay)
+        {
+            float remaining = Mathf.Max(0.05f, delay);
+            while (remaining > 0f)
+            {
+                if (!IsAgentReady())
+                {
+                    stairDestinationReissueRoutine = null;
+                    yield break;
+                }
+
+                remaining -= Time.deltaTime;
+                yield return null;
+            }
+
+            stairDestinationReissueRoutine = null;
+            ReissuePrimaryDestination(primaryDestination);
         }
 
         bool IsInStairTraversalContext()
@@ -1498,23 +1532,8 @@ namespace Sushil.AI
 
         void TryAutoOpenDoorInFront()
         {
-            if (!autoOpenNearbyDoors || Time.time < nextDoorOpenTime || player == null) return;
-            if (state != State.Chase && state != State.Search && state != State.Investigate) return;
-
-            Vector3 origin = transform.position + Vector3.up * 1.0f;
-            Vector3 dirToPlayer = player.position - transform.position;
-            dirToPlayer.y = 0f;
-            Vector3 forward = dirToPlayer.sqrMagnitude > 0.01f ? dirToPlayer.normalized : transform.forward;
-
-            if (!Physics.Raycast(origin, forward, out var hit, Mathf.Max(0.5f, autoDoorOpenRange), ~0, QueryTriggerInteraction.Ignore))
-                return;
-
-            Door door = hit.collider != null ? hit.collider.GetComponentInParent<Door>() : null;
-            if (door == null) return;
-
-            bool opened = door.TryOpenForAI();
-            if (opened)
-                nextDoorOpenTime = Time.time + Mathf.Max(0.05f, autoDoorOpenCooldown);
+            // Resident must never open player doors on its own.
+            return;
         }
 
         bool ShouldBiasToUnlockedKeyDoorRoom()
@@ -1679,6 +1698,8 @@ namespace Sushil.AI
         {
             cachedHideables = FindObjectsByType<HideableObject>(FindObjectsSortMode.None);
             cachedDoors = FindObjectsByType<Door>(FindObjectsSortMode.None);
+            cachedFuseDoors = FindObjectsByType<FuseDoor>(FindObjectsSortMode.None);
+            cachedMainDoors = FindObjectsByType<MainDoor>(FindObjectsSortMode.None);
             cachedHideableColliders.Clear();
             if (cachedHideables == null) return;
 
@@ -1696,10 +1717,18 @@ namespace Sushil.AI
             }
         }
 
-        bool PathCrossesLockedClosedDoor(NavMeshPath path)
+        bool PathCrossesClosedDoor(NavMeshPath path)
         {
             if (path == null || path.corners == null || path.corners.Length < 2) return false;
-            if (cachedDoors == null || cachedDoors.Length == 0) return false;
+            if (cachedDoors == null) cachedDoors = FindObjectsByType<Door>(FindObjectsSortMode.None);
+            if (cachedFuseDoors == null) cachedFuseDoors = FindObjectsByType<FuseDoor>(FindObjectsSortMode.None);
+            if (cachedMainDoors == null) cachedMainDoors = FindObjectsByType<MainDoor>(FindObjectsSortMode.None);
+
+            bool hasAnyDoor =
+                (cachedDoors != null && cachedDoors.Length > 0) ||
+                (cachedFuseDoors != null && cachedFuseDoors.Length > 0) ||
+                (cachedMainDoors != null && cachedMainDoors.Length > 0);
+            if (!hasAnyDoor) return false;
 
             Vector3[] corners = path.corners;
             for (int i = 0; i < corners.Length - 1; i++)
@@ -1711,20 +1740,41 @@ namespace Sushil.AI
                 if (len <= 0.001f) continue;
                 Ray ray = new Ray(a, dir / len);
 
-                for (int d = 0; d < cachedDoors.Length; d++)
-                {
-                    Door door = cachedDoors[d];
-                    if (door == null || !door.gameObject.activeInHierarchy) continue;
-                    if (!door.IsLocked || door.IsOpen) continue;
+                if (SegmentHitsClosedDoor(ray, len, cachedDoors))
+                    return true;
 
-                    Collider[] cols = door.GetComponentsInChildren<Collider>(false);
-                    for (int c = 0; c < cols.Length; c++)
-                    {
-                        Collider col = cols[c];
-                        if (col == null || !col.enabled || col.isTrigger) continue;
-                        if (col.Raycast(ray, out _, len))
-                            return true;
-                    }
+                if (SegmentHitsClosedDoor(ray, len, cachedFuseDoors))
+                    return true;
+
+                if (SegmentHitsClosedDoor(ray, len, cachedMainDoors))
+                    return true;
+            }
+
+            return false;
+        }
+
+        static bool SegmentHitsClosedDoor<TDoor>(Ray ray, float len, TDoor[] doors) where TDoor : MonoBehaviour
+        {
+            if (doors == null || doors.Length == 0) return false;
+
+            for (int d = 0; d < doors.Length; d++)
+            {
+                TDoor door = doors[d];
+                if (door == null || !door.gameObject.activeInHierarchy) continue;
+
+                bool isClosed =
+                    (door is Door standardDoor && !standardDoor.IsOpen) ||
+                    (door is FuseDoor fuseDoor && !fuseDoor.IsOpen) ||
+                    (door is MainDoor mainDoor && !mainDoor.IsOpen);
+                if (!isClosed) continue;
+
+                Collider[] cols = door.GetComponentsInChildren<Collider>(false);
+                for (int c = 0; c < cols.Length; c++)
+                {
+                    Collider col = cols[c];
+                    if (col == null || !col.enabled || col.isTrigger) continue;
+                    if (col.Raycast(ray, out _, len))
+                        return true;
                 }
             }
 
@@ -2064,6 +2114,7 @@ namespace Sushil.AI
                 !IsBodyIntersectingBlocking(desired) &&
                 NavMesh.CalculatePath(transform.position, desired, NavMesh.AllAreas, path) &&
                 path.status == NavMeshPathStatus.PathComplete &&
+                !PathCrossesClosedDoor(path) &&
                 (!strictGeometryValidation || IsPathAllowed(path)))
             {
                 resolved = desired;
@@ -2118,6 +2169,7 @@ namespace Sushil.AI
 
                 if (!IsDestinationAllowed(hit.position) ||
                     IsBodyIntersectingBlocking(hit.position) ||
+                    PathCrossesClosedDoor(path) ||
                     (strictGeometryValidation && !IsPathAllowed(path)))
                     continue;
 
@@ -2190,8 +2242,12 @@ namespace Sushil.AI
             bool tightPassageProfile = IsTightPassageContext(navTarget);
             bool squareFuseTight = IsSquareFuseTightNavigationZone(transform.position) || IsSquareFuseTightNavigationZone(navTarget);
             float targetRadius = enforcedAgentRadius;
-            if (stairProfile || tightPassageProfile)
-                targetRadius = Mathf.Min(enforcedAgentRadius, squareFuseTight ? 0.16f : tightPassageProfile ? 0.2f : 0.22f);
+            if (squareFuseTight)
+                targetRadius = Mathf.Min(enforcedAgentRadius, 0.16f);
+            else if (tightPassageProfile)
+                targetRadius = Mathf.Min(enforcedAgentRadius, 0.2f);
+            else if (stairProfile)
+                targetRadius = Mathf.Min(enforcedAgentRadius, 0.28f);
 
             float targetHeight = enforcedAgentHeight;
             if (tightPassageProfile)
@@ -2289,6 +2345,12 @@ namespace Sushil.AI
                     return;
                 }
 
+                if (!allowRuntimeRecoveryWarps)
+                {
+                    QueueShortAdvanceAndReissueDestination(progressiveTarget, originalDestination, 0.2f);
+                    return;
+                }
+
                 if (NavMesh.SamplePosition(progressiveTarget, out var progressiveHit, 1.0f, NavMesh.AllAreas))
                 {
                     float advanceDistance = Vector3.Distance(current, progressiveHit.position);
@@ -2327,6 +2389,12 @@ namespace Sushil.AI
                 if (squareFuseTraverse)
                 {
                     TrySetDestination(nudgeTarget);
+                    return;
+                }
+
+                if (!allowRuntimeRecoveryWarps)
+                {
+                    QueueShortAdvanceAndReissueDestination(nudgeTarget, originalDestination, 0.18f);
                     return;
                 }
 
@@ -2616,6 +2684,9 @@ namespace Sushil.AI
             if (!validatePathAgainstGeometry || path == null || path.corners == null || path.corners.Length < 2)
                 return true;
 
+            if (PathCrossesClosedDoor(path))
+                return false;
+
             Vector3[] corners = path.corners;
             for (int i = 0; i < corners.Length - 1; i++)
             {
@@ -2868,7 +2939,7 @@ namespace Sushil.AI
                 closePath.status != NavMeshPathStatus.PathComplete)
                 return false;
 
-            if (PathCrossesLockedClosedDoor(closePath))
+            if (PathCrossesClosedDoor(closePath))
                 return false;
 
             float pathLength = GetPathLength(closePath);
@@ -3027,8 +3098,18 @@ namespace Sushil.AI
             Transform t = c.transform;
             if (t == transform || t.IsChildOf(transform)) return false;
             if (player != null && (t == player || t.IsChildOf(player))) return false;
+
             Door door = t.GetComponentInParent<Door>();
-            if (door != null && door.IsOpen) return false;
+            if (door != null)
+                return !door.IsOpen;
+
+            FuseDoor fuseDoor = t.GetComponentInParent<FuseDoor>();
+            if (fuseDoor != null)
+                return !fuseDoor.IsOpen;
+
+            MainDoor mainDoor = t.GetComponentInParent<MainDoor>();
+            if (mainDoor != null)
+                return !mainDoor.IsOpen;
 
             if (t.GetComponentInParent<HideableObject>() != null) return true;
             if (t.GetComponentInParent<KeyItem>() != null) return false;

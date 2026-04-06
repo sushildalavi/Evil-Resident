@@ -88,6 +88,8 @@ public class RohitFPSController : MonoBehaviour
 
     void Start()
     {
+        CollectibleHUD.EnsureExists();
+
         controller = GetComponent<CharacterController>();
         // Ensure stairs/ramp can be walked without requiring a jump.
         controller.stepOffset = Mathf.Max(controller.stepOffset, 0.4f);
