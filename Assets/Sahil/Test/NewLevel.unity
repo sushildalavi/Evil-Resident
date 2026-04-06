@@ -1486,6 +1486,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   interactKey: 101
+  dialNameOverride: 
   rotatePrompt: Press E to rotate dial
   lockedPrompt: The dial is locked
   rotateSfx: {fileID: 0}
@@ -2671,6 +2672,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   interactKey: 101
+  dialNameOverride: 
   rotatePrompt: Press E to rotate dial
   lockedPrompt: The dial is locked
   rotateSfx: {fileID: 0}
@@ -3993,6 +3995,7 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   interactKey: 101
+  dialNameOverride: 
   rotatePrompt: Press E to rotate dial
   lockedPrompt: The dial is locked
   rotateSfx: {fileID: 0}
