@@ -394,11 +394,10 @@ namespace Sushil.AI
             autoDoorOpenCooldown = Mathf.Min(autoDoorOpenCooldown, 0.15f);
             destinationWallClearance = Mathf.Max(destinationWallClearance, 0.34f);
             antiClipProbeRadius = Mathf.Max(antiClipProbeRadius, 0.28f);
-            // Runtime balancing: keep the resident threatening, but stop it from feeling
-            // omniscient and overly sticky once the player breaks contact.
-            chaseMoveSpeed = Mathf.Min(chaseMoveSpeed, 1.7f);
-            patrolMoveSpeed = Mathf.Min(patrolMoveSpeed, 1.2f);
-            chaseAcceleration = Mathf.Min(chaseAcceleration, 3.0f);
+            // Enforce the requested runtime movement speeds directly so prefab/scene
+            // overrides do not drift from the intended feel.
+            patrolMoveSpeed = 1.5f;
+            chaseMoveSpeed = 1.7f;
             omnidirectionalVision = false;
             enablePeripheralAwareness = true;
             peripheralAwarenessRangeMultiplier = 0.76f;
@@ -430,7 +429,7 @@ namespace Sushil.AI
             unlockedKeyDoorBiasRadius = Mathf.Max(unlockedKeyDoorBiasRadius, 5.5f);
             unlockedKeyDoorTraverseRange = Mathf.Max(unlockedKeyDoorTraverseRange, 3.6f);
             searchRadius = Mathf.Max(searchRadius, 6.5f);
-            multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.55f);
+            multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.78f);
             multiFloorRoamHeight = Mathf.Max(multiFloorRoamHeight, 7f);
             pauseOutsideChance = 0f;
             stairVisualLift = Mathf.Max(stairVisualLift, 0.1f);
@@ -472,7 +471,7 @@ namespace Sushil.AI
                 farLoseDelay = Mathf.Max(farLoseDelay, 1.15f);
                 killDistance = Mathf.Clamp(killDistance, 0.98f, 1.08f);
                 killVerticalTolerance = Mathf.Clamp(killVerticalTolerance, 0.95f, 1.1f);
-                multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.7f);
+                multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.9f);
                 multiFloorRoamHeight = Mathf.Max(multiFloorRoamHeight, 8.5f);
                 closeAwarenessDistance = Mathf.Max(closeAwarenessDistance, 4.8f);
                 closeAwarenessVerticalTolerance = Mathf.Clamp(closeAwarenessVerticalTolerance, 1.35f, 1.55f);

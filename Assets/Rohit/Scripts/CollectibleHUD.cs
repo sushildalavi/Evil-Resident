@@ -54,6 +54,7 @@ public class CollectibleHUD : MonoBehaviour
         public Outline outline;
         public Coroutine animation;
         public bool collected;
+        public Color themeColor;
         public Color fillColor;
         public Color borderColor;
     }
@@ -85,6 +86,15 @@ public class CollectibleHUD : MonoBehaviour
     static readonly Color KeysBase = Rgba(100, 180, 255, 1f);
     static readonly Color FusesBase = Rgba(255, 180, 50, 1f);
     static readonly Color CompleteBase = Rgba(80, 200, 120, 1f);
+    static readonly Color CircleKeyColor = Color.blue;
+    static readonly Color RectangleKeyColor = Color.green;
+    static readonly Color SquareKeyColor = Color.red;
+    static readonly Color[] DefaultFuseColors =
+    {
+        Color.yellow,
+        Color.blue,
+        new Color(0.6f, 0.2f, 1f, 1f)
+    };
     static readonly Color RowBackgroundColor = new Color(0.02f, 0.03f, 0.055f, 0.82f);
     static readonly Color RowSheenColor = new Color(1f, 1f, 1f, 0.05f);
     static readonly Color RowShadowColor = new Color(0f, 0f, 0f, 0.42f);
@@ -189,7 +199,7 @@ public class CollectibleHUD : MonoBehaviour
             return;
 
         ApplyVisualState(true);
-        ShowToast(GetToastLabel(type));
+        ShowToast(GetToastLabel(type), GetCollectibleDisplayColor(type));
     }
 
     public void ResetAll()
@@ -428,6 +438,8 @@ public class CollectibleHUD : MonoBehaviour
     {
         RectTransform rect = CreateRect($"KeyPip_{index}", parent);
         rect.sizeDelta = index == 1 ? new Vector2(14f, 10f) : new Vector2(14f, 14f);
+        CollectibleType type = MapKeyIndex(index);
+        Color pipColor = GetCollectibleDisplayColor(type);
 
         Image fill = rect.gameObject.AddComponent<Image>();
         fill.color = UncollectedFill;
@@ -444,12 +456,13 @@ public class CollectibleHUD : MonoBehaviour
 
         return new PipView
         {
-            type = MapKeyIndex(index),
+            type = type,
             root = rect,
             fill = fill,
             outline = outline,
+            themeColor = pipColor,
             fillColor = UncollectedFill,
-            borderColor = WithAlpha(KeysBase, 0.25f)
+            borderColor = WithAlpha(pipColor, 0.3f)
         };
     }
 
@@ -457,6 +470,8 @@ public class CollectibleHUD : MonoBehaviour
     {
         RectTransform rect = CreateRect($"FusePip_{index}", parent);
         rect.sizeDelta = new Vector2(8f, 18f);
+        CollectibleType type = MapFuseIndex(index);
+        Color pipColor = GetCollectibleDisplayColor(type);
 
         Image fill = rect.gameObject.AddComponent<Image>();
         fill.color = UncollectedFill;
@@ -469,12 +484,13 @@ public class CollectibleHUD : MonoBehaviour
 
         return new PipView
         {
-            type = MapFuseIndex(index),
+            type = type,
             root = rect,
             fill = fill,
             outline = outline,
+            themeColor = pipColor,
             fillColor = UncollectedFill,
-            borderColor = WithAlpha(FusesBase, 0.25f)
+            borderColor = WithAlpha(pipColor, 0.3f)
         };
     }
 
@@ -544,7 +560,7 @@ public class CollectibleHUD : MonoBehaviour
     {
         bool isComplete = total > 0 && collected >= total;
         bool isPartial = collected > 0 && !isComplete;
-        Color theme = isComplete ? completeColor : baseColor;
+        Color theme = isComplete ? completeColor : ResolveRowThemeColor(row, baseColor);
 
         float labelAlpha = isComplete ? 0.8f : isPartial ? 0.7f : 0.55f;
         float counterAlpha = isComplete ? 0.9f : isPartial ? 0.85f : 0.45f;
@@ -570,8 +586,9 @@ public class CollectibleHUD : MonoBehaviour
                 ? (i < trackedKeys.Count && shownKeys.Contains(trackedKeys[i]))
                 : shownFuses[i];
 
-            Color targetBorder = isCollected ? theme : WithAlpha(baseColor, 0.25f);
-            Color targetFill = isCollected ? theme : UncollectedFill;
+            Color pipColor = isComplete ? completeColor : row.pips[i].themeColor;
+            Color targetBorder = isCollected ? pipColor : WithAlpha(pipColor, 0.34f);
+            Color targetFill = isCollected ? pipColor : UncollectedFill;
             AnimatePip(row.pips[i], targetFill, targetBorder, animate ? 0.2f : 0f);
         }
     }
@@ -616,7 +633,7 @@ public class CollectibleHUD : MonoBehaviour
         pip.animation = null;
     }
 
-    void ShowToast(string message)
+    void ShowToast(string message, Color themeColor)
     {
         RectTransform toast = CreateRect("Toast", toastRoot);
         toast.anchorMin = new Vector2(0f, 1f);
@@ -626,15 +643,15 @@ public class CollectibleHUD : MonoBehaviour
         toast.sizeDelta = new Vector2(Mathf.Max(120f, message.Length * 7f), 22f);
 
         Image background = toast.gameObject.AddComponent<Image>();
-        background.color = ToastBackgroundColor;
+        background.color = new Color(themeColor.r, themeColor.g, themeColor.b, ToastBackgroundColor.a);
 
         Outline outline = toast.gameObject.AddComponent<Outline>();
         outline.effectDistance = new Vector2(1f, -1f);
-        outline.effectColor = ToastBorderColor;
+        outline.effectColor = new Color(themeColor.r, themeColor.g, themeColor.b, ToastBorderColor.a);
         outline.useGraphicAlpha = true;
 
         Text text = CreateText("ToastText", toast, message, 11, TextAnchor.MiddleLeft);
-        text.color = ToastTextColor;
+        text.color = Color.Lerp(themeColor, Color.white, 0.15f);
         Stretch(text.rectTransform, 8f, 3f, 8f, 3f);
 
         CanvasGroup group = toast.gameObject.AddComponent<CanvasGroup>();
@@ -786,6 +803,31 @@ public class CollectibleHUD : MonoBehaviour
         return count;
     }
 
+    Color ResolveRowThemeColor(RowView row, Color fallback)
+    {
+        if (row == null || row.pips.Count == 0)
+            return fallback;
+
+        for (int i = 0; i < row.pips.Count; i++)
+        {
+            if (!IsPipCollected(row, i))
+                return row.pips[i].themeColor;
+        }
+
+        return row.pips[row.pips.Count - 1].themeColor;
+    }
+
+    bool IsPipCollected(RowView row, int index)
+    {
+        if (row == null || index < 0 || index >= row.pips.Count)
+            return false;
+
+        if (row.kind == RowKind.Keys)
+            return index < trackedKeys.Count && shownKeys.Contains(trackedKeys[index]);
+
+        return index < shownFuses.Length && shownFuses[index];
+    }
+
     static bool TryMapKey(CollectibleType type, out KeyType keyType)
     {
         switch (type)
@@ -836,6 +878,66 @@ public class CollectibleHUD : MonoBehaviour
             case CollectibleType.SquareKey: return "+ SQUARE KEY";
             default: return "+ FUSE";
         }
+    }
+
+    Color GetCollectibleDisplayColor(CollectibleType type)
+    {
+        if (TryMapKey(type, out KeyType keyType))
+            return ResolveKeyDisplayColor(keyType);
+
+        int fuseIndex = GetFuseIndex(type);
+        return ResolveFuseDisplayColor(fuseIndex);
+    }
+
+    Color ResolveKeyDisplayColor(KeyType keyType)
+    {
+        switch (keyType)
+        {
+            case KeyType.Circle:
+                return CircleKeyColor;
+            case KeyType.Rectangle:
+                return RectangleKeyColor;
+            case KeyType.Square:
+                return SquareKeyColor;
+            default:
+                return KeysBase;
+        }
+    }
+
+    Color ResolveFuseDisplayColor(int fuseIndex)
+    {
+        FuseBox[] boxes = FindObjectsByType<FuseBox>(FindObjectsSortMode.None);
+        for (int i = 0; i < boxes.Length; i++)
+        {
+            FuseBox box = boxes[i];
+            if (box == null)
+                continue;
+
+            if (box.preferFusePrefabColor &&
+                box.fusePrefabs != null &&
+                fuseIndex >= 0 &&
+                fuseIndex < box.fusePrefabs.Length &&
+                box.fusePrefabs[fuseIndex] != null)
+            {
+                Renderer fuseRenderer = box.fusePrefabs[fuseIndex].GetComponentInChildren<Renderer>(true);
+                if (fuseRenderer != null)
+                {
+                    Material shared = fuseRenderer.sharedMaterial;
+                    if (shared != null)
+                    {
+                        if (shared.HasProperty("_BaseColor"))
+                            return shared.GetColor("_BaseColor");
+                        if (shared.HasProperty("_Color"))
+                            return shared.GetColor("_Color");
+                    }
+                }
+            }
+
+            if (box.fallbackSlotColors != null && box.fallbackSlotColors.Length > 0)
+                return box.fallbackSlotColors[Mathf.Clamp(fuseIndex, 0, box.fallbackSlotColors.Length - 1)];
+        }
+
+        return DefaultFuseColors[Mathf.Clamp(fuseIndex, 0, DefaultFuseColors.Length - 1)];
     }
 
     static float GetPipAreaWidth(RowKind kind, int count)
