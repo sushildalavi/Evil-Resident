@@ -813,13 +813,10 @@ public class RohitFPSController : MonoBehaviour
         yVelocity = 0f;
         isHidden = true;
         currentHideObject = hideObject;
-        hideObject?.SetExteriorOnlyRenderersVisible(false);
     }
 
     public void ExitHide(Vector3 exitPosition)
     {
-        HideableObject exiting = currentHideObject;
-
         controller.enabled = false;
         transform.position = exitPosition;
         if (hasPreHideRotation)
@@ -839,8 +836,6 @@ public class RohitFPSController : MonoBehaviour
         currentHideObject = null;
         hasPreHidePosition = false;
         hasPreHideRotation = false;
-
-        exiting?.SetExteriorOnlyRenderersVisible(true);
     }
 
     public Vector3 ResolveSafeExitPosition(HideableObject hideObject, Vector3 requestedExitPosition)
