@@ -83,6 +83,7 @@ public class MainDoor : MonoBehaviour, IInteractable
     }
 
     public KeyCode GetInteractKey() => KeyCode.E;
+    public bool IsOpen => isOpen;
 
     public string GetPrompt(RohitFPSController player)
     {

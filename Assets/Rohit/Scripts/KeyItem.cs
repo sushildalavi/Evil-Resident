@@ -64,7 +64,6 @@ public class KeyItem : MonoBehaviour, IInteractable
         if (!inventory.HasKey(keyType))
         {
             inventory.AddKey(keyType);
-            KeyPickupOverlay.ShowKeyCollected(keyType);
             Destroy(gameObject);
         }
     }

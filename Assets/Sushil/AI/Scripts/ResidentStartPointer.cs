@@ -7,6 +7,7 @@ namespace Sushil.Systems
     public class ResidentStartPointer : MonoBehaviour
     {
         static ResidentStartPointer instance;
+        static Sprite triangleSprite;
 
         [Header("Display")]
         public float edgePadding = 92f;
@@ -18,7 +19,11 @@ namespace Sushil.Systems
         RectTransform root;
         RectTransform indicatorRect;
         RectTransform arrowRect;
-        Text arrowText;
+        Image arrowShaftImage;
+        Image arrowTipImage;
+        Image arrowWingLeftImage;
+        Image arrowWingRightImage;
+        Image infoPlateImage;
         Text infoText;
 
         Transform playerCamera;
@@ -162,8 +167,7 @@ namespace Sushil.Systems
 
             bool veryClose = distance <= 3f;
             Color activeColor = veryClose ? dangerColor : pointerColor;
-            arrowText.color = activeColor;
-            infoText.color = activeColor;
+            ApplyMarkerColor(activeColor);
             infoText.text = $"{distance:0}m";
         }
 
@@ -253,29 +257,92 @@ namespace Sushil.Systems
             indicatorRect.anchorMin = new Vector2(0.5f, 0.5f);
             indicatorRect.anchorMax = new Vector2(0.5f, 0.5f);
             indicatorRect.pivot = new Vector2(0.5f, 0.5f);
-            indicatorRect.sizeDelta = new Vector2(88f, 82f);
+            indicatorRect.sizeDelta = new Vector2(64f, 68f);
 
             arrowRect = new GameObject("Arrow", typeof(RectTransform)).GetComponent<RectTransform>();
             arrowRect.SetParent(indicatorRect, false);
             arrowRect.anchorMin = new Vector2(0.5f, 0.5f);
             arrowRect.anchorMax = new Vector2(0.5f, 0.5f);
             arrowRect.pivot = new Vector2(0.5f, 0.5f);
-            arrowRect.anchoredPosition = new Vector2(0f, 10f);
-            arrowRect.sizeDelta = new Vector2(58f, 58f);
+            arrowRect.anchoredPosition = new Vector2(0f, 8f);
+            arrowRect.sizeDelta = new Vector2(42f, 42f);
 
-            arrowText = CreatePointerText(arrowRect.gameObject, 54, "▲", pointerColor, 24, 58);
-            AddOutline(arrowRect.gameObject, new Color(0f, 0f, 0f, 0.92f), new Vector2(2f, -2f));
+            arrowShaftImage = CreateImageElement(
+                "ArrowShaft",
+                arrowRect,
+                new Vector2(4f, 18f),
+                new Vector2(0f, -5f),
+                pointerColor);
+            AddOutline(arrowShaftImage.gameObject, new Color(0f, 0f, 0f, 0.95f), new Vector2(1f, -1f));
 
-            RectTransform infoRect = new GameObject("Info", typeof(RectTransform)).GetComponent<RectTransform>();
+            arrowTipImage = CreateImageElement(
+                "ArrowTip",
+                arrowRect,
+                new Vector2(18f, 16f),
+                new Vector2(0f, 10f),
+                pointerColor,
+                0f);
+            arrowTipImage.sprite = GetTriangleSprite();
+            arrowTipImage.preserveAspect = true;
+            AddOutline(arrowTipImage.gameObject, new Color(0f, 0f, 0f, 0.95f), new Vector2(1f, -1f));
+
+            arrowWingLeftImage = CreateImageElement(
+                "ArrowShoulderLeft",
+                arrowRect,
+                new Vector2(3f, 10f),
+                new Vector2(-5f, 2f),
+                pointerColor,
+                58f);
+            AddOutline(arrowWingLeftImage.gameObject, new Color(0f, 0f, 0f, 0.95f), new Vector2(1f, -1f));
+
+            arrowWingRightImage = CreateImageElement(
+                "ArrowShoulderRight",
+                arrowRect,
+                new Vector2(3f, 10f),
+                new Vector2(5f, 2f),
+                pointerColor,
+                -58f);
+            AddOutline(arrowWingRightImage.gameObject, new Color(0f, 0f, 0f, 0.95f), new Vector2(1f, -1f));
+
+            RectTransform infoRect = new GameObject("Info", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
             infoRect.SetParent(indicatorRect, false);
             infoRect.anchorMin = new Vector2(0.5f, 0.5f);
             infoRect.anchorMax = new Vector2(0.5f, 0.5f);
             infoRect.pivot = new Vector2(0.5f, 0.5f);
             infoRect.anchoredPosition = new Vector2(0f, -18f);
-            infoRect.sizeDelta = new Vector2(80f, 24f);
+            infoRect.sizeDelta = new Vector2(52f, 18f);
+            infoPlateImage = infoRect.GetComponent<Image>();
+            infoPlateImage.color = new Color(0.04f, 0.04f, 0.05f, 0.7f);
+            infoPlateImage.raycastTarget = false;
+            AddOutline(infoRect.gameObject, new Color(0f, 0f, 0f, 0.9f), new Vector2(1f, -1f));
 
-            infoText = CreatePointerText(infoRect.gameObject, 18, "0m", pointerColor, 12, 20);
-            AddOutline(infoRect.gameObject, new Color(0f, 0f, 0f, 0.88f), new Vector2(2f, -2f));
+            RectTransform infoLabelRect = new GameObject("InfoLabel", typeof(RectTransform)).GetComponent<RectTransform>();
+            infoLabelRect.SetParent(infoRect, false);
+            infoLabelRect.anchorMin = Vector2.zero;
+            infoLabelRect.anchorMax = Vector2.one;
+            infoLabelRect.offsetMin = Vector2.zero;
+            infoLabelRect.offsetMax = Vector2.zero;
+
+            infoText = CreatePointerText(infoLabelRect.gameObject, 14, "0m", pointerColor, 10, 16);
+            AddOutline(infoLabelRect.gameObject, new Color(0f, 0f, 0f, 0.88f), new Vector2(1f, -1f));
+            ApplyMarkerColor(pointerColor);
+        }
+
+        Image CreateImageElement(string name, Transform parent, Vector2 size, Vector2 anchoredPosition, Color color, float rotationZ = 0f)
+        {
+            RectTransform rect = new GameObject(name, typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
+            rect.SetParent(parent, false);
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = anchoredPosition;
+            rect.sizeDelta = size;
+            rect.localRotation = Quaternion.Euler(0f, 0f, rotationZ);
+
+            Image image = rect.GetComponent<Image>();
+            image.color = color;
+            image.raycastTarget = false;
+            return image;
         }
 
         Text CreatePointerText(GameObject owner, int fontSize, string content, Color color, int minSize, int maxSize)
@@ -291,6 +358,54 @@ namespace Sushil.Systems
             text.resizeTextMaxSize = maxSize;
             text.raycastTarget = false;
             return text;
+        }
+
+        Sprite GetTriangleSprite()
+        {
+            if (triangleSprite != null)
+                return triangleSprite;
+
+            Texture2D texture = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+
+            float centerX = 15.5f;
+            for (int y = 0; y < 32; y++)
+            {
+                float t = y / 31f;
+                float halfWidth = Mathf.Lerp(13.5f, 0.5f, t);
+                for (int x = 0; x < 32; x++)
+                {
+                    float edge = halfWidth - Mathf.Abs(x - centerX);
+                    float alpha = Mathf.Clamp01(edge + 1f);
+                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+
+            texture.Apply();
+            triangleSprite = Sprite.Create(texture, new Rect(0f, 0f, 32f, 32f), new Vector2(0.5f, 0.18f), 100f);
+            return triangleSprite;
+        }
+
+        void ApplyMarkerColor(Color activeColor)
+        {
+            if (arrowShaftImage != null)
+                arrowShaftImage.color = activeColor;
+
+            if (arrowTipImage != null)
+                arrowTipImage.color = activeColor;
+
+            if (arrowWingLeftImage != null)
+                arrowWingLeftImage.color = activeColor;
+
+            if (arrowWingRightImage != null)
+                arrowWingRightImage.color = activeColor;
+
+            if (infoPlateImage != null)
+                infoPlateImage.color = new Color(0.04f, 0.04f, 0.05f, 0.7f);
+
+            if (infoText != null)
+                infoText.color = Color.Lerp(activeColor, Color.white, 0.1f);
         }
 
         void AddOutline(GameObject owner, Color color, Vector2 distance)

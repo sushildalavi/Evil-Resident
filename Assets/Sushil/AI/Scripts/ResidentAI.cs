@@ -337,6 +337,8 @@ namespace Sushil.AI
         private Vector3 lastSafePosition;
         private bool hasSafePosition;
         private Door[] cachedDoors;
+        private FuseDoor[] cachedFuseDoors;
+        private MainDoor[] cachedMainDoors;
         private float ignoreAntiClipUntilTime;
         private float visibleAccum;
         private float hiddenAccum;
@@ -387,16 +389,15 @@ namespace Sushil.AI
             doorwayAssistRange = Mathf.Max(doorwayAssistRange, 20f);
             doorwayAssistSampleRadius = Mathf.Max(doorwayAssistSampleRadius, 1.25f);
             requireClearPathForWarp = true;
-            autoOpenNearbyDoors = true;
+            autoOpenNearbyDoors = false;
             autoDoorOpenRange = Mathf.Max(autoDoorOpenRange, 2.6f);
             autoDoorOpenCooldown = Mathf.Min(autoDoorOpenCooldown, 0.15f);
             destinationWallClearance = Mathf.Max(destinationWallClearance, 0.34f);
             antiClipProbeRadius = Mathf.Max(antiClipProbeRadius, 0.28f);
-            // Runtime balancing: keep the resident threatening, but stop it from feeling
-            // omniscient and overly sticky once the player breaks contact.
-            chaseMoveSpeed = Mathf.Min(chaseMoveSpeed, 1.7f);
-            patrolMoveSpeed = Mathf.Min(patrolMoveSpeed, 1.2f);
-            chaseAcceleration = Mathf.Min(chaseAcceleration, 3.0f);
+            // Enforce the requested runtime movement speeds directly so prefab/scene
+            // overrides do not drift from the intended feel.
+            patrolMoveSpeed = 1.5f;
+            chaseMoveSpeed = 1.7f;
             omnidirectionalVision = false;
             enablePeripheralAwareness = true;
             peripheralAwarenessRangeMultiplier = 0.76f;
@@ -428,7 +429,7 @@ namespace Sushil.AI
             unlockedKeyDoorBiasRadius = Mathf.Max(unlockedKeyDoorBiasRadius, 5.5f);
             unlockedKeyDoorTraverseRange = Mathf.Max(unlockedKeyDoorTraverseRange, 3.6f);
             searchRadius = Mathf.Max(searchRadius, 6.5f);
-            multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.55f);
+            multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.78f);
             multiFloorRoamHeight = Mathf.Max(multiFloorRoamHeight, 7f);
             pauseOutsideChance = 0f;
             stairVisualLift = Mathf.Max(stairVisualLift, 0.1f);
@@ -470,7 +471,7 @@ namespace Sushil.AI
                 farLoseDelay = Mathf.Max(farLoseDelay, 1.15f);
                 killDistance = Mathf.Clamp(killDistance, 0.98f, 1.08f);
                 killVerticalTolerance = Mathf.Clamp(killVerticalTolerance, 0.95f, 1.1f);
-                multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.7f);
+                multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.9f);
                 multiFloorRoamHeight = Mathf.Max(multiFloorRoamHeight, 8.5f);
                 closeAwarenessDistance = Mathf.Max(closeAwarenessDistance, 4.8f);
                 closeAwarenessVerticalTolerance = Mathf.Clamp(closeAwarenessVerticalTolerance, 1.35f, 1.55f);
@@ -482,12 +483,10 @@ namespace Sushil.AI
             // Keep hard geometry validation enabled so chase logic cannot cut through walls.
             validatePathAgainstGeometry = true;
             rejectDestinationsInsideBlockingGeometry = true;
-            enforceRuntimeAntiClip = allowRuntimeRecoveryWarps;
+            enforceRuntimeAntiClip = true;
             if (!allowRuntimeRecoveryWarps)
             {
                 keepAgentSnappedToNavMesh = false;
-                enforceNavMeshBoundaryAntiClip = false;
-                enableStairTraverseAssist = false;
             }
 
             // Avoid floating weirdness
@@ -549,10 +548,10 @@ namespace Sushil.AI
             }
 
             ApplyDynamicNavigationProfile();
+            ApplyStairTraverseAssist();
             if (allowRuntimeRecoveryWarps)
             {
                 StabilizeAgentOnNavMesh();
-                ApplyStairTraverseAssist();
                 TryGeneralStuckRecovery();
             }
 
@@ -641,12 +640,11 @@ namespace Sushil.AI
 
             wasPlayerHiddenLastFrame = isHiddenNow;
             UpdateMotionAnimation();
-            TryAutoOpenDoorInFront();
         }
 
         void LateUpdate()
         {
-            if (allowRuntimeRecoveryWarps)
+            if (enforceRuntimeAntiClip)
                 EnforceRuntimeNoClip();
         }
 
@@ -1284,7 +1282,7 @@ namespace Sushil.AI
                     return false;
                 }
 
-                if (PathCrossesLockedClosedDoor(path))
+                if (PathCrossesClosedDoor(path))
                     return false;
             }
 

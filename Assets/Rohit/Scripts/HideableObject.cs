@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class HideableObject : MonoBehaviour, IInteractable
@@ -8,6 +9,57 @@ public class HideableObject : MonoBehaviour, IInteractable
 
     [Header("Camera Override (Optional)")]
     public Transform hiddenCameraPoint;
+
+    [Header("Exterior-only visuals (optional)")]
+    [Tooltip("Shown when outside this hide spot; hidden while hiding. If empty, auto-finds latch and/or cupboard doors/handles.")]
+    [SerializeField] Renderer[] exteriorOnlyRenderers;
+
+    Renderer[] cachedExteriorRenderers;
+
+    static readonly string[] AutoExteriorRendererPaths =
+    {
+        "Visuals/Base/Latch",
+        "LeftDoorPivot/LeftDoor",
+        "RightDoorPivot/RightDoor",
+        "RightDoorPivot/RightDoor (1)",
+        "LeftHandle",
+        "RightHandle",
+    };
+
+    void Awake()
+    {
+        if (exteriorOnlyRenderers != null && exteriorOnlyRenderers.Length > 0)
+        {
+            cachedExteriorRenderers = exteriorOnlyRenderers;
+            return;
+        }
+
+        var list = new List<Renderer>();
+        for (int i = 0; i < AutoExteriorRendererPaths.Length; i++)
+        {
+            Transform t = transform.Find(AutoExteriorRendererPaths[i]);
+            if (t == null) continue;
+
+            Renderer self = t.GetComponent<Renderer>();
+            if (self != null)
+                list.Add(self);
+            else
+                list.AddRange(t.GetComponentsInChildren<Renderer>(true));
+        }
+
+        cachedExteriorRenderers = list.Count > 0 ? list.ToArray() : System.Array.Empty<Renderer>();
+    }
+
+    /// <summary>Disable exterior-only renderers while the player is hidden inside (colliders stay on).</summary>
+    public void SetExteriorOnlyRenderersVisible(bool visible)
+    {
+        if (cachedExteriorRenderers == null) return;
+        for (int i = 0; i < cachedExteriorRenderers.Length; i++)
+        {
+            if (cachedExteriorRenderers[i] != null)
+                cachedExteriorRenderers[i].enabled = visible;
+        }
+    }
 
     Transform FindPoint(string relativePath)
     {
