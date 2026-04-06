@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class HideableObject : MonoBehaviour, IInteractable
@@ -10,10 +11,20 @@ public class HideableObject : MonoBehaviour, IInteractable
     public Transform hiddenCameraPoint;
 
     [Header("Exterior-only visuals (optional)")]
-    [Tooltip("Shown when outside this hide spot; hidden while hiding (e.g. front latch). If empty, uses Visuals/Base/Latch when present.")]
+    [Tooltip("Shown when outside this hide spot; hidden while hiding. If empty, auto-finds latch and/or cupboard doors/handles.")]
     [SerializeField] Renderer[] exteriorOnlyRenderers;
 
     Renderer[] cachedExteriorRenderers;
+
+    static readonly string[] AutoExteriorRendererPaths =
+    {
+        "Visuals/Base/Latch",
+        "LeftDoorPivot/LeftDoor",
+        "RightDoorPivot/RightDoor",
+        "RightDoorPivot/RightDoor (1)",
+        "LeftHandle",
+        "RightHandle",
+    };
 
     void Awake()
     {
@@ -23,18 +34,20 @@ public class HideableObject : MonoBehaviour, IInteractable
             return;
         }
 
-        Transform latch = transform.Find("Visuals/Base/Latch");
-        if (latch == null)
+        var list = new List<Renderer>();
+        for (int i = 0; i < AutoExteriorRendererPaths.Length; i++)
         {
-            cachedExteriorRenderers = System.Array.Empty<Renderer>();
-            return;
+            Transform t = transform.Find(AutoExteriorRendererPaths[i]);
+            if (t == null) continue;
+
+            Renderer self = t.GetComponent<Renderer>();
+            if (self != null)
+                list.Add(self);
+            else
+                list.AddRange(t.GetComponentsInChildren<Renderer>(true));
         }
 
-        Renderer self = latch.GetComponent<Renderer>();
-        if (self != null)
-            cachedExteriorRenderers = new[] { self };
-        else
-            cachedExteriorRenderers = latch.GetComponentsInChildren<Renderer>(true);
+        cachedExteriorRenderers = list.Count > 0 ? list.ToArray() : System.Array.Empty<Renderer>();
     }
 
     /// <summary>Disable exterior-only renderers while the player is hidden inside (colliders stay on).</summary>
