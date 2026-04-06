@@ -10,6 +10,8 @@ public class TutorialDoorTransition : MonoBehaviour, IInteractable
     public float openAngle = 90f;
     public float openSpeed = 2f;
     public bool openClockwise = true;
+    [Tooltip("Which edge of the DoorPanel the hinge is on.")]
+    public bool hingeOnRightEdge = false;
 
     [Header("Scene Transition")]
     [Tooltip("Name of the main game scene to load when the door opens.")]
@@ -17,23 +19,27 @@ public class TutorialDoorTransition : MonoBehaviour, IInteractable
     [Tooltip("Delay in seconds after the door opens before loading the scene.")]
     public float transitionDelay = 1.5f;
 
+    [Header("Tutorial Requirements")]
+    [Tooltip("Drag all hideable objects the player must use before the door unlocks.")]
+    public HideableObject[] requiredHideSpots;
+
     [Header("Audio (Optional)")]
     public AudioClip unlockSound;
     public AudioClip lockedSound;
 
-    bool playerHasHidden;
+    bool allHidesDone;
     bool isOpen;
     bool sceneLoadTriggered;
     float currentAngle;
     float timer;
-    Quaternion closedLocalRotation;
     AudioSource audioSource;
     RohitFPSController cachedPlayer;
     Collider[] doorColliders;
+    bool[] hideCompleted;
+    Transform hingePivot;
 
     void Start()
     {
-        closedLocalRotation = transform.localRotation;
         audioSource = GetComponent<AudioSource>();
 
         Door existingDoor = GetComponent<Door>();
@@ -46,16 +52,57 @@ public class TutorialDoorTransition : MonoBehaviour, IInteractable
             : GetComponentsInChildren<Collider>(true);
 
         SetCollidersEnabled(true);
+
+        if (panel != null)
+        {
+            float halfWidth = panel.localScale.x / 2f;
+            Vector3 hingeOffset = hingeOnRightEdge
+                ? new Vector3(halfWidth, 0f, 0f)
+                : new Vector3(-halfWidth, 0f, 0f);
+
+            Vector3 hingeLocalPos = panel.localPosition + hingeOffset;
+            hingeLocalPos.y = 0f;
+
+            GameObject hingeObj = new GameObject("_HingePivot");
+            hingeObj.transform.SetParent(transform, false);
+            hingeObj.transform.localPosition = hingeLocalPos;
+            hingeObj.transform.localRotation = Quaternion.identity;
+
+            panel.SetParent(hingeObj.transform, true);
+            hingePivot = hingeObj.transform;
+        }
+
+        if (requiredHideSpots != null)
+            hideCompleted = new bool[requiredHideSpots.Length];
+        else
+            hideCompleted = new bool[0];
     }
 
     void Update()
     {
-        if (!playerHasHidden)
+        if (!allHidesDone)
         {
             if (cachedPlayer == null)
                 cachedPlayer = FindFirstObjectByType<RohitFPSController>();
-            if (cachedPlayer != null && cachedPlayer.isHidden)
-                playerHasHidden = true;
+
+            if (cachedPlayer != null && cachedPlayer.isHidden && cachedPlayer.currentHideObject != null)
+            {
+                for (int i = 0; i < requiredHideSpots.Length; i++)
+                {
+                    if (!hideCompleted[i] && cachedPlayer.currentHideObject == requiredHideSpots[i])
+                        hideCompleted[i] = true;
+                }
+            }
+
+            allHidesDone = true;
+            for (int i = 0; i < hideCompleted.Length; i++)
+            {
+                if (!hideCompleted[i])
+                {
+                    allHidesDone = false;
+                    break;
+                }
+            }
         }
 
         if (isOpen)
@@ -64,7 +111,8 @@ public class TutorialDoorTransition : MonoBehaviour, IInteractable
             float target = openAngle * direction;
             currentAngle = Mathf.MoveTowards(currentAngle, target, openSpeed * 100f * Time.deltaTime);
 
-            transform.localRotation = closedLocalRotation * Quaternion.Euler(0f, currentAngle, 0f);
+            if (hingePivot != null)
+                hingePivot.localRotation = Quaternion.Euler(0f, currentAngle, 0f);
 
             if (!sceneLoadTriggered)
             {
@@ -84,8 +132,13 @@ public class TutorialDoorTransition : MonoBehaviour, IInteractable
     {
         if (isOpen) return "";
 
-        if (!playerHasHidden)
-            return "Try hiding in the container first!";
+        if (!allHidesDone)
+        {
+            int done = 0;
+            for (int i = 0; i < hideCompleted.Length; i++)
+                if (hideCompleted[i]) done++;
+            return $"Hide in all spots first! ({done}/{hideCompleted.Length})";
+        }
 
         PlayerInventory inventory = player != null ? player.GetComponent<PlayerInventory>() : null;
         if (inventory != null && inventory.HasKey(requiredKey))
@@ -98,7 +151,7 @@ public class TutorialDoorTransition : MonoBehaviour, IInteractable
     {
         if (isOpen) return;
 
-        if (!playerHasHidden) return;
+        if (!allHidesDone) return;
 
         PlayerInventory inventory = player != null ? player.GetComponent<PlayerInventory>() : null;
         if (inventory != null && inventory.HasKey(requiredKey))
