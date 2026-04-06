@@ -1,13 +1,21 @@
 using UnityEngine;
 using System.Collections.Generic;
 
+public enum FuseId
+{
+    FuseA = 0,
+    FuseB = 1,
+    FuseC = 2
+}
+
 public class PlayerInventory : MonoBehaviour
 {
     public static PlayerInventory instance;
 
     private HashSet<KeyType> collectedKeys = new HashSet<KeyType>();
+    private FuseId? carriedFuseId;
 
-    // 🔥 FUSE COUNT SYSTEM
+    // Fuse carry state
     public int fuseCount = 0;
     public int TotalFusesCollected { get; private set; }
 
@@ -42,23 +50,66 @@ public class PlayerInventory : MonoBehaviour
     public bool HasRectangle => collectedKeys.Contains(KeyType.Rectangle);
     public bool HasSquare => collectedKeys.Contains(KeyType.Square);
     public int FuseCount => fuseCount;
+    public bool HasCarriedFuse => carriedFuseId.HasValue;
+    public FuseId? CarriedFuseId => carriedFuseId;
+    public string CarriedFuseName => carriedFuseId.HasValue ? FuseIdToLabel(carriedFuseId.Value) : "";
 
-    // ⚡ FUSE FUNCTIONS
+    // Fuse functions
+    public static string FuseIdToLabel(FuseId fuseId)
+    {
+        switch (fuseId)
+        {
+            case FuseId.FuseA: return "Fuse A";
+            case FuseId.FuseB: return "Fuse B";
+            case FuseId.FuseC: return "Fuse C";
+            default: return fuseId.ToString();
+        }
+    }
+
+    public bool TryPickUpFuse(FuseId fuseId)
+    {
+        if (carriedFuseId.HasValue)
+        {
+            Debug.Log($"Cannot pick up {FuseIdToLabel(fuseId)}: already carrying {FuseIdToLabel(carriedFuseId.Value)}");
+            return false;
+        }
+
+        carriedFuseId = fuseId;
+        fuseCount = 1;
+        TotalFusesCollected++;
+        Debug.Log($"Picked up {FuseIdToLabel(fuseId)}");
+        return true;
+    }
+
+    public bool TryUseFuse(FuseId requiredFuseId)
+    {
+        if (!carriedFuseId.HasValue)
+            return false;
+        if (carriedFuseId.Value != requiredFuseId)
+            return false;
+
+        carriedFuseId = null;
+        fuseCount = 0;
+        return true;
+    }
+
     public void PickUpFuse()
     {
-        fuseCount++;
-        TotalFusesCollected++;
-        Debug.Log("Picked up Fuse. Total: " + fuseCount);
+        // Legacy fallback for old content that doesn't specify a fuse ID.
+        TryPickUpFuse(FuseId.FuseA);
     }
 
     public bool HasFuse()
     {
-        return fuseCount > 0;
+        return carriedFuseId.HasValue;
     }
 
     public void UseFuse()
     {
-        if (fuseCount > 0)
-            fuseCount--;
+        if (!carriedFuseId.HasValue)
+            return;
+
+        carriedFuseId = null;
+        fuseCount = 0;
     }
 }

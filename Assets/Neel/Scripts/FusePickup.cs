@@ -2,6 +2,9 @@ using UnityEngine;
 
 public class FusePickup : MonoBehaviour, IInteractable
 {
+    [Header("Fuse Identity")]
+    public FuseId fuseId = FuseId.FuseA;
+
     private bool playerNearby = false;
     private bool collected = false;
 
@@ -28,7 +31,9 @@ public class FusePickup : MonoBehaviour, IInteractable
     {
         if (collected) return "";
         if (PlayerInventory.instance == null) return "Inventory missing";
-        return "Press E to pick up fuse";
+        if (PlayerInventory.instance.HasCarriedFuse)
+            return $"Cannot pick up {PlayerInventory.FuseIdToLabel(fuseId)}: carrying {PlayerInventory.instance.CarriedFuseName}";
+        return $"Press E to pick up {PlayerInventory.FuseIdToLabel(fuseId)}";
     }
 
     public KeyCode GetInteractKey()
@@ -46,9 +51,10 @@ public class FusePickup : MonoBehaviour, IInteractable
         if (collected) return;
         if (PlayerInventory.instance == null) return;
 
+        if (!PlayerInventory.instance.TryPickUpFuse(fuseId))
+            return;
+
         collected = true;
-        PlayerInventory.instance.PickUpFuse();
-        Debug.Log("Picked fuse. Total: " + PlayerInventory.instance.fuseCount);
         Destroy(gameObject);
     }
 }
