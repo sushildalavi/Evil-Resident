@@ -87,11 +87,13 @@ namespace Sushil.Systems
             if (!shownRunHintThisRound && Time.unscaledTime >= roundStartTime + Mathf.Max(0f, startHintDelay))
             {
                 shownRunHintThisRound = true;
-                QueueHint("Tip: Hold SHIFT to sprint away from the Resident.");
+                if (SceneManager.GetActiveScene().path != "Assets/Neel/Tutorial.unity")
+                    QueueHint("Tip: Hold SHIFT to sprint away from the Resident.");
             }
 
             bool hidden = player.isHidden;
-            if (hidden && !lastHidden && Time.unscaledTime >= nextHideHintAtTime)
+            if (hidden && !lastHidden && Time.unscaledTime >= nextHideHintAtTime
+                && SceneManager.GetActiveScene().path != "Assets/Neel/Tutorial.unity")
             {
                 nextHideHintAtTime = Time.unscaledTime + Mathf.Max(1f, hideHintCooldown);
                 QueueHint("Stay hidden till he is fully out of sight. Beware: he can fake leaving.");

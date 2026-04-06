@@ -150,13 +150,8 @@ namespace Sushil.Systems
             if (scenePath == "Assets/Neel/Tutorial.unity")
             {
                 titleText.text = "TUTORIAL";
-                taglineText.text = "Learn the controls before you enter...";
-                riddleText.gameObject.SetActive(true);
-                riddleText.text =
-                    "WASD - Move   |   Mouse - Look Around\n" +
-                    "Shift - Sprint   |   Space - Jump\n" +
-                    "E - Interact with Doors & Items\n" +
-                    "F - Hide";
+                taglineText.text = "Learn the controls step by step.";
+                riddleText.gameObject.SetActive(false);
                 startHintText.text = "Press ENTER or SPACE to begin";
                 return;
             }

@@ -119,6 +119,17 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!114 &98115452 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3994324752361583718, guid: 6c1703af002e149168e3283228577a01, type: 3}
+  m_PrefabInstance: {fileID: 1471662317}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec69a16fd735d4db69a29a95a30038a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HideableObject
 --- !u!1 &204544053
 GameObject:
   m_ObjectHideFlags: 0
@@ -246,6 +257,64 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1 &217996025
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 217996027}
+  - component: {fileID: 217996026}
+  m_Layer: 0
+  m_Name: TutorialManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &217996026
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 217996025}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4bb84e2f9f79b4ad2bab2b04e8bb24d5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialStepUI
+  fadeInTime: 0.4
+  completedShowTime: 0.8
+  delayBetweenSteps: 0.3
+--- !u!4 &217996027
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 217996025}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 5.33265, y: -2.36601, z: 5.85}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &476325102 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6943964810148802685, guid: 33f470869993f46f3a88e15f8816c67c, type: 3}
+  m_PrefabInstance: {fileID: 855203348}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec69a16fd735d4db69a29a95a30038a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HideableObject
 --- !u!4 &476325103 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1117838418296598307, guid: 33f470869993f46f3a88e15f8816c67c, type: 3}
@@ -556,6 +625,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1938441145}
     m_Modifications:
+    - target: {fileID: 1220389944493880777, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: -0.367
+      objectReference: {fileID: 0}
     - target: {fileID: 2630525224761294863, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
       propertyPath: m_LocalPosition.x
       value: -8.0551405
@@ -657,8 +730,12 @@ MonoBehaviour:
   openAngle: 90
   openSpeed: 2
   openClockwise: 1
+  hingeOnRightEdge: 1
   mainGameSceneName: NewLevel
   transitionDelay: 1.5
+  requiredHideSpots:
+  - {fileID: 476325102}
+  - {fileID: 98115452}
   unlockSound: {fileID: 0}
   lockedSound: {fileID: 0}
 --- !u!1 &1183877772
@@ -1467,5 +1544,6 @@ MonoBehaviour:
 SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
+  - {fileID: 217996027}
   - {fileID: 1938441145}
   - {fileID: 1471662317}
