@@ -1656,7 +1656,14 @@ namespace Sushil.AI
                 Vector3 candidate = center + Random.insideUnitSphere * tryRadius;
                 bool sampleDifferentFloor = allowMultiFloorRoam && Random.value < multiFloorRoamChance;
                 if (sampleDifferentFloor)
-                    candidate.y = center.y + Random.Range(-multiFloorRoamHeight, multiFloorRoamHeight);
+                {
+                    float verticalOffset = Random.Range(
+                        Mathf.Max(2.2f, multiFloorRoamHeight * 0.35f),
+                        Mathf.Max(2.6f, multiFloorRoamHeight));
+
+                    bool preferUpstairs = ShouldBiasRoamUpstairs(center);
+                    candidate.y = center.y + (preferUpstairs ? verticalOffset : -verticalOffset);
+                }
                 else
                     candidate.y = center.y;
 
@@ -1674,6 +1681,31 @@ namespace Sushil.AI
             }
 
             return false;
+        }
+
+        bool ShouldBiasRoamUpstairs(Vector3 center)
+        {
+            const float floorDelta = 2.2f;
+
+            if (player != null)
+            {
+                float playerDelta = player.position.y - center.y;
+                if (playerDelta > floorDelta)
+                    return Random.value < 0.94f;
+                if (playerDelta < -floorDelta)
+                    return Random.value < 0.18f;
+            }
+
+            if (lastSeenPlayerTime > -998f)
+            {
+                float lastSeenDelta = lastSeenPlayerPos.y - center.y;
+                if (lastSeenDelta > floorDelta)
+                    return Random.value < 0.88f;
+                if (lastSeenDelta < -floorDelta)
+                    return Random.value < 0.22f;
+            }
+
+            return Random.value < 0.72f;
         }
 
         Vector3 ComputeRoamCenter()

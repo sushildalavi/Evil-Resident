@@ -7,6 +7,7 @@ namespace Sushil.Systems
     public class ResidentStartPointer : MonoBehaviour
     {
         static ResidentStartPointer instance;
+        static Sprite triangleSprite;
 
         [Header("Display")]
         public float edgePadding = 92f;
@@ -19,7 +20,8 @@ namespace Sushil.Systems
         RectTransform indicatorRect;
         RectTransform arrowRect;
         Image arrowShaftImage;
-        Image arrowHeadImage;
+        Image arrowTipImage;
+        Image arrowWingLeftImage;
         Image arrowWingRightImage;
         Image infoPlateImage;
         Text infoText;
@@ -263,32 +265,43 @@ namespace Sushil.Systems
             arrowRect.anchorMax = new Vector2(0.5f, 0.5f);
             arrowRect.pivot = new Vector2(0.5f, 0.5f);
             arrowRect.anchoredPosition = new Vector2(0f, 8f);
-            arrowRect.sizeDelta = new Vector2(40f, 40f);
+            arrowRect.sizeDelta = new Vector2(42f, 42f);
 
             arrowShaftImage = CreateImageElement(
                 "ArrowShaft",
                 arrowRect,
                 new Vector2(4f, 18f),
-                new Vector2(0f, -1f),
+                new Vector2(0f, -5f),
                 pointerColor);
             AddOutline(arrowShaftImage.gameObject, new Color(0f, 0f, 0f, 0.95f), new Vector2(1f, -1f));
 
-            arrowHeadImage = CreateImageElement(
-                "ArrowHeadLeft",
+            arrowTipImage = CreateImageElement(
+                "ArrowTip",
                 arrowRect,
-                new Vector2(4f, 18f),
-                new Vector2(-6f, 9f),
+                new Vector2(18f, 16f),
+                new Vector2(0f, 10f),
                 pointerColor,
-                40f);
-            AddOutline(arrowHeadImage.gameObject, new Color(0f, 0f, 0f, 0.95f), new Vector2(1f, -1f));
+                0f);
+            arrowTipImage.sprite = GetTriangleSprite();
+            arrowTipImage.preserveAspect = true;
+            AddOutline(arrowTipImage.gameObject, new Color(0f, 0f, 0f, 0.95f), new Vector2(1f, -1f));
+
+            arrowWingLeftImage = CreateImageElement(
+                "ArrowShoulderLeft",
+                arrowRect,
+                new Vector2(3f, 10f),
+                new Vector2(-5f, 2f),
+                pointerColor,
+                58f);
+            AddOutline(arrowWingLeftImage.gameObject, new Color(0f, 0f, 0f, 0.95f), new Vector2(1f, -1f));
 
             arrowWingRightImage = CreateImageElement(
-                "ArrowHeadRight",
+                "ArrowShoulderRight",
                 arrowRect,
-                new Vector2(4f, 18f),
-                new Vector2(6f, 9f),
+                new Vector2(3f, 10f),
+                new Vector2(5f, 2f),
                 pointerColor,
-                -40f);
+                -58f);
             AddOutline(arrowWingRightImage.gameObject, new Color(0f, 0f, 0f, 0.95f), new Vector2(1f, -1f));
 
             RectTransform infoRect = new GameObject("Info", typeof(RectTransform), typeof(Image)).GetComponent<RectTransform>();
@@ -347,13 +360,43 @@ namespace Sushil.Systems
             return text;
         }
 
+        Sprite GetTriangleSprite()
+        {
+            if (triangleSprite != null)
+                return triangleSprite;
+
+            Texture2D texture = new Texture2D(32, 32, TextureFormat.RGBA32, false);
+            texture.filterMode = FilterMode.Bilinear;
+            texture.wrapMode = TextureWrapMode.Clamp;
+
+            float centerX = 15.5f;
+            for (int y = 0; y < 32; y++)
+            {
+                float t = y / 31f;
+                float halfWidth = Mathf.Lerp(13.5f, 0.5f, t);
+                for (int x = 0; x < 32; x++)
+                {
+                    float edge = halfWidth - Mathf.Abs(x - centerX);
+                    float alpha = Mathf.Clamp01(edge + 1f);
+                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+
+            texture.Apply();
+            triangleSprite = Sprite.Create(texture, new Rect(0f, 0f, 32f, 32f), new Vector2(0.5f, 0.18f), 100f);
+            return triangleSprite;
+        }
+
         void ApplyMarkerColor(Color activeColor)
         {
             if (arrowShaftImage != null)
                 arrowShaftImage.color = activeColor;
 
-            if (arrowHeadImage != null)
-                arrowHeadImage.color = activeColor;
+            if (arrowTipImage != null)
+                arrowTipImage.color = activeColor;
+
+            if (arrowWingLeftImage != null)
+                arrowWingLeftImage.color = activeColor;
 
             if (arrowWingRightImage != null)
                 arrowWingRightImage.color = activeColor;
