@@ -145,7 +145,23 @@ namespace Sushil.Systems
             if (titleText == null || taglineText == null || riddleText == null || startHintText == null)
                 return;
 
-            if (SceneManager.GetActiveScene().path == "Assets/Sahil/Test/NewLevel.unity")
+            string scenePath = SceneManager.GetActiveScene().path;
+
+            if (scenePath == "Assets/Neel/Tutorial.unity")
+            {
+                titleText.text = "TUTORIAL";
+                taglineText.text = "Learn the controls before you enter...";
+                riddleText.gameObject.SetActive(true);
+                riddleText.text =
+                    "WASD - Move   |   Mouse - Look Around\n" +
+                    "Shift - Sprint   |   Space - Jump\n" +
+                    "E - Interact with Doors & Items\n" +
+                    "F - Hide";
+                startHintText.text = "Press ENTER or SPACE to begin";
+                return;
+            }
+
+            if (scenePath == "Assets/Sahil/Test/NewLevel.unity")
             {
                 titleText.text = "EVIL RESIDENT";
                 taglineText.text = "Escape from the main door.";
