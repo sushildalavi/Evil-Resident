@@ -9,6 +9,45 @@ public class HideableObject : MonoBehaviour, IInteractable
     [Header("Camera Override (Optional)")]
     public Transform hiddenCameraPoint;
 
+    [Header("Exterior-only visuals (optional)")]
+    [Tooltip("Shown when outside this hide spot; hidden while hiding (e.g. front latch). If empty, uses Visuals/Base/Latch when present.")]
+    [SerializeField] Renderer[] exteriorOnlyRenderers;
+
+    Renderer[] cachedExteriorRenderers;
+
+    void Awake()
+    {
+        if (exteriorOnlyRenderers != null && exteriorOnlyRenderers.Length > 0)
+        {
+            cachedExteriorRenderers = exteriorOnlyRenderers;
+            return;
+        }
+
+        Transform latch = transform.Find("Visuals/Base/Latch");
+        if (latch == null)
+        {
+            cachedExteriorRenderers = System.Array.Empty<Renderer>();
+            return;
+        }
+
+        Renderer self = latch.GetComponent<Renderer>();
+        if (self != null)
+            cachedExteriorRenderers = new[] { self };
+        else
+            cachedExteriorRenderers = latch.GetComponentsInChildren<Renderer>(true);
+    }
+
+    /// <summary>Disable exterior-only renderers while the player is hidden inside (colliders stay on).</summary>
+    public void SetExteriorOnlyRenderersVisible(bool visible)
+    {
+        if (cachedExteriorRenderers == null) return;
+        for (int i = 0; i < cachedExteriorRenderers.Length; i++)
+        {
+            if (cachedExteriorRenderers[i] != null)
+                cachedExteriorRenderers[i].enabled = visible;
+        }
+    }
+
     Transform FindPoint(string relativePath)
     {
         return transform.Find(relativePath);
