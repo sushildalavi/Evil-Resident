@@ -30,7 +30,7 @@ namespace Sushil.Systems
             }
             else
             {
-                instance.Show();
+                instance.RefreshForCurrentScene();
             }
         }
 
@@ -46,7 +46,7 @@ namespace Sushil.Systems
             DontDestroyOnLoad(gameObject);
             BuildUI();
             SceneManager.sceneLoaded += OnSceneLoaded;
-            Show();
+            RefreshForCurrentScene();
         }
 
         void OnDestroy()
@@ -58,7 +58,7 @@ namespace Sushil.Systems
         void OnSceneLoaded(Scene scene, LoadSceneMode mode)
         {
             ApplySceneText();
-            Show();
+            RefreshForCurrentScene();
         }
 
         void Update()
@@ -86,6 +86,27 @@ namespace Sushil.Systems
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
             GameAnalyticsTracker.BeginRun();
+        }
+
+        void RefreshForCurrentScene()
+        {
+            Scene activeScene = SceneManager.GetActiveScene();
+            if (ShouldSuppressOverlayInScene(activeScene))
+            {
+                HideImmediate();
+                return;
+            }
+
+            Show();
+        }
+
+        void HideImmediate()
+        {
+            showing = false;
+            if (root != null) root.SetActive(false);
+            Time.timeScale = 1f;
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
 
         void BuildUI()
@@ -162,11 +183,22 @@ namespace Sushil.Systems
             if (scenePath.StartsWith("Assets/Sahil/Test/") ||
                 scenePath == "Assets/Sushil/Easy Level.unity")
             {
-                titleText.text = "EVIL RESIDENT";
+                titleText.text = "Evil Resident";
                 if (sceneNameLower.Contains("easy"))
+                {
+                    titleText.text = "Evil Resident - Easy";
                     taglineText.text = "Escape from the main door. Easy mode.";
+                }
+                else if (sceneNameLower.Contains("medium"))
+                {
+                    titleText.text = "Evil Resident - Medium";
+                    taglineText.text = "Escape from the main door. Medium mode.";
+                }
                 else if (sceneNameLower.Contains("difficult") || sceneNameLower.Contains("hard"))
-                    taglineText.text = "Escape from the main door. Difficult mode.";
+                {
+                    titleText.text = "Evil Resident - Hard";
+                    taglineText.text = "Escape from the main door. Hard mode.";
+                }
                 else
                     taglineText.text = "Escape from the main door.";
                 riddleText.gameObject.SetActive(true);
@@ -180,6 +212,12 @@ namespace Sushil.Systems
             riddleText.gameObject.SetActive(false);
             riddleText.text = string.Empty;
             startHintText.text = "Press ENTER or SPACE to begin";
+        }
+
+        bool ShouldSuppressOverlayInScene(Scene scene)
+        {
+            string sceneName = string.IsNullOrWhiteSpace(scene.name) ? string.Empty : scene.name.ToLowerInvariant();
+            return sceneName.Contains("level select") || sceneName.Contains("tutorial");
         }
 
         void CreateBackground(Transform parent)

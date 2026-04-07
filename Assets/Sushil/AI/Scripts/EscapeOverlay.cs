@@ -32,7 +32,13 @@ namespace Sushil.Systems
             GameAnalyticsTracker.RegisterEscape();
             if (title != null) title.text = "CONGRATS,\nYOU ESCAPED";
             if (quote != null) quote.text = quotes[Random.Range(0, quotes.Length)];
-            if (hint != null) hint.text = "Press R to play again";
+            if (hint != null)
+            {
+                Scene active = SceneManager.GetActiveScene();
+                hint.text = ShouldReturnToLevelSelectOnEscapeRestart(active)
+                    ? "Press R to return to Level Select"
+                    : "Press R to play again";
+            }
 
             root.SetActive(true);
             if (driver != null) driver.IsShowing = true;
@@ -159,8 +165,28 @@ namespace Sushil.Systems
                 if (root != null) root.SetActive(false);
                 Time.timeScale = 1f;
                 var active = SceneManager.GetActiveScene();
+                if (ShouldReturnToLevelSelectOnEscapeRestart(active))
+                {
+                    int levelSelectBuildIndex = SceneUtility.GetBuildIndexByScenePath("Assets/Sahil/Tutorial/Level Select.unity");
+                    if (levelSelectBuildIndex >= 0)
+                        SceneManager.LoadScene(levelSelectBuildIndex);
+                    else
+                        SceneManager.LoadScene("Level Select");
+                    return;
+                }
+
                 SceneManager.LoadScene(active.buildIndex);
             }
+        }
+
+        static bool ShouldReturnToLevelSelectOnEscapeRestart(Scene activeScene)
+        {
+            string path = activeScene.path;
+            return path == "Assets/Sahil/Test/Easy Level.unity" ||
+                   path == "Assets/Sahil/Test/Medium Level.unity" ||
+                   path == "Assets/Sahil/Test/Hard Level.unity" ||
+                   path == "Assets/Sahil/Test/Difficult Level.unity" ||
+                   path == "Assets/Sushil/Easy Level.unity";
         }
 
         static bool WasRestartPressed()

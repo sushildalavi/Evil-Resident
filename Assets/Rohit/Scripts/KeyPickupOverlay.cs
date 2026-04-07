@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class KeyPickupOverlay : MonoBehaviour
@@ -11,6 +12,7 @@ public class KeyPickupOverlay : MonoBehaviour
     Outline outline;
     Shadow shadow;
     Coroutine activeRoutine;
+    bool overlaysSuppressed;
 
     public static void ShowKeyCollected(KeyType keyType)
     {
@@ -22,6 +24,9 @@ public class KeyPickupOverlay : MonoBehaviour
     static void EnsureInstance()
     {
         if (instance != null) return;
+
+        if (IsOverlaySuppressedScene(SceneManager.GetActiveScene().name))
+            return;
 
         var existing = FindFirstObjectByType<KeyPickupOverlay>();
         if (existing != null)
@@ -45,6 +50,21 @@ public class KeyPickupOverlay : MonoBehaviour
 
         instance = this;
         BuildUI();
+        SceneManager.sceneLoaded += OnSceneLoaded;
+        UpdateOverlayVisibility(SceneManager.GetActiveScene());
+    }
+
+    void OnDestroy()
+    {
+        if (instance == this)
+            instance = null;
+
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        UpdateOverlayVisibility(scene);
     }
 
     void BuildUI()
@@ -96,6 +116,9 @@ public class KeyPickupOverlay : MonoBehaviour
 
     void Play(string message)
     {
+        if (overlaysSuppressed)
+            return;
+
         if (messageText == null) BuildUI();
         if (activeRoutine != null) StopCoroutine(activeRoutine);
         activeRoutine = StartCoroutine(AnimateMessage(message));
@@ -154,5 +177,36 @@ public class KeyPickupOverlay : MonoBehaviour
         RectTransform rect = messageText.rectTransform;
         rect.anchoredPosition = pos;
         rect.localScale = Vector3.one * scale;
+    }
+
+    void UpdateOverlayVisibility(Scene scene)
+    {
+        overlaysSuppressed = IsOverlaySuppressedScene(scene.name);
+
+        if (canvas != null)
+            canvas.enabled = !overlaysSuppressed;
+
+        if (overlaysSuppressed)
+        {
+            if (activeRoutine != null)
+            {
+                StopCoroutine(activeRoutine);
+                activeRoutine = null;
+            }
+
+            if (messageText != null)
+                messageText.text = string.Empty;
+        }
+    }
+
+    static bool IsOverlaySuppressedScene(string sceneName)
+    {
+        if (string.IsNullOrWhiteSpace(sceneName))
+            return false;
+
+        return sceneName == "Level Select" ||
+               sceneName == "New Tutorial 1" ||
+               sceneName == "New Tutorial 2" ||
+               sceneName == "New Tutorial 3";
     }
 }

@@ -123,6 +123,7 @@ public class CollectibleHUD : MonoBehaviour
     int targetKeyCount;
     int targetFuseCount;
     float nextRefreshAt;
+    bool overlaysSuppressed;
 
     public static bool Exists => instance != null;
 
@@ -157,6 +158,7 @@ public class CollectibleHUD : MonoBehaviour
 
         BuildUI();
         BuildDefaultState();
+        UpdateOverlayVisibility(SceneManager.GetActiveScene());
         MarkDirty();
     }
 
@@ -171,6 +173,9 @@ public class CollectibleHUD : MonoBehaviour
 
     void Update()
     {
+        if (overlaysSuppressed)
+            return;
+
         if (Time.unscaledTime >= nextRefreshAt)
             RefreshTargets();
 
@@ -213,6 +218,7 @@ public class CollectibleHUD : MonoBehaviour
 
     void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        UpdateOverlayVisibility(scene);
         MarkDirty();
         StartCoroutine(RefreshNextFrame());
     }
@@ -220,6 +226,9 @@ public class CollectibleHUD : MonoBehaviour
     IEnumerator RefreshNextFrame()
     {
         yield return null;
+        if (overlaysSuppressed)
+            yield break;
+
         MarkDirty();
         RefreshTargets();
         SyncInventoryState(force: true);
@@ -638,6 +647,9 @@ public class CollectibleHUD : MonoBehaviour
 
     void ShowToast(string message, Color themeColor)
     {
+        if (overlaysSuppressed)
+            return;
+
         RectTransform toast = CreateRect("Toast", toastRoot);
         toast.anchorMin = new Vector2(0f, 1f);
         toast.anchorMax = new Vector2(0f, 1f);
@@ -756,6 +768,31 @@ public class CollectibleHUD : MonoBehaviour
         return PlayerInventory.instance != null
             ? PlayerInventory.instance
             : FindFirstObjectByType<PlayerInventory>();
+    }
+
+    void UpdateOverlayVisibility(Scene scene)
+    {
+        overlaysSuppressed = IsOverlaySuppressedScene(scene.name);
+
+        if (canvas != null)
+            canvas.enabled = !overlaysSuppressed;
+
+        if (hudRoot != null)
+            hudRoot.gameObject.SetActive(!overlaysSuppressed);
+
+        if (toastRoot != null)
+            toastRoot.gameObject.SetActive(!overlaysSuppressed);
+    }
+
+    static bool IsOverlaySuppressedScene(string sceneName)
+    {
+        if (string.IsNullOrWhiteSpace(sceneName))
+            return false;
+
+        return sceneName == "Level Select" ||
+               sceneName == "New Tutorial 1" ||
+               sceneName == "New Tutorial 2" ||
+               sceneName == "New Tutorial 3";
     }
 
     int CountShownFuses()
