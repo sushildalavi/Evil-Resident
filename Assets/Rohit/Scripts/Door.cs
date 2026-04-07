@@ -210,10 +210,9 @@ public class Door : MonoBehaviour, IInteractable
 
         if (cachedColliders != null)
         {
-            // Keep the moving panel colliders active while the door is open so
-            // characters must pass through the actual doorway gap instead of
-            // ghosting through the swung door mesh.
-            bool keepPanelCollidersActive = block || isOpen;
+            // Once the doorway is unblocked, disable the moving panel colliders
+            // so the player can pass through the opened door cleanly.
+            bool keepPanelCollidersActive = block;
             for (int i = 0; i < cachedColliders.Length; i++)
             {
                 var c = cachedColliders[i];

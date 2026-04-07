@@ -162,7 +162,7 @@ public class FuseDoor : MonoBehaviour, IInteractable
 
         if (cachedColliders != null)
         {
-            bool keepPanelCollidersActive = block || isOpen;
+            bool keepPanelCollidersActive = block;
             for (int i = 0; i < cachedColliders.Length; i++)
             {
                 var c = cachedColliders[i];
