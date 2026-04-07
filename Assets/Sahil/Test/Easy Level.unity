@@ -973,10 +973,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: KeyRectangle 1
       objectReference: {fileID: 0}
-    - target: {fileID: 3734585985494009268, guid: e6fc2ce3e329c46fb903607db40d73eb, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -1756,10 +1752,6 @@ PrefabInstance:
     - target: {fileID: 6935190896675816081, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
       propertyPath: m_Name
       value: DoorFrameSquare
-      objectReference: {fileID: 0}
-    - target: {fileID: 6935190896675816081, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -8765,7 +8757,7 @@ MonoBehaviour:
   m_OverrideVoxelSize: 1
   m_VoxelSize: 0.08
   m_MinRegionArea: 0.1
-  m_NavMeshData: {fileID: 23800000, guid: 0539d8b6147f84250addf288a7c043f0, type: 2}
+  m_NavMeshData: {fileID: 23800000, guid: 19e25985a5b4b4cec99e466e43b35705, type: 2}
   m_BuildHeightMesh: 1
 --- !u!4 &1439703132
 Transform:
@@ -9919,10 +9911,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: KeySquare
       objectReference: {fileID: 0}
-    - target: {fileID: 5589549026757955759, guid: 1042630fc65eb46719d10f7d81dc00fc, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 6600163164378997395, guid: 1042630fc65eb46719d10f7d81dc00fc, type: 3}
       propertyPath: m_LocalScale.x
       value: 0.5
@@ -10443,10 +10431,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: DoorFrameCircle (1)
       objectReference: {fileID: 0}
-    - target: {fileID: 7293134154816933383, guid: 7b607fe1408b64a159815eea3b46b025, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -10630,10 +10614,6 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
-    - target: {fileID: 3990061695776039152, guid: 2ef12f57cfe004a4f963c5eadb7cd256, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 8593632156659476072, guid: 2ef12f57cfe004a4f963c5eadb7cd256, type: 3}
       propertyPath: m_Name
       value: KeyCircle
@@ -10694,10 +10674,6 @@ PrefabInstance:
     - target: {fileID: 4190697301325015514, guid: ccf8815e9bcc1ed4da07b687264980d4, type: 3}
       propertyPath: m_Name
       value: Fuse_A
-      objectReference: {fileID: 0}
-    - target: {fileID: 4190697301325015514, guid: ccf8815e9bcc1ed4da07b687264980d4, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6357216687861692169, guid: ccf8815e9bcc1ed4da07b687264980d4, type: 3}
       propertyPath: fuseId
@@ -10899,10 +10875,6 @@ PrefabInstance:
     - target: {fileID: 7293134154816933383, guid: 7b607fe1408b64a159815eea3b46b025, type: 3}
       propertyPath: m_Name
       value: DoorFrameCircle
-      objectReference: {fileID: 0}
-    - target: {fileID: 7293134154816933383, guid: 7b607fe1408b64a159815eea3b46b025, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -11602,10 +11574,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Fuse_C
       objectReference: {fileID: 0}
-    - target: {fileID: 5045011381217160335, guid: 11bf79d0ebfce8244ba22b96d69defb1, type: 3}
-      propertyPath: m_IsActive
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 5482435575602178301, guid: 11bf79d0ebfce8244ba22b96d69defb1, type: 3}
       propertyPath: m_LocalPosition.x
       value: 5.465
@@ -12111,10 +12079,6 @@ PrefabInstance:
     - target: {fileID: 6721515515934339124, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
       propertyPath: m_Name
       value: DoorFrameRectangle
-      objectReference: {fileID: 0}
-    - target: {fileID: 6721515515934339124, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
-      propertyPath: m_IsActive
-      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
