@@ -159,7 +159,8 @@ namespace Sushil.Systems
                 return;
             }
 
-            if (scenePath.StartsWith("Assets/Sahil/Test/"))
+            if (scenePath.StartsWith("Assets/Sahil/Test/") ||
+                scenePath == "Assets/Sushil/Easy Level.unity")
             {
                 titleText.text = "EVIL RESIDENT";
                 if (sceneNameLower.Contains("easy"))
