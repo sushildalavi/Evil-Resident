@@ -128,12 +128,6 @@ PrefabInstance:
       addedObject: {fileID: 4362645912369863094}
     - targetCorrespondingSourceObject: {fileID: 5566487683917300211, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 3436918410483728347}
-    - targetCorrespondingSourceObject: {fileID: 5566487683917300211, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 6293001283937126438}
-    - targetCorrespondingSourceObject: {fileID: 5566487683917300211, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 5201700985114855046}
     - targetCorrespondingSourceObject: {fileID: 820000000000000001, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
       insertIndex: -1
@@ -207,61 +201,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bd9292837d4f344deb9b60669b500356, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::InteractionUI
---- !u!114 &3436918410483728347
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8081526744533084343}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 1235a4aa0b8984a578959350fbe78a6e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sushil.Demo.NoiseTester
-  noiseKey: 110
-  intensity: 20
-  emitFromThrowPoint: 1
---- !u!114 &6293001283937126438
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8081526744533084343}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f2b6d5673d064218ba0d779839d7d2ba, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.ResidentRohitNoiseBridge
-  playerController: {fileID: 0}
-  throwRock: {fileID: 0}
-  playerCharacterController: {fileID: 0}
-  autoFindPlayer: 1
-  emitMovementNoise: 0
-  minMoveSpeed: 0.15
-  walkStepInterval: 0.55
-  sprintStepInterval: 0.35
-  walkNoiseIntensity: 4
-  sprintNoiseIntensity: 8
-  footstepNoiseType: footstep
-  emitJumpLandNoise: 0
-  jumpNoiseIntensity: 10
-  landingNoiseIntensity: 12
-  jumpNoiseType: jump
-  landingNoiseType: land
-  enableThrowIntegration: 0
-  throwKey: 103
-  emitThrowReleaseNoise: 0
-  throwReleaseNoiseIntensity: 6
-  throwNoiseType: throw
-  autoConfigureThrownRockImpactNoise: 1
-  impactNoiseIntensity: 18
-  impactMinSpeed: 0.75
-  projectileLifeSeconds: 6
-  impactNoiseType: throwImpact
-  projectileTrackWindow: 1.25
-  continuouslyConfigureRocks: 1
 --- !u!114 &5201700985114855046
 MonoBehaviour:
   m_ObjectHideFlags: 0
