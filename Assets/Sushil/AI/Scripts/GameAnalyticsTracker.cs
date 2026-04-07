@@ -1,39 +1,20 @@
 using System;
-using System.Globalization;
-using System.IO;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace Sushil.Systems
 {
     public static class GameAnalyticsTracker
     {
-        const string AnalyticsFileName = "ResidentAnalytics.csv";
-        const string CsvHeader = "timestamp,scene,event,elapsed_seconds,deaths_this_run,total_deaths,details";
-
         static bool runActive;
         static float runStartTime;
         static int deathsThisRun;
         static int totalDeaths;
-        static string filePath;
-        static bool pathLogged;
 
         public static bool RunActive => runActive;
         public static int DeathsThisRun => deathsThisRun;
         public static int TotalDeaths => totalDeaths;
         public static float ElapsedSeconds => runActive ? Mathf.Max(0f, Time.time - runStartTime) : 0f;
-        public static string AnalyticsPath
-        {
-            get
-            {
-                if (!string.IsNullOrEmpty(filePath)) return filePath;
-
-                string analyticsDir = Path.Combine(Application.dataPath, "Sushil", "Analytics");
-                filePath = Path.Combine(analyticsDir, AnalyticsFileName);
-                return filePath;
-            }
-        }
 
         public static void BeginRun()
         {
@@ -41,12 +22,10 @@ namespace Sushil.Systems
             runStartTime = Time.time;
             deathsThisRun = 0;
             Initialize();
-            AppendRow("run_started", "start_screen_dismissed");
         }
 
         public static void Initialize()
         {
-            EnsureCsvHeader();
         }
 
         public static void RegisterDeath(string reason)
@@ -54,123 +33,12 @@ namespace Sushil.Systems
             if (!runActive) return;
             deathsThisRun++;
             totalDeaths++;
-            AppendRow("death", reason);
         }
 
         public static void RegisterEscape()
         {
             if (!runActive) return;
-            AppendRow("escape", "main_door_unlocked");
             runActive = false;
-        }
-
-        static void EnsureCsvHeader()
-        {
-            EnsureWritablePath();
-            ExecuteWrite(() =>
-            {
-                if (File.Exists(AnalyticsPath)) return;
-                File.WriteAllText(AnalyticsPath, CsvHeader + Environment.NewLine);
-            }, "create analytics header");
-        }
-
-        static void EnsureWritablePath()
-        {
-            try
-            {
-                EnsureDirectoryExists();
-            }
-            catch (Exception ex)
-            {
-                if (!TrySwitchToFallbackPath(ex))
-                {
-                    Debug.LogError($"[Analytics] Failed to prepare analytics directory at {AnalyticsPath}. Reason: {ex}");
-                    return;
-                }
-
-                EnsureDirectoryExists();
-            }
-
-            if (!pathLogged)
-            {
-                pathLogged = true;
-                Debug.Log($"[Analytics] Analytics file path: {AnalyticsPath}");
-            }
-        }
-
-        static void AppendRow(string evt, string details)
-        {
-            EnsureCsvHeader();
-
-            string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture);
-            string scene = SceneManager.GetActiveScene().name;
-            string elapsed = ElapsedSeconds.ToString("F2", CultureInfo.InvariantCulture);
-
-            string row = string.Join(",",
-                SanitizeForCsv(timestamp),
-                SanitizeForCsv(scene),
-                SanitizeForCsv(evt),
-                elapsed,
-                deathsThisRun.ToString(CultureInfo.InvariantCulture),
-                totalDeaths.ToString(CultureInfo.InvariantCulture),
-                SanitizeForCsv(details));
-
-            ExecuteWrite(() => File.AppendAllText(AnalyticsPath, row + Environment.NewLine), $"append analytics event '{evt}'");
-        }
-
-        static void EnsureDirectoryExists()
-        {
-            string dir = Path.GetDirectoryName(AnalyticsPath);
-            if (string.IsNullOrEmpty(dir)) return;
-
-            if (!Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-        }
-
-        static void ExecuteWrite(Action writeAction, string operation)
-        {
-            try
-            {
-                writeAction();
-            }
-            catch (Exception ex)
-            {
-                if (!TrySwitchToFallbackPath(ex))
-                {
-                    Debug.LogError($"[Analytics] Failed to {operation} at {AnalyticsPath}. Reason: {ex}");
-                    return;
-                }
-
-                try
-                {
-                    EnsureDirectoryExists();
-                    writeAction();
-                }
-                catch (Exception fallbackEx)
-                {
-                    Debug.LogError($"[Analytics] Failed to {operation} at fallback path {AnalyticsPath}. Reason: {fallbackEx}");
-                }
-            }
-        }
-
-        static bool TrySwitchToFallbackPath(Exception ex)
-        {
-            string fallbackDir = Path.Combine(Application.persistentDataPath, "Sushil", "Analytics");
-            string fallbackPath = Path.Combine(fallbackDir, AnalyticsFileName);
-            if (string.Equals(AnalyticsPath, fallbackPath, StringComparison.Ordinal))
-                return false;
-
-            filePath = fallbackPath;
-            pathLogged = false;
-            Debug.LogWarning($"[Analytics] Project path not writable, using fallback path: {filePath}. Reason: {ex.Message}");
-            return true;
-        }
-
-        static string SanitizeForCsv(string value)
-        {
-            if (string.IsNullOrEmpty(value)) return "\"\"";
-            string v = value.Replace("\r", " ").Replace("\n", " ").Replace("\"", "\"\"");
-            return "\"" + v + "\"";
         }
     }
 
