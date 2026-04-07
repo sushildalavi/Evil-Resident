@@ -197,13 +197,15 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
 
     void PostRun(RohitGoogleSheetsSettings cfg, bool escaped, float survivalSeconds)
     {
+        if (SceneManager.GetActiveScene().name == "New Tutorial 2") return;
+
         string json = BuildPayloadJson(cfg, escaped, survivalSeconds);
         Debug.Log($"[RohitSheets] Posting: player=({lastPlayerPos.x:F1},{lastPlayerPos.y:F1},{lastPlayerPos.z:F1}) resident=({lastResidentPos.x:F1},{lastResidentPos.y:F1},{lastResidentPos.z:F1}) reason={lastDeathReason} firstKey={firstKeyPickupTime:F1}s patrol={residentPatrolSeconds:F1}s chase={residentChaseSeconds:F1}s");
         byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
         var req = new UnityWebRequest(cfg.webAppUrl.Trim(), UnityWebRequest.kHttpVerbPOST);
         req.uploadHandler = new UploadHandlerRaw(bodyRaw);
         req.downloadHandler = new DownloadHandlerBuffer();
-        req.SetRequestHeader("Content-Type", "application/json");
+        req.SetRequestHeader("Content-Type", "text/plain");
         var op = req.SendWebRequest();
         op.completed += _ =>
         {
@@ -266,7 +268,7 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
         {
             outcome, survivalStr,
             deathsThisRun.ToString(CultureInfo.InvariantCulture),
-            px, py, pz, "", detail, "", distStr
+            px, py, pz, detail, distStr
         });
         string deathZone = "";
         string deathAreaDetail = "";
