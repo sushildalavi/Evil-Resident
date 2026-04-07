@@ -2018,7 +2018,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1766470421345143156, guid: 9e6b65b9c76ba41238a22e8726ac0f6a, type: 3}
       propertyPath: m_Name
-      value: Resident
+      value: Hard_Resident
       objectReference: {fileID: 0}
     - target: {fileID: 1766470421345143156, guid: 9e6b65b9c76ba41238a22e8726ac0f6a, type: 3}
       propertyPath: m_IsActive
@@ -13812,7 +13812,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4190697301325015514, guid: ccf8815e9bcc1ed4da07b687264980d4, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6357216687861692169, guid: ccf8815e9bcc1ed4da07b687264980d4, type: 3}
       propertyPath: fuseId

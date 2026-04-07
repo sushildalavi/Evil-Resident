@@ -2026,7 +2026,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1766470421345143156, guid: 132d9e04548d4f3ca49aa7ad539a746e, type: 3}
       propertyPath: m_Name
-      value: Diff_Resident
+      value: Medium_Resident
       objectReference: {fileID: 0}
     - target: {fileID: 1766470421345143156, guid: 132d9e04548d4f3ca49aa7ad539a746e, type: 3}
       propertyPath: m_IsActive
