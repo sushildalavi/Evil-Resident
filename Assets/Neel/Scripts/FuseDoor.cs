@@ -131,7 +131,7 @@ public class FuseDoor : MonoBehaviour, IInteractable
             FuseBox box = boxes[i];
             if (box == null) continue;
             validCount++;
-            if (!box.IsFull)
+            if (!box.IsPowered)
                 return false;
         }
 

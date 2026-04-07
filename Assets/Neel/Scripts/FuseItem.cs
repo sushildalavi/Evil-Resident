@@ -2,11 +2,14 @@ using UnityEngine;
 
 public class FuseItem : MonoBehaviour, IInteractable
 {
-    public string fuseName = "Fuse";
+    public FuseId fuseId = FuseId.FuseA;
 
     public string GetPrompt(RohitFPSController player)
     {
-        return "Press E to pick up " + fuseName;
+        if (PlayerInventory.instance == null) return "Inventory missing";
+        if (PlayerInventory.instance.HasCarriedFuse)
+            return $"Cannot pick up {PlayerInventory.FuseIdToLabel(fuseId)}: carrying {PlayerInventory.instance.CarriedFuseName}";
+        return "Press E to pick up " + PlayerInventory.FuseIdToLabel(fuseId);
     }
 
     public KeyCode GetInteractKey()
@@ -16,7 +19,8 @@ public class FuseItem : MonoBehaviour, IInteractable
 
     public void Interact(RohitFPSController player)
     {
-        PlayerInventory.instance.PickUpFuse();
+        if (PlayerInventory.instance == null) return;
+        if (!PlayerInventory.instance.TryPickUpFuse(fuseId)) return;
         Destroy(gameObject);
     }
 }
