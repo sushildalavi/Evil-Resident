@@ -6,226 +6,222 @@ using UnityEngine.InputSystem;
 
 public class TutorialStepUI : MonoBehaviour
 {
-    [Header("Timing")]
-    public float fadeInTime = 0.4f;
-    public float completedShowTime = 0.8f;
-    public float delayBetweenSteps = 0.3f;
+    const string MovementLine = "Use WASD to move around.";
+    const string InteractionLine = "Try interacting with something that stands out.";
+    const string HidingLine = "You can hide in some objects, try finding a few around";
+    const string DoorLine = "Great, let's move on to the next level by interacting with the door.";
 
-    Text instructionText;
-    Text completedText;
-    CanvasGroup canvasGroup;
-    RohitFPSController player;
+    [Header("Step Text")]
+    [TextArea] public string movementHint = MovementLine;
+    [TextArea] public string interactionHint = InteractionLine;
+    [TextArea] public string hidingHint = HidingLine;
+    [TextArea] public string doorHint = DoorLine;
 
-    int currentStep;
-    bool stepCompleted;
-    float stepTimer;
-    bool waitingForNext;
-    bool allDone;
-    Vector2 lastMousePos;
-    float mouseMoveAccum;
+    [Header("Visuals")]
+    public int sortingOrder = 200;
+    public Color textColor = new Color(1f, 0.94f, 0.72f, 1f);
+    public Color completedTextColor = new Color(0.4f, 1f, 0.45f, 1f);
+    public Color backgroundColor = new Color(0f, 0f, 0f, 0.42f);
+    public float completedFlashDuration = 0.5f;
 
-    enum Phase { FadeIn, WaitForAction, ShowCompleted, DelayNext }
-    Phase phase;
+    private Text instructionText;
+    private CanvasGroup canvasGroup;
+    private RohitFPSController player;
 
-    readonly string[] instructions = new string[]
+    private enum TutorialStep
     {
-        "Press  W  to move forward",
-        "Press  S  to move backward",
-        "Press  A  to move left",
-        "Press  D  to move right",
-        "Move the  Mouse  to look around",
-        "Hold  Left Shift  to sprint",
-        "Press  Space  to jump",
-        "Press  E  near objects to interact",
-        "Press  F  near a hiding spot to hide",
-        "Now find the key and escape through the door!"
-    };
-
-    void Start()
-    {
-        BuildUI();
-        currentStep = 0;
-        phase = Phase.FadeIn;
-        stepTimer = 0f;
-        canvasGroup.alpha = 0f;
-
-#if ENABLE_INPUT_SYSTEM
-        if (Mouse.current != null)
-            lastMousePos = Mouse.current.position.ReadValue();
-#endif
+        Movement = 0,
+        Interaction = 1,
+        Hiding = 2,
+        DoorAndKey = 3,
+        Complete = 4
     }
 
-    void Update()
+    private TutorialStep currentStep;
+    private TutorialStep pendingStep;
+    private bool hideEntered;
+    private bool hideExited;
+    private bool transitioning;
+    private float transitionTimer;
+
+    private void OnEnable()
     {
-        if (allDone) return;
+        RohitFPSController.OnPrimaryInteraction += HandlePrimaryInteraction;
+        RohitFPSController.OnHideEntered += HandleHideEntered;
+        RohitFPSController.OnHideExited += HandleHideExited;
+    }
+
+    private void OnDisable()
+    {
+        RohitFPSController.OnPrimaryInteraction -= HandlePrimaryInteraction;
+        RohitFPSController.OnHideEntered -= HandleHideEntered;
+        RohitFPSController.OnHideExited -= HandleHideExited;
+    }
+
+    private void Start()
+    {
+        // Force canonical tutorial copy so stale scene overrides cannot change top-banner text.
+        movementHint = MovementLine;
+        interactionHint = InteractionLine;
+        hidingHint = HidingLine;
+        doorHint = DoorLine;
+
+        BuildUI();
+        player = FindFirstObjectByType<RohitFPSController>();
+        currentStep = TutorialStep.Movement;
+        ApplyStepText();
+        canvasGroup.alpha = 1f;
+    }
+
+    private void Update()
+    {
+        if (transitioning)
+        {
+            transitionTimer -= Time.deltaTime;
+            if (transitionTimer <= 0f)
+            {
+                transitioning = false;
+                instructionText.color = textColor;
+                currentStep = pendingStep;
+                ApplyStepText();
+            }
+            return;
+        }
+
+        if (currentStep == TutorialStep.Complete)
+            return;
 
         if (player == null)
         {
             player = FindFirstObjectByType<RohitFPSController>();
-            if (player == null) return;
+            if (player == null)
+                return;
         }
 
-        switch (phase)
-        {
-            case Phase.FadeIn:
-                stepTimer += Time.deltaTime;
-                canvasGroup.alpha = Mathf.Clamp01(stepTimer / fadeInTime);
-                instructionText.text = instructions[currentStep];
-                completedText.gameObject.SetActive(false);
-
-                if (stepTimer >= fadeInTime)
-                {
-                    canvasGroup.alpha = 1f;
-                    phase = Phase.WaitForAction;
-                    mouseMoveAccum = 0f;
-                }
-                break;
-
-            case Phase.WaitForAction:
-                if (CheckStepComplete())
-                {
-                    phase = Phase.ShowCompleted;
-                    stepTimer = 0f;
-
-                    if (currentStep < instructions.Length - 1)
-                        completedText.gameObject.SetActive(true);
-                }
-                break;
-
-            case Phase.ShowCompleted:
-                stepTimer += Time.deltaTime;
-                if (stepTimer >= completedShowTime)
-                {
-                    currentStep++;
-                    if (currentStep >= instructions.Length)
-                    {
-                        allDone = true;
-                        StartCoroutine(FadeOutAndDisable());
-                        return;
-                    }
-                    phase = Phase.DelayNext;
-                    stepTimer = 0f;
-                }
-                break;
-
-            case Phase.DelayNext:
-                stepTimer += Time.deltaTime;
-                canvasGroup.alpha = Mathf.Clamp01(1f - (stepTimer / delayBetweenSteps));
-                if (stepTimer >= delayBetweenSteps)
-                {
-                    phase = Phase.FadeIn;
-                    stepTimer = 0f;
-                }
-                break;
-        }
-    }
-
-    bool CheckStepComplete()
-    {
         switch (currentStep)
         {
-            case 0: return IsKeyHeld(KeyCode.W);
-            case 1: return IsKeyHeld(KeyCode.S);
-            case 2: return IsKeyHeld(KeyCode.A);
-            case 3: return IsKeyHeld(KeyCode.D);
-            case 4: return CheckMouseMoved();
-            case 5: return IsKeyHeld(KeyCode.LeftShift);
-            case 6: return WasKeyPressed(KeyCode.Space);
-            case 7: return WasKeyPressed(KeyCode.E);
-            case 8: return player != null && player.isHidden;
-            case 9: return false;
-            default: return false;
+            case TutorialStep.Movement:
+                if (IsAnyMovementPressed())
+                    AdvanceTo(TutorialStep.Interaction);
+                break;
+
+            case TutorialStep.Hiding:
+                if (hideEntered && hideExited)
+                    AdvanceTo(TutorialStep.DoorAndKey);
+                break;
         }
     }
 
-    bool IsKeyHeld(KeyCode key)
+    public void MarkDoorAndKeyComplete()
     {
-        bool held = false;
-#if ENABLE_LEGACY_INPUT_MANAGER
-        held |= Input.GetKey(key);
-#endif
-#if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current != null)
-        {
-            switch (key)
-            {
-                case KeyCode.W: held |= Keyboard.current.wKey.isPressed; break;
-                case KeyCode.A: held |= Keyboard.current.aKey.isPressed; break;
-                case KeyCode.S: held |= Keyboard.current.sKey.isPressed; break;
-                case KeyCode.D: held |= Keyboard.current.dKey.isPressed; break;
-                case KeyCode.LeftShift: held |= Keyboard.current.leftShiftKey.isPressed; break;
-            }
-        }
-#endif
-        return held;
+        AdvanceTo(TutorialStep.Complete);
     }
 
-    bool WasKeyPressed(KeyCode key)
+    private void HandlePrimaryInteraction(RohitFPSController source, IInteractable interactable)
+    {
+        if (source == null || source != player)
+            return;
+
+        if (currentStep == TutorialStep.Interaction)
+            AdvanceTo(TutorialStep.Hiding);
+    }
+
+    private void HandleHideEntered(RohitFPSController source, HideableObject hideable)
+    {
+        if (source == null || source != player)
+            return;
+
+        if (currentStep == TutorialStep.Hiding)
+            hideEntered = true;
+    }
+
+    private void HandleHideExited(RohitFPSController source, HideableObject hideable)
+    {
+        if (source == null || source != player)
+            return;
+
+        if (currentStep == TutorialStep.Hiding && hideEntered)
+            hideExited = true;
+    }
+
+    private void AdvanceTo(TutorialStep step)
+    {
+        if (step == currentStep || transitioning)
+            return;
+        
+        pendingStep = step;
+        transitioning = true;
+        transitionTimer = Mathf.Max(0.05f, completedFlashDuration);
+        if (instructionText != null)
+            instructionText.color = completedTextColor;
+    }
+
+    private void ApplyStepText()
+    {
+        if (instructionText == null)
+            return;
+
+        switch (currentStep)
+        {
+            case TutorialStep.Movement:
+                instructionText.text = movementHint;
+                break;
+            case TutorialStep.Interaction:
+                instructionText.text = interactionHint;
+                break;
+            case TutorialStep.Hiding:
+                instructionText.text = hidingHint;
+                break;
+            case TutorialStep.DoorAndKey:
+                instructionText.text = doorHint;
+                break;
+            default:
+                instructionText.text = string.Empty;
+                canvasGroup.alpha = 0f;
+                break;
+        }
+    }
+
+    private bool IsAnyMovementPressed()
     {
         bool pressed = false;
 #if ENABLE_LEGACY_INPUT_MANAGER
-        pressed |= Input.GetKeyDown(key);
+        pressed |= Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.D);
 #endif
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null)
         {
-            switch (key)
-            {
-                case KeyCode.E: pressed |= Keyboard.current.eKey.wasPressedThisFrame; break;
-                case KeyCode.F: pressed |= Keyboard.current.fKey.wasPressedThisFrame; break;
-                case KeyCode.Space: pressed |= Keyboard.current.spaceKey.wasPressedThisFrame; break;
-            }
+            pressed |= Keyboard.current.wKey.wasPressedThisFrame;
+            pressed |= Keyboard.current.aKey.wasPressedThisFrame;
+            pressed |= Keyboard.current.sKey.wasPressedThisFrame;
+            pressed |= Keyboard.current.dKey.wasPressedThisFrame;
         }
 #endif
         return pressed;
     }
 
-    bool CheckMouseMoved()
-    {
-        Vector2 currentPos = Vector2.zero;
-        bool hasInput = false;
-
-#if ENABLE_INPUT_SYSTEM
-        if (Mouse.current != null)
-        {
-            Vector2 delta = Mouse.current.delta.ReadValue();
-            mouseMoveAccum += delta.magnitude;
-            hasInput = true;
-        }
-#endif
-#if ENABLE_LEGACY_INPUT_MANAGER
-        if (!hasInput)
-        {
-            float mx = Input.GetAxis("Mouse X");
-            float my = Input.GetAxis("Mouse Y");
-            mouseMoveAccum += Mathf.Abs(mx) + Mathf.Abs(my);
-        }
-#endif
-        return mouseMoveAccum > 80f;
-    }
-
-    void BuildUI()
+    private void BuildUI()
     {
         GameObject canvasObj = new GameObject("TutorialStepCanvas");
         Canvas canvas = canvasObj.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 200;
+        canvas.sortingOrder = sortingOrder;
 
         CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.referenceResolution = new Vector2(1920f, 1080f);
         scaler.matchWidthOrHeight = 0.5f;
 
         canvasGroup = canvasObj.AddComponent<CanvasGroup>();
-        canvasGroup.alpha = 0f;
 
         GameObject bgObj = new GameObject("Background");
         bgObj.transform.SetParent(canvasObj.transform, false);
         Image bg = bgObj.AddComponent<Image>();
-        bg.color = new Color(0f, 0f, 0f, 0.5f);
+        bg.color = backgroundColor;
+
         RectTransform bgRect = bg.rectTransform;
-        bgRect.anchorMin = new Vector2(0.2f, 0.82f);
-        bgRect.anchorMax = new Vector2(0.8f, 0.95f);
+        bgRect.anchorMin = new Vector2(0.22f, 0.84f);
+        bgRect.anchorMax = new Vector2(0.78f, 0.94f);
         bgRect.offsetMin = Vector2.zero;
         bgRect.offsetMax = Vector2.zero;
 
@@ -233,59 +229,21 @@ public class TutorialStepUI : MonoBehaviour
         textObj.transform.SetParent(canvasObj.transform, false);
         instructionText = textObj.AddComponent<Text>();
         instructionText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        instructionText.fontSize = 40;
-        instructionText.fontStyle = FontStyle.Bold;
+        instructionText.fontSize = 36;
         instructionText.alignment = TextAnchor.MiddleCenter;
-        instructionText.color = new Color(1f, 0.95f, 0.4f, 1f);
+        instructionText.color = textColor;
         instructionText.resizeTextForBestFit = true;
-        instructionText.resizeTextMinSize = 20;
-        instructionText.resizeTextMaxSize = 40;
-        instructionText.horizontalOverflow = HorizontalWrapMode.Wrap;
+        instructionText.resizeTextMinSize = 18;
+        instructionText.resizeTextMaxSize = 36;
 
         RectTransform textRect = instructionText.rectTransform;
-        textRect.anchorMin = new Vector2(0.2f, 0.83f);
-        textRect.anchorMax = new Vector2(0.8f, 0.92f);
+        textRect.anchorMin = new Vector2(0.24f, 0.85f);
+        textRect.anchorMax = new Vector2(0.76f, 0.93f);
         textRect.offsetMin = Vector2.zero;
         textRect.offsetMax = Vector2.zero;
 
         Shadow shadow = textObj.AddComponent<Shadow>();
-        shadow.effectColor = new Color(0f, 0f, 0f, 0.9f);
+        shadow.effectColor = new Color(0f, 0f, 0f, 0.85f);
         shadow.effectDistance = new Vector2(2f, -2f);
-
-        GameObject checkObj = new GameObject("CompletedText");
-        checkObj.transform.SetParent(canvasObj.transform, false);
-        completedText = checkObj.AddComponent<Text>();
-        completedText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        completedText.fontSize = 28;
-        completedText.fontStyle = FontStyle.Bold;
-        completedText.alignment = TextAnchor.MiddleCenter;
-        completedText.color = new Color(0.3f, 1f, 0.3f, 1f);
-        completedText.text = "Good!";
-        completedText.resizeTextForBestFit = true;
-        completedText.resizeTextMinSize = 16;
-        completedText.resizeTextMaxSize = 28;
-
-        RectTransform checkRect = completedText.rectTransform;
-        checkRect.anchorMin = new Vector2(0.35f, 0.76f);
-        checkRect.anchorMax = new Vector2(0.65f, 0.83f);
-        checkRect.offsetMin = Vector2.zero;
-        checkRect.offsetMax = Vector2.zero;
-
-        completedText.gameObject.SetActive(false);
-    }
-
-    System.Collections.IEnumerator FadeOutAndDisable()
-    {
-        yield return new WaitForSeconds(3f);
-
-        float t = 0f;
-        float fadeDuration = 1f;
-        while (t < fadeDuration)
-        {
-            t += Time.deltaTime;
-            canvasGroup.alpha = 1f - (t / fadeDuration);
-            yield return null;
-        }
-        canvasGroup.alpha = 0f;
     }
 }

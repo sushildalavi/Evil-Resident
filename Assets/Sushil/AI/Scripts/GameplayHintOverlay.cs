@@ -15,8 +15,6 @@ namespace Sushil.Systems
 
         RohitFPSController player;
         bool lastHidden;
-        bool shownRunHintThisRound;
-        float nextHideHintAtTime;
         float roundStartTime;
         float hideAtTime;
         string pendingMessage;
@@ -61,8 +59,6 @@ namespace Sushil.Systems
             ReleaseOwnedPrompt();
             player = null;
             lastHidden = false;
-            shownRunHintThisRound = false;
-            nextHideHintAtTime = 0f;
             roundStartTime = Time.unscaledTime;
             hideAtTime = 0f;
             pendingMessage = null;
@@ -84,21 +80,7 @@ namespace Sushil.Systems
                 return;
             }
 
-            if (!shownRunHintThisRound && Time.unscaledTime >= roundStartTime + Mathf.Max(0f, startHintDelay))
-            {
-                shownRunHintThisRound = true;
-                if (SceneManager.GetActiveScene().path != "Assets/Neel/Tutorial.unity")
-                    QueueHint("Tip: Hold SHIFT to sprint away from the Resident.");
-            }
-
-            bool hidden = player.isHidden;
-            if (hidden && !lastHidden && Time.unscaledTime >= nextHideHintAtTime
-                && SceneManager.GetActiveScene().path != "Assets/Neel/Tutorial.unity")
-            {
-                nextHideHintAtTime = Time.unscaledTime + Mathf.Max(1f, hideHintCooldown);
-                QueueHint("Stay hidden till he is fully out of sight. Beware: he can fake leaving.");
-            }
-            lastHidden = hidden;
+            lastHidden = player.isHidden;
 
             if (ownsPromptText)
             {

@@ -7,6 +7,10 @@ using UnityEngine.InputSystem;
 
 public class RohitFPSController : MonoBehaviour
 {
+    public static event System.Action<RohitFPSController, IInteractable> OnPrimaryInteraction;
+    public static event System.Action<RohitFPSController, HideableObject> OnHideEntered;
+    public static event System.Action<RohitFPSController, HideableObject> OnHideExited;
+
     [Header("Movement")]
     public float walkSpeed = 5f;
     public float sprintSpeed = 8f;
@@ -303,7 +307,10 @@ public class RohitFPSController : MonoBehaviour
                 ShowPrompt(prompt);
 
                 if (WasKeyPressed(nearbyKey.GetInteractKey()))
+                {
                     nearbyKey.Interact(this);
+                    OnPrimaryInteraction?.Invoke(this, nearbyKey);
+                }
 
                 return;
             }
@@ -318,7 +325,10 @@ public class RohitFPSController : MonoBehaviour
                 ShowPrompt(prompt);
 
                 if (WasKeyPressed(nearbyFuse.GetInteractKey()))
+                {
                     nearbyFuse.Interact(this);
+                    OnPrimaryInteraction?.Invoke(this, nearbyFuse);
+                }
 
                 return;
             }
@@ -341,7 +351,10 @@ public class RohitFPSController : MonoBehaviour
 
             KeyCode interactKey = interactable.GetInteractKey();
             if (WasKeyPressed(interactKey))
+            {
                 interactable.Interact(this);
+                OnPrimaryInteraction?.Invoke(this, interactable);
+            }
 
             return;
         }
@@ -359,7 +372,10 @@ public class RohitFPSController : MonoBehaviour
             }
 
             if (WasKeyPressed(nearbyWheel.GetInteractKey()))
+            {
                 nearbyWheel.Interact(this);
+                OnPrimaryInteraction?.Invoke(this, nearbyWheel);
+            }
 
             return;
         }
@@ -421,8 +437,9 @@ public class RohitFPSController : MonoBehaviour
                 continue;
             }
 
-            // A solid non-interactable object blocks interaction behind it.
-            if (!col.isTrigger) break;
+            // Keep scanning: complex door prefabs often have non-interactable frame colliders
+            // in front of interactable children. Candidate LOS checks still prevent wall-through use.
+            if (!col.isTrigger) continue;
         }
 
         if (fallbackInteractable != null)
@@ -876,6 +893,7 @@ public class RohitFPSController : MonoBehaviour
         isHidden = true;
         currentHideObject = hideObject;
         hideObject?.SetExteriorOnlyRenderersVisible(false);
+        OnHideEntered?.Invoke(this, hideObject);
     }
 
     public void ExitHide(Vector3 exitPosition)
@@ -903,6 +921,7 @@ public class RohitFPSController : MonoBehaviour
         hasPreHideRotation = false;
 
         exiting?.SetExteriorOnlyRenderersVisible(true);
+        OnHideExited?.Invoke(this, exiting);
     }
 
     public Vector3 ResolveSafeExitPosition(HideableObject hideObject, Vector3 requestedExitPosition)

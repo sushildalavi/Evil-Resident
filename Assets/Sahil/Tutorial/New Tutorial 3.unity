@@ -119,6 +119,17 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!114 &98115452 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 3994324752361583718, guid: 6c1703af002e149168e3283228577a01, type: 3}
+  m_PrefabInstance: {fileID: 1471662317}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec69a16fd735d4db69a29a95a30038a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HideableObject
 --- !u!1001 &191478390
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -204,8 +215,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
-  m_Intensity: 0.5
+  m_Color: {r: 1, g: 0.95686275, b: 0.8392157, a: 1}
+  m_Intensity: 1
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -268,7 +279,7 @@ Transform:
   m_GameObject: {fileID: 204544053}
   serializedVersion: 2
   m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
-  m_LocalPosition: {x: -2.63413, y: -1.11, z: -6}
+  m_LocalPosition: {x: -2.63413, y: -1.06562, z: -6}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -332,10 +343,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4bb84e2f9f79b4ad2bab2b04e8bb24d5, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialStepUI
-  movementHint: Move around
-  interactionHint: Interact with something that stands out
-  hidingHint: Some places feel safer than others
-  doorHint: Find a key. The exit is waiting
+  movementHint: Use WASD to move around.
+  interactionHint: Try interacting with something that stands out.
+  hidingHint: You can hide in some objects, try finding a few around
+  doorHint: Great, let's move on to the next level by interacting with the door.
   sortingOrder: 200
   textColor: {r: 1, g: 0.94, b: 0.72, a: 1}
   completedTextColor: {r: 0.4, g: 1, b: 0.45, a: 1}
@@ -365,6 +376,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6917401607510528306, guid: 6f0761f60cc92469e9d7939349ad2f17, type: 3}
   m_PrefabInstance: {fileID: 191478390}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &476325102 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6943964810148802685, guid: 33f470869993f46f3a88e15f8816c67c, type: 3}
+  m_PrefabInstance: {fileID: 855203348}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ec69a16fd735d4db69a29a95a30038a2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HideableObject
 --- !u!4 &476325103 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1117838418296598307, guid: 33f470869993f46f3a88e15f8816c67c, type: 3}
@@ -764,21 +786,20 @@ PrefabInstance:
       propertyPath: m_LocalPosition.y
       value: 1.946
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 4354348589401275070, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 6614050097757066136, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1122977417}
+      addedObject: {fileID: 1122977415}
   m_SourcePrefab: {fileID: 100100000, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
 --- !u!1 &1122977412 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 6614050097757066136, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
   m_PrefabInstance: {fileID: 1035314895}
   m_PrefabAsset: {fileID: 0}
---- !u!114 &1122977417
+--- !u!114 &1122977415
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -792,20 +813,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::TutorialDoorSceneTransition
   requiredKey: 1
   allowAnyCollectedKey: 1
-  mainGameSceneName: New Tutorial 2
-  interactDistance: 3
-  openPrompt: Press E to open the door.
-  lockedPrompt: The way forward is locked
-  unlockSound: {fileID: 0}
-  lockedSound: {fileID: 0}
-  audioSource: {fileID: 0}
   openAngle: 90
   openSpeed: 2
   openClockwise: 1
-  hingeOnRightEdge: 0
-  transitionDelay: 0
-  transitionMessage: 'Tutorial 2: Stalker'
-  requiredHideSpots: []
+  hingeOnRightEdge: 1
+  mainGameSceneName: New Tutorial 2
+  transitionDelay: 1.5
+  requiredHideSpots:
+  - {fileID: 476325102}
+  - {fileID: 98115452}
+  unlockSound: {fileID: 0}
+  lockedSound: {fileID: 0}
 --- !u!1 &1183877772
 GameObject:
   m_ObjectHideFlags: 0
