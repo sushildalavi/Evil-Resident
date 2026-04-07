@@ -454,6 +454,20 @@ namespace Sushil.AI
             roamWholeHouseWhenPlayerLost = false;
             wholeHouseSearchDuration = Mathf.Min(wholeHouseSearchDuration, 10f);
             lostSightLastKnownBias = Mathf.Max(lostSightLastKnownBias, 0.95f);
+            if (IsDifficultyVariantScene())
+            {
+                // Difficulty-variant scenes should feel more house-driven than corridor-driven.
+                patrolPointVisitChance = Mathf.Min(patrolPointVisitChance, 0.18f);
+                lastNoiseRoomBiasChance = Mathf.Max(lastNoiseRoomBiasChance, 0.82f);
+                lastNoiseRoomRadius = Mathf.Max(lastNoiseRoomRadius, 12f);
+                unlockedKeyDoorBiasChance = Mathf.Max(unlockedKeyDoorBiasChance, 0.9f);
+                unlockedKeyDoorBiasRadius = Mathf.Max(unlockedKeyDoorBiasRadius, 7f);
+                unlockedKeyDoorTraverseRange = Mathf.Max(unlockedKeyDoorTraverseRange, 4.2f);
+                multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.92f);
+                multiFloorRoamHeight = Mathf.Max(multiFloorRoamHeight, 8.8f);
+                roomSuspicionPortion = Mathf.Max(roomSuspicionPortion, 0.82f);
+                roamSampleAttempts = Mathf.Max(roamSampleAttempts, 36);
+            }
             if (IsSahilTestNewLevel())
             {
                 sightRange = Mathf.Clamp(sightRange, 22f, 25f);
@@ -537,6 +551,13 @@ namespace Sushil.AI
             ChangeState(State.Patrol);
             lastSafePosition = transform.position;
             hasSafePosition = true;
+        }
+
+        bool IsDifficultyVariantScene()
+        {
+            string path = SceneManager.GetActiveScene().path;
+            return path == "Assets/Sahil/Test/Easy Level.unity" ||
+                   path == "Assets/Sahil/Test/Difficult Level.unity";
         }
 
         void Update()
@@ -761,12 +782,6 @@ namespace Sushil.AI
             {
                 var rohit = FindFirstObjectByType<RohitFPSController>();
                 if (rohit != null) player = rohit.transform;
-            }
-
-            if (player == null)
-            {
-                var fps = FindFirstObjectByType<Sushil.Demo.SushilFPSController>();
-                if (fps != null) player = fps.transform;
             }
 
             if (player == null)

@@ -210,9 +210,9 @@ namespace Sushil.AI
                     return;
             }
 
-            if (NavMesh.SamplePosition(fallbackDestination, out var sampledFallback, Mathf.Max(destinationSampleRadius, 2.8f), NavMesh.AllAreas))
+            if (NavMesh.SamplePosition(fallbackDestination, out var sampledFallback, Mathf.Max(destinationSampleRadius, 2.8f), NavMesh.AllAreas) &&
+                TrySetDestination(sampledFallback.position))
             {
-                agent.SetDestination(sampledFallback.position);
                 return;
             }
 
@@ -1546,18 +1546,51 @@ namespace Sushil.AI
             if (cachedDoors == null || cachedDoors.Length == 0)
                 return false;
 
+            bool hasAnyOpenDoor = false;
+            bool hasUnlockedKeyDoor = false;
             for (int i = 0; i < cachedDoors.Length; i++)
             {
                 Door door = cachedDoors[i];
                 if (door == null || !door.gameObject.activeInHierarchy)
                     continue;
-                if (!door.IsOpen || door.IsLocked || !door.WasUnlockedByKey)
+                if (!door.IsOpen || door.IsLocked)
                     continue;
 
+                hasAnyOpenDoor = true;
+                if (door.WasUnlockedByKey)
+                    hasUnlockedKeyDoor = true;
+            }
+
+            if (hasUnlockedKeyDoor)
                 return Random.value < unlockedKeyDoorBiasChance;
+
+            if (hasAnyOpenDoor)
+            {
+                float openDoorBiasChance = IsDifficultyVariantScene()
+                    ? Mathf.Max(0.82f, unlockedKeyDoorBiasChance * 0.92f)
+                    : Mathf.Clamp01(unlockedKeyDoorBiasChance * 0.72f);
+                return Random.value < openDoorBiasChance;
             }
 
             return false;
+        }
+
+        float GetDoorRoomRoamScoreBonus(Door door, Vector3 candidatePoint)
+        {
+            float bonus = 0f;
+            if (door != null && door.WasUnlockedByKey)
+                bonus += 4.5f;
+
+            if (IsDifficultyVariantScene())
+            {
+                float verticalDelta = candidatePoint.y - transform.position.y;
+                if (verticalDelta > 2.2f)
+                    bonus += 4.2f;
+                else if (verticalDelta > 0.75f)
+                    bonus += 1.8f;
+            }
+
+            return bonus;
         }
 
         bool TryGetUnlockedKeyDoorRoomTarget(out Vector3 point)
@@ -1579,7 +1612,7 @@ namespace Sushil.AI
                 Door door = cachedDoors[(startIndex + offset) % cachedDoors.Length];
                 if (door == null || !door.gameObject.activeInHierarchy)
                     continue;
-                if (!door.IsOpen || door.IsLocked || !door.WasUnlockedByKey)
+                if (!door.IsOpen || door.IsLocked)
                     continue;
 
                 Vector3 center = door.GetDoorwayCenter();
@@ -1589,7 +1622,9 @@ namespace Sushil.AI
 
                 if (TryGetBestDoorTraversalPoint(door, center, favorDesiredSide: false, requireCompletePath: true, out var interiorPoint, out float traversalScore))
                 {
-                    float score = Vector3.SqrMagnitude(interiorPoint - transform.position) - (traversalScore * 0.25f);
+                    float score = Vector3.SqrMagnitude(interiorPoint - transform.position) -
+                                  (traversalScore * 0.25f) -
+                                  GetDoorRoomRoamScoreBonus(door, interiorPoint);
                     if (score < bestScore)
                     {
                         bestScore = score;
@@ -1604,7 +1639,8 @@ namespace Sushil.AI
                 if ((TryGetRandomRoamPoint(candidateA, unlockedKeyDoorBiasRadius, out var candidatePointA) ||
                      ResolveReachableDestination(candidateA, out candidatePointA)))
                 {
-                    float scoreA = Vector3.SqrMagnitude(candidatePointA - transform.position);
+                    float scoreA = Vector3.SqrMagnitude(candidatePointA - transform.position) -
+                                   GetDoorRoomRoamScoreBonus(door, candidatePointA);
                     if (scoreA < bestScore)
                     {
                         bestScore = scoreA;
@@ -1616,7 +1652,8 @@ namespace Sushil.AI
                 if ((TryGetRandomRoamPoint(candidateB, unlockedKeyDoorBiasRadius, out var candidatePointB) ||
                      ResolveReachableDestination(candidateB, out candidatePointB)))
                 {
-                    float scoreB = Vector3.SqrMagnitude(candidatePointB - transform.position);
+                    float scoreB = Vector3.SqrMagnitude(candidatePointB - transform.position) -
+                                   GetDoorRoomRoamScoreBonus(door, candidatePointB);
                     if (scoreB < bestScore)
                     {
                         bestScore = scoreB;
@@ -1703,12 +1740,12 @@ namespace Sushil.AI
             {
                 float lastSeenDelta = lastSeenPlayerPos.y - center.y;
                 if (lastSeenDelta > floorDelta)
-                    return Random.value < 0.88f;
+                    return Random.value < (IsDifficultyVariantScene() ? 0.96f : 0.88f);
                 if (lastSeenDelta < -floorDelta)
                     return Random.value < 0.22f;
             }
 
-            return Random.value < 0.72f;
+            return Random.value < (IsDifficultyVariantScene() ? 0.86f : 0.72f);
         }
 
         Vector3 ComputeRoamCenter()
@@ -2417,6 +2454,12 @@ namespace Sushil.AI
                     float advanceDistance = Vector3.Distance(current, progressiveHit.position);
                     if (advanceDistance <= Mathf.Max(0.9f, stairTraverseProbeDistance * 1.35f))
                     {
+                        if (!CanTraverseWarpSegment(current, progressiveHit.position))
+                        {
+                            TrySetDestination(progressiveTarget);
+                            return;
+                        }
+
                         agent.Warp(progressiveHit.position);
                         transform.position = progressiveHit.position;
                         agent.nextPosition = progressiveHit.position;
@@ -2470,6 +2513,12 @@ namespace Sushil.AI
                 }
 
                 if (desiredVerticalDelta < -0.18f && warpHit.position.y > current.y - 0.03f)
+                {
+                    TrySetDestination(nudgeTarget);
+                    return;
+                }
+
+                if (!CanTraverseWarpSegment(current, warpHit.position))
                 {
                     TrySetDestination(nudgeTarget);
                     return;
@@ -2721,6 +2770,8 @@ namespace Sushil.AI
                     continue;
                 if (IsBodyIntersectingBlocking(pHit.position))
                     continue;
+                if (!HasDoorSafeRecoveryPath(preferredFallback, pHit.position))
+                    continue;
 
                 safePos = pHit.position;
                 return true;
@@ -2738,6 +2789,21 @@ namespace Sushil.AI
                 return true;
 
             return NavMesh.Raycast(fromHit.position, toHit.position, out _, NavMesh.AllAreas);
+        }
+
+        bool HasDoorSafeRecoveryPath(Vector3 fromWorld, Vector3 toWorld)
+        {
+            if (!NavMesh.SamplePosition(fromWorld, out var fromHit, 1.8f, NavMesh.AllAreas))
+                return true;
+            if (!NavMesh.SamplePosition(toWorld, out var toHit, 1.8f, NavMesh.AllAreas))
+                return false;
+
+            NavMeshPath recoveryPath = new NavMeshPath();
+            if (!NavMesh.CalculatePath(fromHit.position, toHit.position, NavMesh.AllAreas, recoveryPath) ||
+                recoveryPath.status != NavMeshPathStatus.PathComplete)
+                return false;
+
+            return IsPathAllowed(recoveryPath);
         }
 
         bool IsPathAllowed(NavMeshPath path)

@@ -96,20 +96,11 @@ namespace Sushil.AI
             rohit.enabled = false;
             rohit.CancelInvoke();
 
-            var throwRock = rohit.GetComponent<ThrowRock>();
-            if (throwRock != null) throwRock.enabled = false;
-
             var interactionUi = rohit.GetComponent<InteractionUI>();
             if (interactionUi != null) interactionUi.enabled = false;
 
             var torch = rohit.GetComponent<PlayerTorch>();
             if (torch != null) torch.enabled = false;
-
-            var noiseTester = rohit.GetComponent<Sushil.Demo.NoiseTester>();
-            if (noiseTester != null) noiseTester.enabled = false;
-
-            var noiseBridge = rohit.GetComponent<ResidentRohitNoiseBridge>();
-            if (noiseBridge != null) noiseBridge.enabled = false;
 
             var cc = rohit.GetComponent<CharacterController>();
             if (cc != null) cc.enabled = false;
