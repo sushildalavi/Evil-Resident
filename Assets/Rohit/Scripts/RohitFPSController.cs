@@ -35,14 +35,15 @@ public class RohitFPSController : MonoBehaviour
     public Transform cameraTransform;
 
     [Header("Interaction")]
-    public float interactDistance = 1.5f;
-    public float keyInteractDistance = 2f;
-    public float keyProximityRadius = 1f;
-    public float fuseProximityRadius = 0.5f;
+    public float interactDistance = 2.2f;
+    public float keyInteractDistance = 3f;
+    public float keyProximityRadius = 1.6f;
+    public float fuseInteractDistance = 3f;
+    public float fuseProximityRadius = 1.4f;
     [Tooltip("Small wall dials are easy to miss with a pure ray hit, so give them a little extra usable range.")]
-    public float puzzleWheelInteractDistance = 2f;
+    public float puzzleWheelInteractDistance = 2.4f;
     [Tooltip("Player proximity radius used to keep dial prompts stable near the puzzle wall.")]
-    public float puzzleWheelProximityRadius = 1.5f;
+    public float puzzleWheelProximityRadius = 2f;
     [Range(0.75f, 0.999f)]
     [Tooltip("How close to the center of view a puzzle dial must be before the prompt snaps to it.")]
     public float puzzleWheelPromptViewDot = 0.88f;
@@ -88,12 +89,7 @@ public class RohitFPSController : MonoBehaviour
 
     void Start()
     {
-        interactDistance = 1.5f;
-        keyInteractDistance = 2f;
-        keyProximityRadius = 1f;
-        fuseProximityRadius = 0.5f;
-        puzzleWheelInteractDistance = 2f;
-        puzzleWheelProximityRadius = 1.5f;
+        NormalizeInteractionSettings();
 
         CollectibleHUD.EnsureExists();
 
@@ -125,6 +121,11 @@ public class RohitFPSController : MonoBehaviour
             defaultCameraLocalRot = cameraTransform.localRotation;
             hasDefaultCameraPose = true;
         }
+    }
+
+    void OnValidate()
+    {
+        NormalizeInteractionSettings();
     }
 
     void Update()
@@ -309,9 +310,9 @@ public class RohitFPSController : MonoBehaviour
         }
 
         // Proximity-based fuse pickup to avoid missing small fuse colliders.
-        if (TryFindNearbyFuse(out FusePickup nearbyFuse))
+        if (TryFindNearbyFuse(out IInteractable nearbyFuse))
         {
-            if (HasLineOfSightToInteractable(nearbyFuse, keyInteractDistance))
+            if (HasLineOfSightToInteractable(nearbyFuse, Mathf.Max(interactDistance, fuseInteractDistance)))
             {
                 string prompt = nearbyFuse.GetPrompt(this);
                 ShowPrompt(prompt);
@@ -370,7 +371,7 @@ public class RohitFPSController : MonoBehaviour
     {
         interactable = null;
 
-        float maxDistance = Mathf.Max(Mathf.Max(interactDistance, keyInteractDistance), puzzleWheelInteractDistance);
+        float maxDistance = Mathf.Max(Mathf.Max(interactDistance, keyInteractDistance), Mathf.Max(fuseInteractDistance, puzzleWheelInteractDistance));
         RaycastHit[] hits = Physics.RaycastAll(ray, maxDistance, ~0, QueryTriggerInteraction.Collide);
         if (hits == null || hits.Length == 0) return false;
 
@@ -386,12 +387,11 @@ public class RohitFPSController : MonoBehaviour
             IInteractable candidate = col.GetComponentInParent<IInteractable>();
             if (candidate != null)
             {
-                if (candidate is FusePickup)
-                    continue;
-
                 float allowedDistance = interactDistance;
                 if (candidate is KeyItem)
                     allowedDistance = Mathf.Max(interactDistance, keyInteractDistance);
+                else if (candidate is FusePickup || candidate is FuseItem)
+                    allowedDistance = Mathf.Max(interactDistance, fuseInteractDistance);
                 else if (candidate is PuzzleWheel)
                     allowedDistance = Mathf.Max(interactDistance, puzzleWheelInteractDistance);
 
@@ -524,39 +524,63 @@ public class RohitFPSController : MonoBehaviour
         return wheel != null;
     }
 
-    bool TryFindNearbyFuse(out FusePickup fusePickup)
+    bool TryFindNearbyFuse(out IInteractable fuseInteractable)
     {
-        fusePickup = null;
+        fuseInteractable = null;
 
         FusePickup[] allFuses = FindObjectsByType<FusePickup>(FindObjectsSortMode.None);
-        if (allFuses == null || allFuses.Length == 0) return false;
+        FuseItem[] allFuseItems = FindObjectsByType<FuseItem>(FindObjectsSortMode.None);
+        if ((allFuses == null || allFuses.Length == 0) && (allFuseItems == null || allFuseItems.Length == 0))
+            return false;
 
         float bestSqr = float.MaxValue;
         Vector3 playerPos = transform.position;
         float radius = Mathf.Max(0.01f, fuseProximityRadius);
         float radiusSqr = radius * radius;
 
-        for (int i = 0; i < allFuses.Length; i++)
+        if (allFuses != null)
         {
-            FusePickup candidate = allFuses[i];
-            if (candidate == null || !candidate.gameObject.activeInHierarchy) continue;
-
-            Vector3 fusePos = candidate.transform.position;
-
-            // Keep XZ-only distance so uneven floor height does not block pickup prompt.
-            Vector2 playerXZ = new Vector2(playerPos.x, playerPos.z);
-            Vector2 fuseXZ = new Vector2(fusePos.x, fusePos.z);
-            float sqr = (playerXZ - fuseXZ).sqrMagnitude;
-            if (sqr > radiusSqr) continue;
-
-            if (sqr < bestSqr)
+            for (int i = 0; i < allFuses.Length; i++)
             {
-                bestSqr = sqr;
-                fusePickup = candidate;
+                FusePickup candidate = allFuses[i];
+                if (candidate == null || !candidate.gameObject.activeInHierarchy) continue;
+
+                Vector3 fusePos = candidate.transform.position;
+                Vector2 playerXZ = new Vector2(playerPos.x, playerPos.z);
+                Vector2 fuseXZ = new Vector2(fusePos.x, fusePos.z);
+                float sqr = (playerXZ - fuseXZ).sqrMagnitude;
+                if (sqr > radiusSqr) continue;
+
+                if (sqr < bestSqr)
+                {
+                    bestSqr = sqr;
+                    fuseInteractable = candidate;
+                }
             }
         }
 
-        return fusePickup != null;
+        if (allFuseItems != null)
+        {
+            for (int i = 0; i < allFuseItems.Length; i++)
+            {
+                FuseItem candidate = allFuseItems[i];
+                if (candidate == null || !candidate.gameObject.activeInHierarchy) continue;
+
+                Vector3 fusePos = candidate.transform.position;
+                Vector2 playerXZ = new Vector2(playerPos.x, playerPos.z);
+                Vector2 fuseXZ = new Vector2(fusePos.x, fusePos.z);
+                float sqr = (playerXZ - fuseXZ).sqrMagnitude;
+                if (sqr > radiusSqr) continue;
+
+                if (sqr < bestSqr)
+                {
+                    bestSqr = sqr;
+                    fuseInteractable = candidate;
+                }
+            }
+        }
+
+        return fuseInteractable != null;
     }
 
     bool HasLineOfSightToInteractable(IInteractable interactable, float maxDistance)
@@ -725,6 +749,17 @@ public class RohitFPSController : MonoBehaviour
     bool WasJumpPressed()
     {
         return WasKeyPressed(KeyCode.Space);
+    }
+
+    void NormalizeInteractionSettings()
+    {
+        interactDistance = Mathf.Max(1f, interactDistance);
+        keyInteractDistance = Mathf.Max(interactDistance, keyInteractDistance);
+        fuseInteractDistance = Mathf.Max(interactDistance, fuseInteractDistance);
+        keyProximityRadius = Mathf.Max(0.2f, keyProximityRadius);
+        fuseProximityRadius = Mathf.Max(0.2f, fuseProximityRadius);
+        puzzleWheelInteractDistance = Mathf.Max(interactDistance, puzzleWheelInteractDistance);
+        puzzleWheelProximityRadius = Mathf.Max(0.3f, puzzleWheelProximityRadius);
     }
 
     bool WasKeyPressed(KeyCode key)

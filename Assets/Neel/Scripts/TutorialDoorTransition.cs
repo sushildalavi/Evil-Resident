@@ -15,7 +15,7 @@ public class TutorialDoorTransition : MonoBehaviour, IInteractable
 
     [Header("Scene Transition")]
     [Tooltip("Name of the main game scene to load when the door opens.")]
-    public string mainGameSceneName = "NewLevel";
+    public string mainGameSceneName = "NewNewLevel";
     [Tooltip("Delay in seconds after the door opens before loading the scene.")]
     public float transitionDelay = 1.5f;
 

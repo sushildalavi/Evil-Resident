@@ -156,7 +156,8 @@ namespace Sushil.Systems
                 return;
             }
 
-            if (scenePath == "Assets/Sahil/Test/NewLevel.unity")
+            if (scenePath == "Assets/Sahil/Test/NewLevel.unity" ||
+                scenePath == "Assets/Sahil/Test/NewNewLevel.unity")
             {
                 titleText.text = "EVIL RESIDENT";
                 taglineText.text = "Escape from the main door.";

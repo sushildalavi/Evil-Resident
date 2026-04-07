@@ -333,7 +333,9 @@ namespace Sushil.AI
 
         bool IsSahilTestNewLevel()
         {
-            return SceneManager.GetActiveScene().path == "Assets/Sahil/Test/NewLevel.unity";
+            string path = SceneManager.GetActiveScene().path;
+            return path == "Assets/Sahil/Test/NewLevel.unity" ||
+                   path == "Assets/Sahil/Test/NewNewLevel.unity";
         }
 
         bool IsPlayerHidden()
