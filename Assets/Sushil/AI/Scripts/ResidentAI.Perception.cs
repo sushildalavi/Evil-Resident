@@ -19,6 +19,27 @@ namespace Sushil.AI
             hasSuspectedHideSpot = true;
         }
 
+        bool TryBeginSearchAwayFromHideSpot(float minimumDuration)
+        {
+            if (!ShouldRelocateSearchAwayFromHideSpot())
+                return false;
+
+            if (!GetCurrentHideSpotPosition(out Vector3 hidePos))
+                return false;
+
+            if (NavMesh.SamplePosition(hidePos, out var hit, 2.5f, NavMesh.AllAreas))
+                hidePos = hit.position;
+
+            if (!TryGetSearchRelocationPointAwayFromHideSpot(hidePos, out Vector3 searchOrigin))
+                return false;
+
+            hasSuspectedHideSpot = false;
+            avoidHideableAreasThisSearch = true;
+            suspectedHideSpot = hidePos;
+            BeginWholeHouseSearch(searchOrigin, minimumDuration);
+            return true;
+        }
+
         bool GetCurrentHideSpotPosition(out Vector3 pos)
         {
             pos = Vector3.zero;

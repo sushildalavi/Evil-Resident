@@ -1723,6 +1723,126 @@ namespace Sushil.AI
             return false;
         }
 
+        bool TryGetSearchRelocationPointAwayFromHideSpot(Vector3 hideSpot, out Vector3 point)
+        {
+            point = transform.position;
+
+            Vector3 away = transform.position - hideSpot;
+            away.y = 0f;
+            if (away.sqrMagnitude < 0.25f)
+            {
+                away = roamCenter - hideSpot;
+                away.y = 0f;
+            }
+            if (away.sqrMagnitude < 0.25f)
+            {
+                Vector2 random = Random.insideUnitCircle;
+                away = new Vector3(random.x, 0f, random.y);
+            }
+
+            away.Normalize();
+
+            float minHideDistance = Mathf.Max(10.5f, searchRadius * 2.35f);
+            float minHideableDistance = Mathf.Max(4.5f, searchRadius * 1.05f);
+            float primaryRadius = Mathf.Max(searchRadius * outwardSearchMultiplier, 8f);
+            float roamRadius = Mathf.Max(freeRoamRadius * 0.55f, 16f);
+
+            Vector3[] centers =
+            {
+                hideSpot + away * minHideDistance,
+                roamCenter,
+                transform.position + away * (minHideDistance * 0.85f),
+                ComputeRoamCenter()
+            };
+
+            float[] radii =
+            {
+                primaryRadius,
+                roamRadius,
+                Mathf.Max(primaryRadius * 0.85f, 7f),
+                roamRadius
+            };
+
+            for (int i = 0; i < centers.Length; i++)
+            {
+                Vector3 center = centers[i];
+                float radius = radii[Mathf.Min(i, radii.Length - 1)];
+
+                for (int attempt = 0; attempt < 3; attempt++)
+                {
+                    if (!TryGetRandomRoamPoint(center, radius, out Vector3 candidate))
+                        continue;
+
+                    if (!IsValidHideRelocationPoint(candidate, hideSpot, minHideDistance, minHideableDistance))
+                        continue;
+
+                    point = candidate;
+                    return true;
+                }
+
+                if (NavMesh.SamplePosition(center, out var sampledCenter, Mathf.Max(2.5f, radius * 0.35f), NavMesh.AllAreas) &&
+                    IsValidHideRelocationPoint(sampledCenter.position, hideSpot, minHideDistance, minHideableDistance))
+                {
+                    point = sampledCenter.position;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        bool IsValidHideRelocationPoint(Vector3 candidate, Vector3 hideSpot, float minHideDistance, float minHideableDistance)
+        {
+            if (GetFlatDistance(candidate, hideSpot) < minHideDistance)
+                return false;
+
+            if (!IsDestinationAllowed(candidate))
+                return false;
+
+            if (!IsFarFromHideableAreas(candidate, minHideableDistance))
+                return false;
+
+            if (agent == null)
+                return true;
+
+            NavMeshPath path = new NavMeshPath();
+            if (!NavMesh.CalculatePath(transform.position, candidate, NavMesh.AllAreas, path) ||
+                path.status != NavMeshPathStatus.PathComplete)
+                return false;
+
+            return IsPathAllowed(path);
+        }
+
+        bool IsFarFromHideableAreas(Vector3 point, float minimumDistance)
+        {
+            if (cachedHideables == null || cachedHideables.Length == 0)
+                return true;
+
+            for (int i = 0; i < cachedHideables.Length; i++)
+            {
+                HideableObject hideable = cachedHideables[i];
+                if (hideable == null || !hideable.gameObject.activeInHierarchy)
+                    continue;
+
+                Vector3 reference = hideable.transform.position;
+                Collider hideCollider = hideable.GetComponentInChildren<Collider>();
+                if (hideCollider != null)
+                    reference = hideCollider.ClosestPoint(point);
+
+                if (GetFlatDistance(point, reference) < minimumDistance)
+                    return false;
+            }
+
+            return true;
+        }
+
+        float GetFlatDistance(Vector3 a, Vector3 b)
+        {
+            a.y = 0f;
+            b.y = 0f;
+            return Vector3.Distance(a, b);
+        }
+
         bool ShouldBiasRoamUpstairs(Vector3 center)
         {
             const float floorDelta = 2.2f;
@@ -1805,49 +1925,180 @@ namespace Sushil.AI
             Vector3[] corners = path.corners;
             for (int i = 0; i < corners.Length - 1; i++)
             {
-                Vector3 a = corners[i] + Vector3.up * 1.0f;
-                Vector3 b = corners[i + 1] + Vector3.up * 1.0f;
-                Vector3 dir = b - a;
-                float len = dir.magnitude;
-                if (len <= 0.001f) continue;
-                Ray ray = new Ray(a, dir / len);
-
-                if (SegmentHitsClosedDoor(ray, len, cachedDoors))
-                    return true;
-
-                if (SegmentHitsClosedDoor(ray, len, cachedFuseDoors))
-                    return true;
-
-                if (SegmentHitsClosedDoor(ray, len, cachedMainDoors))
+                if (SegmentCrossesClosedDoor(corners[i], corners[i + 1]))
                     return true;
             }
 
             return false;
         }
 
-        static bool SegmentHitsClosedDoor<TDoor>(Ray ray, float len, TDoor[] doors) where TDoor : MonoBehaviour
+        bool SegmentCrossesClosedDoor(Vector3 fromWorld, Vector3 toWorld)
         {
-            if (doors == null || doors.Length == 0) return false;
+            if ((toWorld - fromWorld).sqrMagnitude <= 0.01f)
+                return false;
+
+            if (cachedDoors == null) cachedDoors = FindObjectsByType<Door>(FindObjectsSortMode.None);
+            if (cachedFuseDoors == null) cachedFuseDoors = FindObjectsByType<FuseDoor>(FindObjectsSortMode.None);
+            if (cachedMainDoors == null) cachedMainDoors = FindObjectsByType<MainDoor>(FindObjectsSortMode.None);
+
+            return SegmentCrossesClosedDoor(fromWorld, toWorld, cachedDoors) ||
+                   SegmentCrossesClosedDoor(fromWorld, toWorld, cachedFuseDoors) ||
+                   SegmentCrossesClosedDoor(fromWorld, toWorld, cachedMainDoors);
+        }
+
+        static bool SegmentCrossesClosedDoor<TDoor>(Vector3 fromWorld, Vector3 toWorld, TDoor[] doors) where TDoor : MonoBehaviour
+        {
+            if (doors == null || doors.Length == 0)
+                return false;
 
             for (int d = 0; d < doors.Length; d++)
             {
                 TDoor door = doors[d];
                 if (door == null || !door.gameObject.activeInHierarchy) continue;
 
-                bool isClosed =
-                    (door is Door standardDoor && !standardDoor.IsOpen) ||
-                    (door is FuseDoor fuseDoor && !fuseDoor.IsOpen) ||
-                    (door is MainDoor mainDoor && !mainDoor.IsOpen);
-                if (!isClosed) continue;
+                if (!IsDoorClosed(door))
+                    continue;
 
                 Collider[] cols = door.GetComponentsInChildren<Collider>(false);
+                if (SegmentHitsClosedDoorColliders(fromWorld, toWorld, cols))
+                    return true;
+
+                if (TryGetClosedDoorFootprint(door, cols, out var center, out var forward, out var right, out float halfWidth, out float halfDepth) &&
+                    SegmentPassesThroughDoorwayBounds(fromWorld, toWorld, center, forward, right, halfWidth, halfDepth))
+                    return true;
+            }
+
+            return false;
+        }
+
+        static bool IsDoorClosed(MonoBehaviour door)
+        {
+            return (door is Door standardDoor && !standardDoor.IsOpen) ||
+                   (door is FuseDoor fuseDoor && !fuseDoor.IsOpen) ||
+                   (door is MainDoor mainDoor && !mainDoor.IsOpen);
+        }
+
+        static bool SegmentHitsClosedDoorColliders(Vector3 fromWorld, Vector3 toWorld, Collider[] cols)
+        {
+            if (cols == null || cols.Length == 0)
+                return false;
+
+            float[] heights = { 0.35f, 1.0f, 1.65f };
+            for (int h = 0; h < heights.Length; h++)
+            {
+                Vector3 start = fromWorld + Vector3.up * heights[h];
+                Vector3 end = toWorld + Vector3.up * heights[h];
+                Vector3 delta = end - start;
+                float len = delta.magnitude;
+                if (len <= 0.001f)
+                    continue;
+
+                Ray ray = new Ray(start, delta / len);
                 for (int c = 0; c < cols.Length; c++)
                 {
                     Collider col = cols[c];
-                    if (col == null || !col.enabled || col.isTrigger) continue;
+                    if (col == null || !col.enabled || col.isTrigger)
+                        continue;
                     if (col.Raycast(ray, out _, len))
                         return true;
                 }
+            }
+
+            return false;
+        }
+
+        static bool TryGetClosedDoorFootprint(MonoBehaviour door, Collider[] cols, out Vector3 center, out Vector3 forward, out Vector3 right, out float halfWidth, out float halfDepth)
+        {
+            center = door != null ? door.transform.position : Vector3.zero;
+            forward = door != null ? door.transform.forward : Vector3.forward;
+            right = door != null ? door.transform.right : Vector3.right;
+            halfWidth = 0.8f;
+            halfDepth = 1.25f;
+
+            if (door == null)
+                return false;
+
+            if (door is Door standardDoor)
+            {
+                center = standardDoor.GetDoorwayCenter();
+                forward = standardDoor.GetDoorwayForward();
+                right = standardDoor.GetDoorwayRight();
+                halfWidth = Mathf.Max(0.6f, (standardDoor.navLinkWidth * 0.5f) + 0.28f);
+                halfDepth = Mathf.Max(0.75f, standardDoor.navLinkDepth + 0.22f);
+                return true;
+            }
+
+            if (door is FuseDoor fuseDoor)
+            {
+                halfWidth = Mathf.Max(0.6f, (fuseDoor.navLinkWidth * 0.5f) + 0.28f);
+                halfDepth = Mathf.Max(0.75f, fuseDoor.navLinkDepth + 0.22f);
+            }
+            else if (door is MainDoor mainDoor)
+            {
+                halfWidth = Mathf.Max(0.6f, (mainDoor.navLinkWidth * 0.5f) + 0.28f);
+                halfDepth = Mathf.Max(0.75f, mainDoor.navLinkDepth + 0.22f);
+            }
+
+            bool foundCollider = false;
+            Bounds combinedBounds = default;
+            if (cols != null)
+            {
+                for (int i = 0; i < cols.Length; i++)
+                {
+                    Collider col = cols[i];
+                    if (col == null || !col.enabled || col.isTrigger)
+                        continue;
+
+                    if (!foundCollider)
+                    {
+                        combinedBounds = col.bounds;
+                        foundCollider = true;
+                    }
+                    else
+                    {
+                        combinedBounds.Encapsulate(col.bounds);
+                    }
+                }
+            }
+
+            if (foundCollider)
+                center = combinedBounds.center;
+
+            forward.y = 0f;
+            right.y = 0f;
+            if (forward.sqrMagnitude < 0.001f)
+                forward = Vector3.forward;
+            if (right.sqrMagnitude < 0.001f)
+                right = Vector3.Cross(Vector3.up, forward);
+
+            forward.Normalize();
+            right.Normalize();
+            center.y = door.transform.position.y;
+            return true;
+        }
+
+        static bool SegmentPassesThroughDoorwayBounds(Vector3 fromWorld, Vector3 toWorld, Vector3 center, Vector3 forward, Vector3 right, float halfWidth, float halfDepth)
+        {
+            if (forward.sqrMagnitude < 0.001f || right.sqrMagnitude < 0.001f)
+                return false;
+
+            const int samples = 10;
+            const float verticalAllowance = 2.4f;
+            float widthAllowance = Mathf.Max(0.6f, halfWidth);
+            float depthAllowance = Mathf.Max(0.75f, halfDepth);
+
+            for (int i = 0; i <= samples; i++)
+            {
+                Vector3 sample = Vector3.Lerp(fromWorld, toWorld, i / (float)samples);
+                if (Mathf.Abs(sample.y - center.y) > verticalAllowance)
+                    continue;
+
+                Vector3 offset = sample - center;
+                offset.y = 0f;
+                float forwardDistance = Mathf.Abs(Vector3.Dot(offset, forward));
+                float rightDistance = Mathf.Abs(Vector3.Dot(offset, right));
+                if (forwardDistance <= depthAllowance && rightDistance <= widthAllowance)
+                    return true;
             }
 
             return false;
@@ -1864,6 +2115,9 @@ namespace Sushil.AI
                 to = toHit.position;
 
             if (IsSegmentBlocked(from, to))
+                return false;
+
+            if (SegmentCrossesClosedDoor(from, to))
                 return false;
 
             NavMeshPath warpPath = new NavMeshPath();
@@ -2386,7 +2640,21 @@ namespace Sushil.AI
 
             float stairBlend      = GetStairBlend();
             bool  elevatedPath    = IsCurrentlyOnElevatedPath();
-            bool  onStairs        = stairBlend >= 0.24f || elevatedPath;
+            Vector3 steeringFocus = agent.hasPath ? agent.steeringTarget : agent.destination;
+            Vector3 destinationFocus = agent.destination;
+            Vector3 stairFocus    = Mathf.Abs(destinationFocus.y - transform.position.y) >
+                                    Mathf.Abs(steeringFocus.y - transform.position.y)
+                ? destinationFocus
+                : steeringFocus;
+            float primaryVerticalDelta = Mathf.Abs(GetPrimaryVerticalTraversalDelta());
+            bool  onStairs        = stairBlend >= 0.18f ||
+                                    elevatedPath ||
+                                    IsStairLikePosition(transform.position) ||
+                                    IsStairLikePosition(steeringFocus) ||
+                                    IsStairLikePosition(destinationFocus) ||
+                                    Mathf.Abs(steeringFocus.y - transform.position.y) > 0.28f ||
+                                    Mathf.Abs(destinationFocus.y - transform.position.y) > 0.28f ||
+                                    primaryVerticalDelta > 0.28f;
             bool  tightPassage    = IsTightPassageContext(agent.destination);
 
             // Only activate the assist when on stairs OR traversing an elevated path.
@@ -2443,7 +2711,7 @@ namespace Sushil.AI
                     return;
                 }
 
-                if (!allowRuntimeRecoveryWarps)
+                if (!ShouldAllowValidatedStairWarp(stairFocus))
                 {
                     QueueShortAdvanceAndReissueDestination(progressiveTarget, originalDestination, 0.2f);
                     return;
@@ -2496,7 +2764,7 @@ namespace Sushil.AI
                     return;
                 }
 
-                if (!allowRuntimeRecoveryWarps)
+                if (!ShouldAllowValidatedStairWarp(stairFocus))
                 {
                     QueueShortAdvanceAndReissueDestination(nudgeTarget, originalDestination, 0.18f);
                     return;
@@ -2535,6 +2803,28 @@ namespace Sushil.AI
                 hasSafePosition  = true;
                 ReissuePrimaryDestination(originalDestination);
             }
+        }
+
+        bool ShouldAllowValidatedStairWarp(Vector3 stairFocus)
+        {
+            if (allowRuntimeRecoveryWarps)
+                return true;
+
+            if (!IsAgentReady())
+                return false;
+
+            if (GetStairBlend() >= 0.16f || IsCurrentlyOnElevatedPath())
+                return true;
+
+            if (Mathf.Abs(stairFocus.y - transform.position.y) > 0.4f)
+                return true;
+
+            if (Mathf.Abs(agent.destination.y - transform.position.y) > 0.28f)
+                return true;
+
+            return IsStairLikePosition(transform.position) ||
+                   IsStairLikePosition(stairFocus) ||
+                   IsStairLikePosition(agent.destination);
         }
 
         bool TryFindStairPathCornerRecoveryTarget(Vector3 current, out Vector3 recoveryTarget)
@@ -2695,6 +2985,7 @@ namespace Sushil.AI
             bool insideBlocking = IsInsideBlockingGeometry(current, clipProbeRadius);
             bool bodyInsideBlocking = IsBodyIntersectingBlocking(current);
             bool insideHideable = rejectDestinationsInsideHideables && IsInsideHideableCollider(current, destinationHideableClearance);
+            bool crossedClosedDoor = SegmentCrossesClosedDoor(lastSafePosition, current);
             bool crossedNavBoundary = enforceNavMeshBoundaryAntiClip &&
                                       CrossedNavBoundary(lastSafePosition, current);
             float moved = Vector3.Distance(lastSafePosition, current);
@@ -2703,9 +2994,9 @@ namespace Sushil.AI
             hardWallMoveThreshold = Mathf.Min(hardWallMoveThreshold, 0.18f);
             bool hardWallViolation = stairTraversal
                 ? bodyInsideBlocking || hardNavViolation
-                : bodyInsideBlocking || (insideBlocking && moved > hardWallMoveThreshold);
+                : bodyInsideBlocking || (insideBlocking && moved > hardWallMoveThreshold) || (crossedClosedDoor && moved > 0.06f);
 
-            if (!hardWallViolation && !insideHideable && !hardNavViolation)
+            if (!hardWallViolation && !insideHideable && !hardNavViolation && !crossedClosedDoor)
             {
                 lastSafePosition = current;
                 return;
@@ -2751,7 +3042,8 @@ namespace Sushil.AI
 
             if (NavMesh.SamplePosition(preferredFallback, out var hit, 1.8f, NavMesh.AllAreas) &&
                 !IsInsideBlockingGeometry(hit.position, antiClipProbeRadius) &&
-                !IsBodyIntersectingBlocking(hit.position))
+                !IsBodyIntersectingBlocking(hit.position) &&
+                !SegmentCrossesClosedDoor(current, hit.position))
             {
                 safePos = hit.position;
                 return true;
@@ -2769,6 +3061,8 @@ namespace Sushil.AI
                 if (IsInsideBlockingGeometry(pHit.position, antiClipProbeRadius))
                     continue;
                 if (IsBodyIntersectingBlocking(pHit.position))
+                    continue;
+                if (SegmentCrossesClosedDoor(current, pHit.position))
                     continue;
                 if (!HasDoorSafeRecoveryPath(preferredFallback, pHit.position))
                     continue;

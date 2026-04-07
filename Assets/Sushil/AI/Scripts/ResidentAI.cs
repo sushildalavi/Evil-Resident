@@ -329,6 +329,7 @@ namespace Sushil.AI
         private float chaseStuckTimer;
         private float nextDoorOpenTime;
         private bool hasSuspectedHideSpot;
+        private bool avoidHideableAreasThisSearch;
         private Vector3 suspectedHideSpot;
         private float hiddenTakedownTimer;
         private static readonly Collider[] movementBlockerHits = new Collider[32];
@@ -494,6 +495,31 @@ namespace Sushil.AI
                 // corridor (x=4.5–5.5) that is too tight to bake NavMesh at radius 0.5.
                 EnsureSquareFuseCorridorNavLink();
             }
+            if (IsEasyLevelScene())
+            {
+                patrolMoveSpeed = 0.95f;
+                chaseMoveSpeed = 1.15f;
+                chaseAcceleration = Mathf.Min(chaseAcceleration, 8.5f);
+                sightRange = 9.5f;
+                fovDegrees = Mathf.Min(fovDegrees, 95f);
+                peripheralAwarenessRangeMultiplier = Mathf.Min(peripheralAwarenessRangeMultiplier, 0.5f);
+                peripheralAwarenessVerticalTolerance = Mathf.Min(peripheralAwarenessVerticalTolerance, 1.55f);
+                closeAwarenessDistance = Mathf.Min(closeAwarenessDistance, 2.35f);
+                closeAwarenessVerticalTolerance = Mathf.Min(closeAwarenessVerticalTolerance, 1.0f);
+                allowProximityChaseWithoutNoise = true;
+                proximityChaseDistance = Mathf.Min(proximityChaseDistance, 1.45f);
+                proximityChaseVerticalTolerance = Mathf.Min(proximityChaseVerticalTolerance, 1.25f);
+                maxVisualChaseSeconds = Mathf.Min(maxVisualChaseSeconds, 4.5f);
+                chaseMemorySeconds = Mathf.Min(chaseMemorySeconds, 1.1f);
+                lostSightPursuitSeconds = Mathf.Min(lostSightPursuitSeconds, 1.45f);
+                lostSightToSearchDelay = Mathf.Min(lostSightToSearchDelay, 0.25f);
+                maxChaseDistance = Mathf.Min(maxChaseDistance, 8.5f);
+                farLoseDelay = Mathf.Min(farLoseDelay, 0.45f);
+                killDistance = Mathf.Min(killDistance, 0.8f);
+                killVerticalTolerance = Mathf.Min(killVerticalTolerance, 0.82f);
+                hiddenTakedownDistance = Mathf.Min(hiddenTakedownDistance, 0.92f);
+                hiddenTakedownConfirmSeconds = Mathf.Max(hiddenTakedownConfirmSeconds, 0.75f);
+            }
             // Keep hard geometry validation enabled so chase logic cannot cut through walls.
             validatePathAgainstGeometry = true;
             rejectDestinationsInsideBlockingGeometry = true;
@@ -563,6 +589,21 @@ namespace Sushil.AI
                    path == "Assets/Sahil/Test/Difficult Level.unity";
         }
 
+        bool IsEasyLevelScene()
+        {
+            string path = SceneManager.GetActiveScene().path;
+            return path == "Assets/Sushil/Easy Level.unity" ||
+                   path == "Assets/Sahil/Test/Easy Level.unity";
+        }
+
+        bool ShouldRelocateSearchAwayFromHideSpot()
+        {
+            string path = SceneManager.GetActiveScene().path;
+            return path == "Assets/Sushil/Easy Level.unity" ||
+                   path == "Assets/Sahil/Test/Easy Level.unity" ||
+                   path == "Assets/Sahil/Test/Medium Level.unity";
+        }
+
         void Update()
         {
             if (player == null)
@@ -598,9 +639,13 @@ namespace Sushil.AI
             // If player hides during chase, immediately lose them and switch to search.
             if (state == State.Chase && isHiddenNow)
             {
-                MarkSuspectedHideSpot();
-                BeginWholeHouseSearch(player.position, hideTriggeredSearchDuration + lastSeenSearchDurationBoost);
-                forcedNextSearchDuration = Mathf.Max(forcedNextSearchDuration, hideTriggeredSearchDuration + lastSeenSearchDurationBoost);
+                float hideSearchDuration = hideTriggeredSearchDuration + lastSeenSearchDurationBoost;
+                if (!TryBeginSearchAwayFromHideSpot(hideSearchDuration))
+                {
+                    MarkSuspectedHideSpot();
+                    BeginWholeHouseSearch(player.position, hideSearchDuration);
+                }
+                forcedNextSearchDuration = Mathf.Max(forcedNextSearchDuration, hideSearchDuration);
                 ChangeState(State.Search);
                 wasPlayerHiddenLastFrame = isHiddenNow;
                 return;
@@ -981,7 +1026,9 @@ namespace Sushil.AI
                 TryHandleHiddenTakedown();
 
                 // Sometimes go check a hiding inspect point
-                if (hidingInspectPoints.Count > 0 && Random.value < checkHidingChance)
+                if (!avoidHideableAreasThisSearch &&
+                    hidingInspectPoints.Count > 0 &&
+                    Random.value < checkHidingChance)
                 {
                     if (TryGetRandomInspectPoint(out var inspectPoint) && IsAgentReady())
                     {
@@ -1022,7 +1069,9 @@ namespace Sushil.AI
                         : roamCenter;
                     float radius = Mathf.Max(freeRoamRadius, searchRadius * outwardSearchMultiplier);
 
-                    if (TryGetRandomRoamPoint(searchCenter, radius, out var roamPoint) ||
+                    if ((avoidHideableAreasThisSearch &&
+                         TryGetSearchRelocationPointAwayFromHideSpot(suspectedHideSpot, out var roamPoint)) ||
+                        TryGetRandomRoamPoint(searchCenter, radius, out roamPoint) ||
                         TryGetRandomRoamPoint(roamCenter, Mathf.Max(radius, freeRoamRadius), out roamPoint))
                     {
                         TrySetDestination(roamPoint);
@@ -1032,7 +1081,9 @@ namespace Sushil.AI
                 {
                     float localPhase = activeSearchDuration * Mathf.Clamp01(roomSuspicionPortion);
                     float radius = elapsed < localPhase ? searchRadius : (searchRadius * outwardSearchMultiplier);
-                    if (TryGetRandomRoamPoint(center, radius, out var roamPoint))
+                    if ((avoidHideableAreasThisSearch &&
+                         TryGetSearchRelocationPointAwayFromHideSpot(suspectedHideSpot, out var roamPoint)) ||
+                        TryGetRandomRoamPoint(center, radius, out roamPoint))
                         TrySetDestination(roamPoint);
                 }
 
@@ -1043,6 +1094,7 @@ namespace Sushil.AI
             hasNoise = false;
             hasInvestigateTarget = false;
             hasSuspectedHideSpot = false;
+            avoidHideableAreasThisSearch = false;
             wholeHouseSearchMode = false;
             ChangeState(State.Patrol);
         }
