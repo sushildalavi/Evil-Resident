@@ -145,7 +145,10 @@ namespace Sushil.Systems
             if (titleText == null || taglineText == null || riddleText == null || startHintText == null)
                 return;
 
-            string scenePath = SceneManager.GetActiveScene().path;
+            Scene activeScene = SceneManager.GetActiveScene();
+            string scenePath = activeScene.path;
+            string sceneName = activeScene.name;
+            string sceneNameLower = string.IsNullOrWhiteSpace(sceneName) ? string.Empty : sceneName.ToLowerInvariant();
 
             if (scenePath == "Assets/Neel/Tutorial.unity")
             {
@@ -156,11 +159,15 @@ namespace Sushil.Systems
                 return;
             }
 
-            if (scenePath == "Assets/Sahil/Test/NewLevel.unity" ||
-                scenePath == "Assets/Sahil/Test/NewNewLevel.unity")
+            if (scenePath.StartsWith("Assets/Sahil/Test/"))
             {
                 titleText.text = "EVIL RESIDENT";
-                taglineText.text = "Escape from the main door.";
+                if (sceneNameLower.Contains("easy"))
+                    taglineText.text = "Escape from the main door. Easy mode.";
+                else if (sceneNameLower.Contains("difficult") || sceneNameLower.Contains("hard"))
+                    taglineText.text = "Escape from the main door. Difficult mode.";
+                else
+                    taglineText.text = "Escape from the main door.";
                 riddleText.gameObject.SetActive(true);
                 riddleText.text = "Walls here do not have ears, but they might show something... ;)";
                 startHintText.text = "Press ENTER or SPACE to begin";

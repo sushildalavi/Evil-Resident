@@ -1085,6 +1085,9 @@ namespace Sushil.AI
                     }
                 }
 
+                if (!CanTraverseWarpSegment(from, hit.position))
+                    continue;
+
                 agent.Warp(hit.position);
                 transform.position = hit.position;
                 ignoreAntiClipUntilTime = Time.time + 0.35f;
@@ -1813,6 +1816,27 @@ namespace Sushil.AI
             return false;
         }
 
+        bool CanTraverseWarpSegment(Vector3 fromWorld, Vector3 toWorld)
+        {
+            Vector3 from = fromWorld;
+            if (NavMesh.SamplePosition(fromWorld, out var fromHit, 1.8f, NavMesh.AllAreas))
+                from = fromHit.position;
+
+            Vector3 to = toWorld;
+            if (NavMesh.SamplePosition(toWorld, out var toHit, 1.8f, NavMesh.AllAreas))
+                to = toHit.position;
+
+            if (IsSegmentBlocked(from, to))
+                return false;
+
+            NavMeshPath warpPath = new NavMeshPath();
+            if (!NavMesh.CalculatePath(from, to, NavMesh.AllAreas, warpPath) ||
+                warpPath.status != NavMeshPathStatus.PathComplete)
+                return false;
+
+            return !PathCrossesClosedDoor(warpPath);
+        }
+
         void SetupNavigationCollisionFixes()
         {
             if (autoSyncAgentAndColliderToScale)
@@ -2104,6 +2128,9 @@ namespace Sushil.AI
                 if (!NavMesh.SamplePosition(target, out var hit, 1.8f, NavMesh.AllAreas))
                     continue;
 
+                if (!CanTraverseWarpSegment(pos, hit.position))
+                    continue;
+
                 // Warp, seed safe-pos, suppress anti-clip for 1.5 s, restore destination.
                 agent.Warp(hit.position);
                 transform.position   = hit.position;
@@ -2233,7 +2260,9 @@ namespace Sushil.AI
             if (NavMesh.SamplePosition(transform.position, out var hit, navSnapSearchRadius, NavMesh.AllAreas))
             {
                 float d = Vector3.Distance(transform.position, hit.position);
-                if (d >= navSnapWarpDistance && IsDestinationAllowed(hit.position))
+                if (d >= navSnapWarpDistance &&
+                    IsDestinationAllowed(hit.position) &&
+                    CanTraverseWarpSegment(transform.position, hit.position))
                 {
                     agent.Warp(hit.position);
                     transform.position = hit.position;
