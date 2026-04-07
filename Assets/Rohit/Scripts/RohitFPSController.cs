@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.AI;
+using Sushil.Systems;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -137,6 +138,13 @@ public class RohitFPSController : MonoBehaviour
 
     void Update()
     {
+        if (PauseOverlay.IsPaused || StartScreenOverlay.IsShowing || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing)
+        {
+            horizontalVelocity = Vector3.zero;
+            HidePrompt();
+            return;
+        }
+
         if (!isHidden && !isInPuzzle)
             Move();
 

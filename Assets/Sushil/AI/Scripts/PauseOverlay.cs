@@ -44,7 +44,7 @@ namespace Sushil.Systems
 
         void Update()
         {
-            if (WasEscapePressed())
+            if (WasPausePressed())
             {
                 if (StartScreenOverlay.IsShowing || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing) return;
                 TogglePause();
@@ -64,12 +64,14 @@ namespace Sushil.Systems
             if (isPaused)
             {
                 Time.timeScale = 0f;
+                AudioListener.pause = true;
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
             }
             else
             {
                 Time.timeScale = 1f;
+                AudioListener.pause = false;
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
             }
@@ -80,6 +82,7 @@ namespace Sushil.Systems
             isPaused = false;
             SetVisible(false);
             Time.timeScale = 1f;
+            AudioListener.pause = false;
 
             Scene active = SceneManager.GetActiveScene();
             SceneManager.LoadScene(active.buildIndex);
@@ -104,41 +107,36 @@ namespace Sushil.Systems
             scaler.matchWidthOrHeight = 0.5f;
             gameObject.AddComponent<GraphicRaycaster>();
 
-            root = new GameObject("PauseRoot");
+            root = new GameObject("PauseRoot", typeof(RectTransform));
             root.transform.SetParent(transform, false);
+            RectTransform rootRect = root.GetComponent<RectTransform>();
+            rootRect.anchorMin = Vector2.zero;
+            rootRect.anchorMax = Vector2.one;
+            rootRect.offsetMin = Vector2.zero;
+            rootRect.offsetMax = Vector2.zero;
 
             GameObject dimObj = new GameObject("Dim");
             dimObj.transform.SetParent(root.transform, false);
             var dim = dimObj.AddComponent<Image>();
-            dim.color = new Color(0f, 0f, 0f, 0.75f);
+            dim.color = new Color(0.01f, 0.01f, 0.02f, 1f);
             var dimRect = dim.rectTransform;
             dimRect.anchorMin = Vector2.zero;
             dimRect.anchorMax = Vector2.one;
             dimRect.offsetMin = Vector2.zero;
             dimRect.offsetMax = Vector2.zero;
 
-            GameObject cardObj = new GameObject("Card");
-            cardObj.transform.SetParent(root.transform, false);
-            var card = cardObj.AddComponent<Image>();
-            card.color = new Color(0.08f, 0.08f, 0.11f, 0.96f);
-            var cardRect = card.rectTransform;
-            cardRect.anchorMin = new Vector2(0.5f, 0.5f);
-            cardRect.anchorMax = new Vector2(0.5f, 0.5f);
-            cardRect.pivot = new Vector2(0.5f, 0.5f);
-            cardRect.sizeDelta = new Vector2(760f, 420f);
+            titleText = CreateText(root.transform, "Title", "PAUSED", 92, FontStyle.Bold,
+                TextAnchor.MiddleCenter, new Color(1f, 0.25f, 0.25f, 1f),
+                new Vector2(0.15f, 0.60f), new Vector2(0.85f, 0.78f),
+                Vector2.zero, Vector2.zero);
 
-            titleText = CreateText(card.transform, "Title", "PAUSED", 82, FontStyle.Bold,
-                TextAnchor.UpperCenter, new Color(1f, 0.25f, 0.25f, 1f),
-                new Vector2(0f, 1f), new Vector2(1f, 1f),
-                new Vector2(20f, -130f), new Vector2(-20f, -20f));
-
-            bodyText = CreateText(card.transform, "Body",
-                "Esc  Resume   |   R  Restart\n\n" +
+            bodyText = CreateText(root.transform, "Body",
+                "Tab  Resume   |   R  Restart\n\n" +
                 "WASD Move   Mouse Look\n" +
                 "E Pick Up / Interact   F Hide",
                 26, FontStyle.Normal, TextAnchor.MiddleCenter, Color.white,
-                new Vector2(0f, 0f), new Vector2(1f, 1f),
-                new Vector2(30f, 30f), new Vector2(-30f, -120f));
+                new Vector2(0.20f, 0.28f), new Vector2(0.80f, 0.56f),
+                Vector2.zero, Vector2.zero);
         }
 
         static Text CreateText(
@@ -182,14 +180,14 @@ namespace Sushil.Systems
             return Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         }
 
-        bool WasEscapePressed()
+        bool WasPausePressed()
         {
             bool pressed = false;
 #if ENABLE_LEGACY_INPUT_MANAGER
-            pressed |= Input.GetKeyDown(KeyCode.Escape);
+            pressed |= Input.GetKeyDown(KeyCode.Tab);
 #endif
 #if ENABLE_INPUT_SYSTEM
-            if (Keyboard.current != null) pressed |= Keyboard.current.escapeKey.wasPressedThisFrame;
+            if (Keyboard.current != null) pressed |= Keyboard.current.tabKey.wasPressedThisFrame;
 #endif
             return pressed;
         }

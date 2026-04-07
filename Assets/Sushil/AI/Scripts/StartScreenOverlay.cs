@@ -15,6 +15,7 @@ namespace Sushil.Systems
         Canvas canvas;
         GameObject root;
         bool showing;
+        Text productionText;
         Text titleText;
         Text taglineText;
         Text riddleText;
@@ -136,27 +137,35 @@ namespace Sushil.Systems
             CreateBackground(root.transform);
             Transform content = CreateContentContainer(root.transform);
 
+            productionText = CreateText(content, "Production",
+                "5 Guys at Freddy's presents :",
+                24, FontStyle.Normal, TextAnchor.MiddleCenter,
+                new Color(0.88f, 0.90f, 0.94f, 0.96f), new Vector2(0.14f, 0.82f), new Vector2(0.86f, 0.89f));
+            AddTextEffects(productionText.gameObject, new Color(0.03f, 0.05f, 0.08f, 0.95f));
+
             Text title = CreateText(content, "Title",
-                "IT SAW YOU", 88, FontStyle.Bold, TextAnchor.MiddleCenter,
-                new Color(1f, 0.2f, 0.2f, 1f), new Vector2(0.04f, 0.72f), new Vector2(0.96f, 0.92f));
+                "IT SAW YOU", 96, FontStyle.Bold, TextAnchor.MiddleCenter,
+                new Color(1f, 0.2f, 0.2f, 1f), new Vector2(0.08f, 0.60f), new Vector2(0.92f, 0.80f));
             AddTextEffects(title.gameObject, new Color(0.18f, 0f, 0f, 1f));
             titleText = title;
 
             taglineText = CreateText(content, "Tagline",
                 "Collect 3 keys. Escape. Don't be seen.",
-                38, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.92f, 0.92f, 0.95f, 1f),
-                new Vector2(0.08f, 0.56f), new Vector2(0.92f, 0.66f));
+                34, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.92f, 0.92f, 0.95f, 1f),
+                new Vector2(0.10f, 0.44f), new Vector2(0.90f, 0.53f));
+            AddTextEffects(taglineText.gameObject, new Color(0.04f, 0.05f, 0.08f, 0.95f));
 
             riddleText = CreateText(content, "Riddle",
                 string.Empty,
-                30, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.82f, 0.84f, 0.90f, 0.95f),
-                new Vector2(0.12f, 0.22f), new Vector2(0.88f, 0.46f), 1.15f);
+                28, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.82f, 0.84f, 0.90f, 0.95f),
+                new Vector2(0.14f, 0.28f), new Vector2(0.86f, 0.40f), 1.15f);
             AddTextEffects(riddleText.gameObject, new Color(0.02f, 0.04f, 0.08f, 0.95f));
 
             startHintText = CreateText(content, "StartHint",
                 "Press ENTER or SPACE to begin",
-                48, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.85f, 0.35f, 1f),
-                new Vector2(0.10f, 0.08f), new Vector2(0.90f, 0.18f));
+                44, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.86f, 0.36f, 1f),
+                new Vector2(0.12f, 0.08f), new Vector2(0.88f, 0.17f));
+            AddTextEffects(startHintText.gameObject, new Color(0.18f, 0.11f, 0.02f, 1f));
 
             ApplySceneText();
         }
@@ -171,11 +180,23 @@ namespace Sushil.Systems
             string sceneName = activeScene.name;
             string sceneNameLower = string.IsNullOrWhiteSpace(sceneName) ? string.Empty : sceneName.ToLowerInvariant();
 
+            titleText.gameObject.SetActive(true);
+            startHintText.gameObject.SetActive(true);
+            taglineText.gameObject.SetActive(true);
+            riddleText.gameObject.SetActive(true);
+
+            if (productionText != null)
+                productionText.gameObject.SetActive(false);
+
             if (sceneName == "Level Select")
             {
+                if (productionText != null)
+                    productionText.gameObject.SetActive(true);
                 titleText.text = "The Evil Resident";
-                taglineText.gameObject.SetActive(false);
+                taglineText.gameObject.SetActive(true);
+                taglineText.text = "Choose a door. The resident will critique your decision later.";
                 riddleText.gameObject.SetActive(false);
+                riddleText.text = string.Empty;
                 startHintText.gameObject.SetActive(true);
                 startHintText.text = "Press SPACE to start";
                 return;
@@ -254,7 +275,7 @@ namespace Sushil.Systems
             GameObject bgObj = new GameObject("Background");
             bgObj.transform.SetParent(parent, false);
             var bg = bgObj.AddComponent<Image>();
-            bg.color = new Color(0.01f, 0.01f, 0.03f, 0.92f);
+            bg.color = new Color(0.01f, 0.01f, 0.03f, 1f);
             var bgRect = bg.rectTransform;
             bgRect.anchorMin = Vector2.zero;
             bgRect.anchorMax = Vector2.one;
@@ -267,7 +288,7 @@ namespace Sushil.Systems
             var obj = new GameObject("ContentContainer");
             obj.transform.SetParent(parent, false);
             var image = obj.AddComponent<Image>();
-            image.color = new Color(0.02f, 0.03f, 0.06f, 0.45f);
+            image.color = new Color(0.02f, 0.03f, 0.06f, 0f);
 
             var rect = image.rectTransform;
             rect.anchorMin = new Vector2(0.06f, 0.03f);
@@ -292,7 +313,7 @@ namespace Sushil.Systems
             GameObject obj = new GameObject(name);
             obj.transform.SetParent(parent, false);
             Text text = obj.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            text.font = OverlayTypography.GetFont(fontSize);
             text.fontSize = fontSize;
             text.fontStyle = style;
             text.alignment = anchor;

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using Sushil.Systems;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -49,6 +50,12 @@ public class PlayerTorch : MonoBehaviour
 
     void Update()
     {
+        if (PauseOverlay.IsPaused || StartScreenOverlay.IsShowing || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing)
+        {
+            RefreshHud();
+            return;
+        }
+
         if (WasTogglePressed())
         {
             if (!useBattery || battery > 0.05f)

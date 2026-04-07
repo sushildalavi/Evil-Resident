@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using Sushil.Systems;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -110,6 +111,9 @@ public class TutorialStepUI : MonoBehaviour
 
     private void Update()
     {
+        if (PauseOverlay.IsPaused || StartScreenOverlay.IsShowing || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing)
+            return;
+
         if (useScene3TimedSequence)
             return;
 

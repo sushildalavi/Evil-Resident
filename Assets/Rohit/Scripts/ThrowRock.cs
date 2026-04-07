@@ -1,4 +1,5 @@
 using UnityEngine;
+using Sushil.Systems;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -15,6 +16,7 @@ public class ThrowRock : MonoBehaviour
     void Update()
     {
         if (!enableThrowFeature) return;
+        if (PauseOverlay.IsPaused || StartScreenOverlay.IsShowing || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing) return;
 
         if (WasThrowPressed())
         {
