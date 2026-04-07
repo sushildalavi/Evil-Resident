@@ -197,7 +197,8 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
 
     void PostRun(bool escaped, float survivalSeconds)
     {
-        if (SceneManager.GetActiveScene().name == "New Tutorial 2") return;
+        string scene = SceneManager.GetActiveScene().name;
+        if (scene != "Easy Level" && scene != "Medium Level" && scene != "Hard Level") return;
 
         string sceneName = SceneManager.GetActiveScene().name;
         string platform = Application.platform.ToString();
