@@ -878,6 +878,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 1509034308862935320, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
+      propertyPath: openClockwise
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6935190896675816081, guid: 39fd175cbe8864db885f9689ead1d899, type: 3}
       propertyPath: m_Name
       value: DoorFrameSquare
@@ -7880,6 +7884,10 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2630525224761294863, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4354348589401275070, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}
+      propertyPath: openClockwise
       value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6721515515934339124, guid: d40bd5e3b41404769acb82cc7cb36ac8, type: 3}

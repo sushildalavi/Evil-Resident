@@ -2104,6 +2104,54 @@ namespace Sushil.AI
             return false;
         }
 
+        bool IsBodyIntersectingClosedDoor(Vector3 worldPos)
+        {
+            CapsuleCollider residentCapsule = GetComponent<CapsuleCollider>();
+            if (residentCapsule == null)
+                return false;
+
+            if (cachedDoors == null) cachedDoors = FindObjectsByType<Door>(FindObjectsSortMode.None);
+            if (cachedFuseDoors == null) cachedFuseDoors = FindObjectsByType<FuseDoor>(FindObjectsSortMode.None);
+            if (cachedMainDoors == null) cachedMainDoors = FindObjectsByType<MainDoor>(FindObjectsSortMode.None);
+
+            return IsBodyIntersectingClosedDoor(worldPos, residentCapsule, cachedDoors) ||
+                   IsBodyIntersectingClosedDoor(worldPos, residentCapsule, cachedFuseDoors) ||
+                   IsBodyIntersectingClosedDoor(worldPos, residentCapsule, cachedMainDoors);
+        }
+
+        bool IsBodyIntersectingClosedDoor<TDoor>(Vector3 worldPos, CapsuleCollider residentCapsule, TDoor[] doors) where TDoor : MonoBehaviour
+        {
+            if (residentCapsule == null || doors == null || doors.Length == 0)
+                return false;
+
+            float penetrationThreshold = Mathf.Max(0.01f, antiClipPenetrationEpsilon * 0.35f);
+            for (int d = 0; d < doors.Length; d++)
+            {
+                TDoor door = doors[d];
+                if (door == null || !door.gameObject.activeInHierarchy || !IsDoorClosed(door))
+                    continue;
+
+                Collider[] cols = door.GetComponentsInChildren<Collider>(false);
+                for (int c = 0; c < cols.Length; c++)
+                {
+                    Collider col = cols[c];
+                    if (col == null || !col.enabled || col.isTrigger)
+                        continue;
+
+                    if (Physics.ComputePenetration(
+                        residentCapsule, worldPos, transform.rotation,
+                        col, col.transform.position, col.transform.rotation,
+                        out _, out float distance) &&
+                        distance >= penetrationThreshold)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
         bool CanTraverseWarpSegment(Vector3 fromWorld, Vector3 toWorld)
         {
             Vector3 from = fromWorld;
@@ -2945,15 +2993,6 @@ namespace Sushil.AI
         void EnforceRuntimeNoClip()
         {
             if (!enforceRuntimeAntiClip || !IsAgentReady()) return;
-            if (Time.time < ignoreAntiClipUntilTime)
-            {
-                // Keep lastSafePosition fresh during the ignore window so that when the
-                // window expires the stale floor position is not used as the reference
-                // point for CrossedNavBoundary — which would warp the agent back down.
-                lastSafePosition = transform.position;
-                hasSafePosition  = true;
-                return;
-            }
 
             Vector3 current = transform.position;
             if (!hasSafePosition)
@@ -2963,15 +3002,33 @@ namespace Sushil.AI
                 return;
             }
 
+            bool crossedClosedDoor = SegmentCrossesClosedDoor(lastSafePosition, current);
+            bool bodyInsideClosedDoor = IsBodyIntersectingClosedDoor(current);
+            if (Time.time < ignoreAntiClipUntilTime)
+            {
+                if (!crossedClosedDoor && !bodyInsideClosedDoor)
+                {
+                    // Keep lastSafePosition fresh during the ignore window so that when the
+                    // window expires the stale floor position is not used as the reference
+                    // point for CrossedNavBoundary — which would warp the agent back down.
+                    lastSafePosition = current;
+                    hasSafePosition  = true;
+                    return;
+                }
+            }
+
             bool stairTraversal = GetStairBlend() >= 0.24f || IsCurrentlyOnElevatedPath();
             if (stairTraversal)
             {
-                // During ANY stair/ramp traversal let the NavMeshAgent move freely.
-                // All geometry checks (body intersection, boundary crossing) can produce
-                // false positives on stair geometry and teleport the agent back down.
-                lastSafePosition = current;
-                hasSafePosition  = true;
-                return;
+                if (!crossedClosedDoor && !bodyInsideClosedDoor)
+                {
+                    // During ANY stair/ramp traversal let the NavMeshAgent move freely.
+                    // All geometry checks (body intersection, boundary crossing) can produce
+                    // false positives on stair geometry and teleport the agent back down.
+                    lastSafePosition = current;
+                    hasSafePosition  = true;
+                    return;
+                }
             }
 
             if (IsSquareFusePortalTraversalActive(agent.hasPath ? agent.destination : current))
@@ -2985,7 +3042,6 @@ namespace Sushil.AI
             bool insideBlocking = IsInsideBlockingGeometry(current, clipProbeRadius);
             bool bodyInsideBlocking = IsBodyIntersectingBlocking(current);
             bool insideHideable = rejectDestinationsInsideHideables && IsInsideHideableCollider(current, destinationHideableClearance);
-            bool crossedClosedDoor = SegmentCrossesClosedDoor(lastSafePosition, current);
             bool crossedNavBoundary = enforceNavMeshBoundaryAntiClip &&
                                       CrossedNavBoundary(lastSafePosition, current);
             float moved = Vector3.Distance(lastSafePosition, current);
@@ -2993,10 +3049,10 @@ namespace Sushil.AI
             float hardWallMoveThreshold = stairTraversal ? 0.16f : 0.3f;
             hardWallMoveThreshold = Mathf.Min(hardWallMoveThreshold, 0.18f);
             bool hardWallViolation = stairTraversal
-                ? bodyInsideBlocking || hardNavViolation
-                : bodyInsideBlocking || (insideBlocking && moved > hardWallMoveThreshold) || (crossedClosedDoor && moved > 0.06f);
+                ? bodyInsideBlocking || bodyInsideClosedDoor || hardNavViolation
+                : bodyInsideBlocking || bodyInsideClosedDoor || (insideBlocking && moved > hardWallMoveThreshold) || (crossedClosedDoor && moved > 0.06f);
 
-            if (!hardWallViolation && !insideHideable && !hardNavViolation && !crossedClosedDoor)
+            if (!hardWallViolation && !insideHideable && !hardNavViolation && !crossedClosedDoor && !bodyInsideClosedDoor)
             {
                 lastSafePosition = current;
                 return;
@@ -3043,6 +3099,7 @@ namespace Sushil.AI
             if (NavMesh.SamplePosition(preferredFallback, out var hit, 1.8f, NavMesh.AllAreas) &&
                 !IsInsideBlockingGeometry(hit.position, antiClipProbeRadius) &&
                 !IsBodyIntersectingBlocking(hit.position) &&
+                !IsBodyIntersectingClosedDoor(hit.position) &&
                 !SegmentCrossesClosedDoor(current, hit.position))
             {
                 safePos = hit.position;
@@ -3061,6 +3118,8 @@ namespace Sushil.AI
                 if (IsInsideBlockingGeometry(pHit.position, antiClipProbeRadius))
                     continue;
                 if (IsBodyIntersectingBlocking(pHit.position))
+                    continue;
+                if (IsBodyIntersectingClosedDoor(pHit.position))
                     continue;
                 if (SegmentCrossesClosedDoor(current, pHit.position))
                     continue;

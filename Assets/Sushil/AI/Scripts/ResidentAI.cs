@@ -497,28 +497,8 @@ namespace Sushil.AI
             }
             if (IsEasyLevelScene())
             {
-                patrolMoveSpeed = 0.95f;
-                chaseMoveSpeed = 1.15f;
-                chaseAcceleration = Mathf.Min(chaseAcceleration, 8.5f);
-                sightRange = 9.5f;
-                fovDegrees = Mathf.Min(fovDegrees, 95f);
-                peripheralAwarenessRangeMultiplier = Mathf.Min(peripheralAwarenessRangeMultiplier, 0.5f);
-                peripheralAwarenessVerticalTolerance = Mathf.Min(peripheralAwarenessVerticalTolerance, 1.55f);
-                closeAwarenessDistance = Mathf.Min(closeAwarenessDistance, 2.35f);
-                closeAwarenessVerticalTolerance = Mathf.Min(closeAwarenessVerticalTolerance, 1.0f);
-                allowProximityChaseWithoutNoise = true;
-                proximityChaseDistance = Mathf.Min(proximityChaseDistance, 1.45f);
-                proximityChaseVerticalTolerance = Mathf.Min(proximityChaseVerticalTolerance, 1.25f);
-                maxVisualChaseSeconds = Mathf.Min(maxVisualChaseSeconds, 4.5f);
-                chaseMemorySeconds = Mathf.Min(chaseMemorySeconds, 1.1f);
-                lostSightPursuitSeconds = Mathf.Min(lostSightPursuitSeconds, 1.45f);
-                lostSightToSearchDelay = Mathf.Min(lostSightToSearchDelay, 0.25f);
-                maxChaseDistance = Mathf.Min(maxChaseDistance, 8.5f);
-                farLoseDelay = Mathf.Min(farLoseDelay, 0.45f);
-                killDistance = Mathf.Min(killDistance, 0.8f);
-                killVerticalTolerance = Mathf.Min(killVerticalTolerance, 0.82f);
-                hiddenTakedownDistance = Mathf.Min(hiddenTakedownDistance, 0.92f);
-                hiddenTakedownConfirmSeconds = Mathf.Max(hiddenTakedownConfirmSeconds, 0.75f);
+                patrolMoveSpeed = 1.4f;
+                chaseMoveSpeed = 1.62f;
             }
             // Keep hard geometry validation enabled so chase logic cannot cut through walls.
             validatePathAgainstGeometry = true;
@@ -601,7 +581,8 @@ namespace Sushil.AI
             string path = SceneManager.GetActiveScene().path;
             return path == "Assets/Sushil/Easy Level.unity" ||
                    path == "Assets/Sahil/Test/Easy Level.unity" ||
-                   path == "Assets/Sahil/Test/Medium Level.unity";
+                   path == "Assets/Sahil/Test/Medium Level.unity" ||
+                   path == "Assets/Sahil/Test/Hard Level.unity";
         }
 
         void Update()
