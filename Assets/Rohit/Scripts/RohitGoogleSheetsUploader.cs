@@ -15,9 +15,11 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
 
     bool wasRunActive;
     bool wasGameOverShowing;
+    bool wasEscapeShowing;
     float cachedSurvivalSeconds;
     bool uploadSentForThisRun;
     string currentRunId;
+    int lastSceneBuildIndex;
 
     Vector3 lastPlayerPos;
     Vector3 lastResidentPos;
@@ -44,21 +46,31 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
 
         bool active = GameAnalyticsTracker.RunActive;
         bool gameOverNow = GameOverOverlay.IsShowing;
+        bool escapeNow = EscapeOverlay.IsShowing;
+        int sceneBuildIndex = SceneManager.GetActiveScene().buildIndex;
 
-        if (!wasRunActive && active)
+        bool sceneReloaded = sceneBuildIndex != lastSceneBuildIndex;
+        bool overlayDismissed = (wasGameOverShowing && !gameOverNow) || (wasEscapeShowing && !escapeNow);
+        bool newRunDetected = (!wasRunActive && active) || sceneReloaded || overlayDismissed;
+
+        if (newRunDetected && active && !gameOverNow && !escapeNow)
         {
             currentRunId = Guid.NewGuid().ToString("N");
             uploadSentForThisRun = false;
             lastDeathReason = "";
+            lastPlayerPos = Vector3.zero;
+            lastResidentPos = Vector3.zero;
+            lastDistance = 0f;
+            lastKeyCount = 0;
         }
 
-        if (active && !gameOverNow)
+        if (active && !gameOverNow && !escapeNow)
         {
             cachedSurvivalSeconds = GameAnalyticsTracker.ElapsedSeconds;
             CachePositions();
         }
 
-        if (gameOverNow && !wasGameOverShowing && active && !uploadSentForThisRun)
+        if (gameOverNow && !wasGameOverShowing && !uploadSentForThisRun)
         {
             CachePositions();
             TryReadDeathReason();
@@ -66,14 +78,17 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
             PostRun(settings, escaped: false, cachedSurvivalSeconds);
         }
 
-        if (wasRunActive && !active && !uploadSentForThisRun)
+        if (escapeNow && !wasEscapeShowing && !uploadSentForThisRun)
         {
+            CachePositions();
             uploadSentForThisRun = true;
             PostRun(settings, escaped: true, cachedSurvivalSeconds);
         }
 
         wasRunActive = active;
         wasGameOverShowing = gameOverNow;
+        wasEscapeShowing = escapeNow;
+        lastSceneBuildIndex = sceneBuildIndex;
     }
 
     void CachePositions()
@@ -219,8 +234,6 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
     {
         var rohit = FindFirstObjectByType<RohitFPSController>();
         if (rohit != null) return rohit.transform;
-        var pd = FindFirstObjectByType<PlayerDeath>();
-        if (pd != null) return pd.transform;
         GameObject tagged = GameObject.FindGameObjectWithTag("Player");
         return tagged != null ? tagged.transform : null;
     }
