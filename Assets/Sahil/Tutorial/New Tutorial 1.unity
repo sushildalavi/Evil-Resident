@@ -458,6 +458,38 @@ PrefabInstance:
       propertyPath: m_Name
       value: Player Variant
       objectReference: {fileID: 0}
+    - target: {fileID: 4403181079989416031, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: walkSpeed
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 4403181079989416031, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: airControl
+      value: 0.2
+      objectReference: {fileID: 0}
+    - target: {fileID: 4403181079989416031, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: jumpHeight
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4403181079989416031, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: sprintSpeed
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 4403181079989416031, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: acceleration
+      value: 15
+      objectReference: {fileID: 0}
+    - target: {fileID: 4403181079989416031, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: deceleration
+      value: 10
+      objectReference: {fileID: 0}
+    - target: {fileID: 4403181079989416031, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: mouseSensitivity
+      value: 150
+      objectReference: {fileID: 0}
+    - target: {fileID: 4403181079989416031, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: useCapsulePreCast
+      value: 0
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

@@ -2855,8 +2855,8 @@ namespace Sushil.AI
 
         bool ShouldAllowValidatedStairWarp(Vector3 stairFocus)
         {
-            if (allowRuntimeRecoveryWarps)
-                return true;
+            if (!allowRuntimeRecoveryWarps)
+                return false;
 
             if (!IsAgentReady())
                 return false;
@@ -3066,11 +3066,38 @@ namespace Sushil.AI
             }
 
             fallback = safeHitPos;
+            if (!allowRuntimeRecoveryWarps)
+            {
+                SoftRecoverFromNoClipViolation(current, fallback);
+                return;
+            }
+
             agent.Warp(fallback);
             transform.position = fallback;
             agent.nextPosition = fallback;
             agent.ResetPath();
             lastSafePosition = fallback;
+        }
+
+        void SoftRecoverFromNoClipViolation(Vector3 current, Vector3 fallback)
+        {
+            if (!IsAgentReady())
+                return;
+
+            if (Time.time < nextSoftNoClipRecoveryAt)
+                return;
+
+            nextSoftNoClipRecoveryAt = Time.time + 0.2f;
+
+            // Prefer a short repath out of the bad position instead of a visible teleport.
+            agent.ResetPath();
+            bool hasFallbackMove = Vector3.Distance(current, fallback) > 0.08f && TrySetDestination(fallback);
+            if (!hasFallbackMove && state == State.Chase && player != null)
+                TrySetDestination(player.position);
+
+            ignoreAntiClipUntilTime = Mathf.Max(ignoreAntiClipUntilTime, Time.time + 0.25f);
+            lastSafePosition = current;
+            hasSafePosition = true;
         }
 
         void DisableVisualBodyColliders()

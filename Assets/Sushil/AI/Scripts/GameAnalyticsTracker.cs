@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 namespace Sushil.Systems
@@ -72,7 +73,12 @@ namespace Sushil.Systems
 
         void Update()
         {
-            if (StartScreenOverlay.IsShowing || PauseOverlay.IsPaused || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing || !GameAnalyticsTracker.RunActive)
+            if (ShouldHideForScene(SceneManager.GetActiveScene().name) ||
+                StartScreenOverlay.IsShowing ||
+                PauseOverlay.IsPaused ||
+                GameOverOverlay.IsShowing ||
+                EscapeOverlay.IsShowing ||
+                !GameAnalyticsTracker.RunActive)
             {
                 if (canvas != null) canvas.enabled = false;
                 return;
@@ -119,6 +125,17 @@ namespace Sushil.Systems
             rect.sizeDelta = new Vector2(520f, 80f);
 
             canvas.enabled = false;
+        }
+
+        static bool ShouldHideForScene(string sceneName)
+        {
+            if (string.IsNullOrWhiteSpace(sceneName))
+                return false;
+
+            return sceneName == "Level Select" ||
+                   sceneName == "New Tutorial 1" ||
+                   sceneName == "New Tutorial 2" ||
+                   sceneName == "New Tutorial 3";
         }
     }
 }

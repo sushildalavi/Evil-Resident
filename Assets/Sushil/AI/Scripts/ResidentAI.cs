@@ -337,6 +337,7 @@ namespace Sushil.AI
         private readonly List<Collider> cachedHideableColliders = new();
         private Vector3 lastSafePosition;
         private bool hasSafePosition;
+        private float nextSoftNoClipRecoveryAt;
         private Door[] cachedDoors;
         private FuseDoor[] cachedFuseDoors;
         private MainDoor[] cachedMainDoors;
@@ -500,6 +501,11 @@ namespace Sushil.AI
                 patrolMoveSpeed = 1.4f;
                 chaseMoveSpeed = 1.62f;
             }
+            if (IsTutorialResidentScene())
+            {
+                patrolMoveSpeed = 1.1f;
+                chaseMoveSpeed = 1.28f;
+            }
             // Keep hard geometry validation enabled so chase logic cannot cut through walls.
             validatePathAgainstGeometry = true;
             rejectDestinationsInsideBlockingGeometry = true;
@@ -574,6 +580,14 @@ namespace Sushil.AI
             string path = SceneManager.GetActiveScene().path;
             return path == "Assets/Sushil/Easy Level.unity" ||
                    path == "Assets/Sahil/Test/Easy Level.unity";
+        }
+
+        bool IsTutorialResidentScene()
+        {
+            string path = SceneManager.GetActiveScene().path;
+            return path == "Assets/Sahil/Tutorial/New Tutorial 1.unity" ||
+                   path == "Assets/Sahil/Tutorial/New Tutorial 2.unity" ||
+                   path == "Assets/Sahil/Tutorial/New Tutorial 3.unity";
         }
 
         bool ShouldRelocateSearchAwayFromHideSpot()

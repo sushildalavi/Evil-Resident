@@ -279,7 +279,7 @@ public class CollectibleHUD : MonoBehaviour
         trackedKeys.Clear();
         trackedKeys.AddRange(KeyOrder);
         targetKeyCount = DefaultKeyCount;
-        targetFuseCount = DefaultFuseCount;
+        targetFuseCount = IsKeyOnlyEscapeScene() ? 0 : DefaultFuseCount;
 
         BuildRowPips(keyRow, targetKeyCount);
         BuildRowPips(fuseRow, targetFuseCount);
@@ -293,6 +293,7 @@ public class CollectibleHUD : MonoBehaviour
 
         List<KeyType> detectedKeys = ResolveTrackedKeys();
         int detectedFuses = ResolveFuseTargetCount();
+        bool keyOnlyEscapeScene = IsKeyOnlyEscapeScene();
 
         if (ShouldUseProjectDefaults())
         {
@@ -302,13 +303,17 @@ public class CollectibleHUD : MonoBehaviour
                 detectedKeys.AddRange(KeyOrder);
             }
 
-            detectedFuses = Mathf.Max(detectedFuses, DefaultFuseCount);
+            detectedFuses = keyOnlyEscapeScene
+                ? 0
+                : Mathf.Max(detectedFuses, DefaultFuseCount);
         }
 
         if (detectedKeys.Count == 0)
             detectedKeys.AddRange(KeyOrder);
 
-        detectedFuses = Mathf.Clamp(Mathf.Max(detectedFuses, DefaultFuseCount), 0, MaxSupportedFuses);
+        detectedFuses = keyOnlyEscapeScene
+            ? 0
+            : Mathf.Clamp(Mathf.Max(detectedFuses, DefaultFuseCount), 0, MaxSupportedFuses);
 
         bool keysChanged = trackedKeys.Count != detectedKeys.Count;
         if (!keysChanged)
@@ -508,15 +513,39 @@ public class CollectibleHUD : MonoBehaviour
 
     void LayoutRows()
     {
-        float keyWidth = LayoutRow(keyRow, trackedKeys.Count);
-        float fuseWidth = LayoutRow(fuseRow, targetFuseCount);
+        bool showKeys = trackedKeys.Count > 0;
+        bool showFuses = targetFuseCount > 0;
+
+        keyRow.root.gameObject.SetActive(showKeys);
+        fuseRow.root.gameObject.SetActive(showFuses);
+
+        float keyWidth = showKeys ? LayoutRow(keyRow, trackedKeys.Count) : 0f;
+        float fuseWidth = showFuses ? LayoutRow(fuseRow, targetFuseCount) : 0f;
         float rootWidth = Mathf.Max(keyWidth, fuseWidth);
+        float currentTop = 0f;
+        float totalHeight = 0f;
 
-        hudRoot.sizeDelta = new Vector2(rootWidth, (RowHeight * 2f) + RootGap);
-        toastRoot.anchoredPosition = new Vector2(HudPadding, -(HudPadding + hudRoot.sizeDelta.y + 12f));
+        if (showKeys)
+        {
+            PositionRow(keyRow.root, currentTop, rootWidth);
+            currentTop += RowHeight;
+            totalHeight += RowHeight;
+        }
 
-        PositionRow(keyRow.root, 0f, rootWidth);
-        PositionRow(fuseRow.root, RowHeight + RootGap, rootWidth);
+        if (showFuses)
+        {
+            if (showKeys)
+            {
+                currentTop += RootGap;
+                totalHeight += RootGap;
+            }
+
+            PositionRow(fuseRow.root, currentTop, rootWidth);
+            totalHeight += RowHeight;
+        }
+
+        hudRoot.sizeDelta = new Vector2(rootWidth, totalHeight);
+        toastRoot.anchoredPosition = new Vector2(HudPadding, -(HudPadding + totalHeight + 12f));
     }
 
     float LayoutRow(RowView row, int count)
@@ -750,6 +779,20 @@ public class CollectibleHUD : MonoBehaviour
     int ResolveFuseTargetCount()
     {
         return GetTrackedFuseBoxes().Length;
+    }
+
+    bool IsKeyOnlyEscapeScene()
+    {
+        if (FindFirstObjectByType<MainDoor>() == null)
+            return false;
+
+        if (FindFirstObjectByType<FuseDoor>() != null)
+            return false;
+
+        if (GetTrackedFuseBoxes().Length > 0)
+            return false;
+
+        return true;
     }
 
     bool ShouldUseProjectDefaults()
