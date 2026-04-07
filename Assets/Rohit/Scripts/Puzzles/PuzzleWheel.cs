@@ -62,6 +62,8 @@ public class PuzzleWheel : MonoBehaviour, IInteractable
     public int CurrentState => currentState;
     public int StateCount => Mathf.Max(2, stateCount);
     public bool IsLocked => isLocked;
+    public bool IsAnimating => isAnimating;
+    public ColorWheelPuzzleManager PuzzleManager => puzzleManager;
 
     void Reset()
     {
@@ -128,13 +130,28 @@ public class PuzzleWheel : MonoBehaviour, IInteractable
         isLocked = locked;
     }
 
+    public void ResetToStartingStateImmediate()
+    {
+        if (isAnimating)
+            return;
+
+        SetCurrentStateImmediate(startingState);
+    }
+
     public KeyCode GetInteractKey() => interactKey;
 
     public string GetPrompt(RohitFPSController player)
     {
+        string prompt;
         if (puzzleManager != null && puzzleManager.IsSolved && puzzleManager.LockWheelsWhenSolved)
-            return puzzleManager.SolvedPrompt;
-        return IsLocked ? GetLockedPromptText() : GetRotatePromptText();
+            prompt = puzzleManager.SolvedPrompt;
+        else
+            prompt = IsLocked ? GetLockedPromptText() : GetRotatePromptText();
+
+        if (puzzleManager != null)
+            prompt = puzzleManager.WithResetPrompt(prompt);
+
+        return prompt;
     }
 
     public void Interact(RohitFPSController player)

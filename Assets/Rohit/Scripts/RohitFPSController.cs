@@ -328,6 +328,16 @@ public class RohitFPSController : MonoBehaviour
             string prompt = interactable.GetPrompt(this);
             ShowPrompt(prompt);
 
+            if (interactable is PuzzleWheel interactableWheel)
+            {
+                ColorWheelPuzzleManager manager = interactableWheel.PuzzleManager;
+                if (manager != null && WasKeyPressed(manager.ResetKey))
+                {
+                    manager.ResetPuzzleToStartingState();
+                    return;
+                }
+            }
+
             KeyCode interactKey = interactable.GetInteractKey();
             if (WasKeyPressed(interactKey))
                 interactable.Interact(this);
@@ -339,6 +349,13 @@ public class RohitFPSController : MonoBehaviour
         {
             string prompt = nearbyWheel.GetPrompt(this);
             ShowPrompt(prompt);
+
+            ColorWheelPuzzleManager manager = nearbyWheel.PuzzleManager;
+            if (manager != null && WasKeyPressed(manager.ResetKey))
+            {
+                manager.ResetPuzzleToStartingState();
+                return;
+            }
 
             if (WasKeyPressed(nearbyWheel.GetInteractKey()))
                 nearbyWheel.Interact(this);

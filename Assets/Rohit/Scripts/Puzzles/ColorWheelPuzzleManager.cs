@@ -16,6 +16,8 @@ public class ColorWheelPuzzleManager : MonoBehaviour
     [SerializeField] bool isSolved;
     [SerializeField] bool lockWheelsWhenSolved = true;
     [SerializeField] string solvedPrompt = "The mechanism is already unlocked";
+    [SerializeField] KeyCode resetKey = KeyCode.R;
+    [SerializeField] string resetPromptSuffix = "Press R to reset";
     [SerializeField] bool verboseLogging = true;
 
     [Header("Solved Feedback")]
@@ -47,6 +49,7 @@ public class ColorWheelPuzzleManager : MonoBehaviour
     public bool IsSolved => isSolved;
     public bool LockWheelsWhenSolved => lockWheelsWhenSolved;
     public string SolvedPrompt => solvedPrompt;
+    public KeyCode ResetKey => resetKey;
 
     void Reset()
     {
@@ -127,6 +130,53 @@ public class ColorWheelPuzzleManager : MonoBehaviour
             Debug.Log($"[ColorWheelPuzzle] Wheel '{wheel.name}' -> state {wheel.CurrentState}", wheel);
 
         EvaluateSolved();
+    }
+
+    public void ResetPuzzleToStartingState()
+    {
+        if (wheels == null || wheels.Count == 0)
+            return;
+
+        bool changed = false;
+        for (int i = 0; i < wheels.Count; i++)
+        {
+            PuzzleWheel wheel = wheels[i];
+            if (wheel == null)
+                continue;
+
+            if (wheel.IsAnimating)
+                continue;
+
+            wheel.ResetToStartingStateImmediate();
+            changed = true;
+        }
+
+        if (!changed)
+            return;
+
+        isSolved = false;
+        SetWheelLockState(false);
+        UpdateSolvedIndicatorVisual(false);
+
+        if (verboseLogging)
+            Debug.Log("[ColorWheelPuzzle] Puzzle reset to starting state.", this);
+    }
+
+    public string WithResetPrompt(string basePrompt)
+    {
+        string prompt = string.IsNullOrWhiteSpace(basePrompt) ? string.Empty : basePrompt.Trim();
+        string suffix = string.IsNullOrWhiteSpace(resetPromptSuffix) ? $"Press {resetKey} to reset" : resetPromptSuffix.Trim();
+
+        if (string.IsNullOrEmpty(suffix))
+            return prompt;
+
+        if (prompt.IndexOf(suffix, System.StringComparison.OrdinalIgnoreCase) >= 0)
+            return prompt;
+
+        if (string.IsNullOrEmpty(prompt))
+            return suffix;
+
+        return prompt + "\n" + suffix;
     }
 
     public int[] GetCurrentCombination()

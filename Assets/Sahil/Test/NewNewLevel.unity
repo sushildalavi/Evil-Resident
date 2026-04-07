@@ -2022,7 +2022,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1766470421345143156, guid: 9e6b65b9c76ba41238a22e8726ac0f6a, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 4792105798038391821, guid: 9e6b65b9c76ba41238a22e8726ac0f6a, type: 3}
       propertyPath: m_LocalScale.x
@@ -10094,15 +10094,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6600163164378997395, guid: 1042630fc65eb46719d10f7d81dc00fc, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 7.804
+      value: 8.379
       objectReference: {fileID: 0}
     - target: {fileID: 6600163164378997395, guid: 1042630fc65eb46719d10f7d81dc00fc, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.599
+      value: 0.625
       objectReference: {fileID: 0}
     - target: {fileID: 6600163164378997395, guid: 1042630fc65eb46719d10f7d81dc00fc, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -21.168
+      value: -21.165
       objectReference: {fileID: 0}
     - target: {fileID: 6600163164378997395, guid: 1042630fc65eb46719d10f7d81dc00fc, type: 3}
       propertyPath: m_LocalRotation.w
@@ -13812,7 +13812,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 4190697301325015514, guid: ccf8815e9bcc1ed4da07b687264980d4, type: 3}
       propertyPath: m_IsActive
-      value: 1
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6357216687861692169, guid: ccf8815e9bcc1ed4da07b687264980d4, type: 3}
       propertyPath: fuseId
@@ -13840,11 +13840,7 @@ GameObject:
   m_CorrespondingSourceObject: {fileID: 4190697301325015514, guid: ccf8815e9bcc1ed4da07b687264980d4, type: 3}
   m_PrefabInstance: {fileID: 2100001003}
   m_PrefabAsset: {fileID: 0}
-<<<<<<< Updated upstream:Assets/Sahil/Test/Easy Level.unity
---- !u!1001 &2100002001
-=======
 --- !u!1001 &2100002002
->>>>>>> Stashed changes:Assets/Sahil/Test/NewLevel.unity
 PrefabInstance:
   m_ObjectHideFlags: 0
   serializedVersion: 2
@@ -13852,51 +13848,6 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
-<<<<<<< Updated upstream:Assets/Sahil/Test/Easy Level.unity
-    - target: {fileID: 2000000000000000000, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-      propertyPath: m_Name
-      value: HorrorLight
-      objectReference: {fileID: 0}
-    - target: {fileID: 2000000000000000001, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 6.5
-      objectReference: {fileID: 0}
-    - target: {fileID: 2000000000000000001, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 2.6
-      objectReference: {fileID: 0}
-    - target: {fileID: 2000000000000000001, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -20.9
-      objectReference: {fileID: 0}
-    - target: {fileID: 2000000000000000001, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 2000000000000000001, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2000000000000000001, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2000000000000000001, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2000000000000000001, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2000000000000000001, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 2000000000000000001, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-=======
     - target: {fileID: 3000000000000000000, guid: 3d75d8d7b7574d51ad28ae0eb5221038, type: 3}
       propertyPath: m_Name
       value: HorrorSpotLight
@@ -14024,17 +13975,12 @@ PrefabInstance:
     - target: {fileID: 3000000000000000033, guid: 3d75d8d7b7574d51ad28ae0eb5221038, type: 3}
       propertyPath: flickerAmount
       value: 0.8
->>>>>>> Stashed changes:Assets/Sahil/Test/NewLevel.unity
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
-<<<<<<< Updated upstream:Assets/Sahil/Test/Easy Level.unity
-  m_SourcePrefab: {fileID: 100100000, guid: 57ff8ff08a624b3185022d2695ad3fab, type: 3}
-=======
   m_SourcePrefab: {fileID: 100100000, guid: 3d75d8d7b7574d51ad28ae0eb5221038, type: 3}
->>>>>>> Stashed changes:Assets/Sahil/Test/NewLevel.unity
 --- !u!1 &2133427843
 GameObject:
   m_ObjectHideFlags: 0

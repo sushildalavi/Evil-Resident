@@ -1,7 +1,10 @@
 using UnityEngine;
+using System;
 
 public class FuseBox : MonoBehaviour, IInteractable
 {
+    public static event Action<FuseId, FuseBox> FuseBoxPowered;
+
     [Header("Legacy Visual Slots (kept for prefab compatibility)")]
     public Transform[] slots;
     public Renderer[] slotRenderers;
@@ -24,6 +27,7 @@ public class FuseBox : MonoBehaviour, IInteractable
 
     public bool IsPowered => isPowered;
     public bool IsFull => isPowered;
+    public FuseId RequiredFuseId => requiredFuseId;
 
     public string GetPrompt(RohitFPSController player)
     {
@@ -83,6 +87,7 @@ public class FuseBox : MonoBehaviour, IInteractable
         isPowered = true;
         ApplyPoweredVisuals();
         Debug.Log($"Inserted {PlayerInventory.FuseIdToLabel(requiredFuseId)} into {name}");
+        FuseBoxPowered?.Invoke(requiredFuseId, this);
     }
 
     private void ApplyPoweredVisuals()
