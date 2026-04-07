@@ -15,6 +15,9 @@ EditorBuildSettings:
     path: Assets/Scenes/SahilLevelDesign.unity
     guid: 27ce0f6984147424da1dd5781b4d86b8
   - enabled: 1
+    path: Assets/Sahil/Tutorial/Level Select.unity
+    guid: f834dda87dd3b4c7a818cbe0c674cdd1
+  - enabled: 1
     path: Assets/Sahil/Test/Medium Level.unity
     guid: 5260f108c387f480fb2f3d05fbc0cbc2
   - enabled: 0
@@ -28,10 +31,7 @@ EditorBuildSettings:
     guid: 629c9a8296a174f70acc305beefdb258
   - enabled: 1
     path: Assets/Sahil/Tutorial/New Tutorial 3.unity
-    guid: 800e04c6f3bee45abb4ad875a498a78c
-  - enabled: 1
-    path: Assets/Sahil/Tutorial/Level Select.unity
-    guid: f834dda87dd3b4c7a818cbe0c674cdd1
+    guid: b6c9406886b514f9bbc11b4525d9bcea
   - enabled: 1
     path: Assets/Sahil/Test/Easy Level.unity
     guid: 6edacfe4248234e64bd8c37c8ea1b65e

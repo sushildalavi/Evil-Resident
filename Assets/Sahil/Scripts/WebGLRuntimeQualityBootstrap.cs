@@ -2,22 +2,52 @@ using UnityEngine;
 
 public static class WebGLRuntimeQualityBootstrap
 {
-    private const string DesiredQualityName = "PC";
-    private const int TargetFps = 60;
+    private static readonly string[] PreferredQualityOrder =
+    {
+        "WebGL",
+        "Mobile",
+        "Fast",
+        "Simple",
+        "Low"
+    };
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Apply()
     {
 #if UNITY_WEBGL
-        int qualityIndex = GetQualityIndex(DesiredQualityName);
+        int qualityIndex = GetPreferredQualityIndex();
         if (qualityIndex >= 0)
             QualitySettings.SetQualityLevel(qualityIndex, true);
 
         QualitySettings.vSyncCount = 0;
-        Application.targetFrameRate = TargetFps;
+        Application.targetFrameRate = -1;
 
-        Debug.Log($"[WebGLRuntimeQualityBootstrap] quality={QualitySettings.names[QualitySettings.GetQualityLevel()]} vSync={QualitySettings.vSyncCount} targetFps={Application.targetFrameRate}");
+        // WebGL-specific parity-safe GPU budget controls.
+        QualitySettings.realtimeReflectionProbes = true;
+        QualitySettings.anisotropicFiltering = AnisotropicFiltering.Enable;
+        QualitySettings.shadowDistance = Mathf.Min(QualitySettings.shadowDistance, 50f);
+
+        Debug.Log(
+            $"[WebGLRuntimeQualityBootstrap] profile=webgl-optimized applied=true " +
+            $"quality={QualitySettings.names[QualitySettings.GetQualityLevel()]} " +
+            $"vSync={QualitySettings.vSyncCount} targetFps={Application.targetFrameRate} " +
+            $"shadowDistance={QualitySettings.shadowDistance}");
 #endif
+    }
+
+    private static int GetPreferredQualityIndex()
+    {
+        for (int i = 0; i < PreferredQualityOrder.Length; i++)
+        {
+            int index = GetQualityIndex(PreferredQualityOrder[i]);
+            if (index >= 0)
+                return index;
+        }
+
+        if (QualitySettings.names != null && QualitySettings.names.Length > 0)
+            return 0;
+
+        return -1;
     }
 
     private static int GetQualityIndex(string qualityName)
