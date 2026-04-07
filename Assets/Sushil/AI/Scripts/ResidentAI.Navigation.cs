@@ -1514,7 +1514,11 @@ namespace Sushil.AI
         bool TryWarpThroughOpenDoor(Door door, Vector3 targetPos)
         {
             if (door == null || !IsAgentReady()) return false;
+            if (!door.IsOpen)
+                return false;
             if (!TryGetBestDoorTraversalPoint(door, targetPos, favorDesiredSide: true, requireCompletePath: false, out var best, out _))
+                return false;
+            if (!CanTraverseWarpSegment(transform.position, best))
                 return false;
 
             agent.Warp(best);
