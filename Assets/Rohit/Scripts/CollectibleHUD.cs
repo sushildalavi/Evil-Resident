@@ -358,10 +358,13 @@ public class CollectibleHUD : MonoBehaviour
             }
         }
 
-        int collectedFuses = Mathf.Clamp(inventory.TotalFusesCollected, 0, targetFuseCount);
-        for (int i = 0; i < targetFuseCount && i < shownFuses.Length; i++)
+        FuseBox[] trackedFuseBoxes = GetTrackedFuseBoxes();
+        for (int i = 0; i < shownFuses.Length; i++)
         {
-            bool shouldBeShown = i < collectedFuses;
+            bool shouldBeShown = i < targetFuseCount &&
+                                i < trackedFuseBoxes.Length &&
+                                trackedFuseBoxes[i] != null &&
+                                trackedFuseBoxes[i].IsPowered;
             if (shownFuses[i] != shouldBeShown)
             {
                 shownFuses[i] = shouldBeShown;
@@ -734,43 +737,7 @@ public class CollectibleHUD : MonoBehaviour
 
     int ResolveFuseTargetCount()
     {
-        int slotCount = 0;
-        FuseBox[] boxes = FindObjectsByType<FuseBox>(FindObjectsSortMode.None);
-        for (int i = 0; i < boxes.Length; i++)
-        {
-            FuseBox box = boxes[i];
-            if (box == null || !box.gameObject.activeInHierarchy || box.slots == null)
-                continue;
-            slotCount += box.slots.Length;
-        }
-
-        int liveFuseObjects = CountUniqueFuseObjects();
-        PlayerInventory inventory = GetInventory();
-        int collectedFuses = inventory != null ? inventory.TotalFusesCollected : 0;
-
-        return Mathf.Max(slotCount, liveFuseObjects + collectedFuses);
-    }
-
-    int CountUniqueFuseObjects()
-    {
-        var ids = new HashSet<int>();
-        RegisterFuseObjects(ids, FindObjectsByType<FusePickup>(FindObjectsSortMode.None));
-        RegisterFuseObjects(ids, FindObjectsByType<FuseItem>(FindObjectsSortMode.None));
-        RegisterFuseObjects(ids, FindObjectsByType<FuseInteract>(FindObjectsSortMode.None));
-        return ids.Count;
-    }
-
-    void RegisterFuseObjects<T>(HashSet<int> ids, T[] objects) where T : Component
-    {
-        if (objects == null)
-            return;
-
-        for (int i = 0; i < objects.Length; i++)
-        {
-            T obj = objects[i];
-            if (obj != null && obj.gameObject.activeInHierarchy)
-                ids.Add(obj.gameObject.GetInstanceID());
-        }
+        return GetTrackedFuseBoxes().Length;
     }
 
     bool ShouldUseProjectDefaults()
@@ -906,20 +873,17 @@ public class CollectibleHUD : MonoBehaviour
 
     Color ResolveFuseDisplayColor(int fuseIndex)
     {
-        FuseBox[] boxes = FindObjectsByType<FuseBox>(FindObjectsSortMode.None);
-        for (int i = 0; i < boxes.Length; i++)
+        FuseBox[] boxes = GetTrackedFuseBoxes();
+        if (fuseIndex >= 0 && fuseIndex < boxes.Length)
         {
-            FuseBox box = boxes[i];
-            if (box == null)
-                continue;
-
+            FuseBox box = boxes[fuseIndex];
+            int boxColorIndex = Mathf.Clamp((int)box.requiredFuseId, 0, MaxSupportedFuses - 1);
             if (box.preferFusePrefabColor &&
                 box.fusePrefabs != null &&
-                fuseIndex >= 0 &&
-                fuseIndex < box.fusePrefabs.Length &&
-                box.fusePrefabs[fuseIndex] != null)
+                boxColorIndex < box.fusePrefabs.Length &&
+                box.fusePrefabs[boxColorIndex] != null)
             {
-                Renderer fuseRenderer = box.fusePrefabs[fuseIndex].GetComponentInChildren<Renderer>(true);
+                Renderer fuseRenderer = box.fusePrefabs[boxColorIndex].GetComponentInChildren<Renderer>(true);
                 if (fuseRenderer != null)
                 {
                     Material shared = fuseRenderer.sharedMaterial;
@@ -934,10 +898,42 @@ public class CollectibleHUD : MonoBehaviour
             }
 
             if (box.fallbackSlotColors != null && box.fallbackSlotColors.Length > 0)
-                return box.fallbackSlotColors[Mathf.Clamp(fuseIndex, 0, box.fallbackSlotColors.Length - 1)];
+                return box.fallbackSlotColors[Mathf.Clamp(boxColorIndex, 0, box.fallbackSlotColors.Length - 1)];
         }
 
         return DefaultFuseColors[Mathf.Clamp(fuseIndex, 0, DefaultFuseColors.Length - 1)];
+    }
+
+    FuseBox[] GetTrackedFuseBoxes()
+    {
+        FuseBox[] boxes = FindObjectsByType<FuseBox>(FindObjectsSortMode.None);
+        if (boxes == null || boxes.Length == 0)
+            return System.Array.Empty<FuseBox>();
+
+        List<FuseBox> trackedBoxes = new List<FuseBox>(boxes.Length);
+        for (int i = 0; i < boxes.Length; i++)
+        {
+            FuseBox box = boxes[i];
+            if (box == null || !box.isActiveAndEnabled || !box.gameObject.activeInHierarchy)
+                continue;
+
+            trackedBoxes.Add(box);
+        }
+
+        trackedBoxes.Sort((a, b) =>
+        {
+            int idCompare = a.requiredFuseId.CompareTo(b.requiredFuseId);
+            if (idCompare != 0)
+                return idCompare;
+
+            int nameCompare = string.CompareOrdinal(a.name, b.name);
+            if (nameCompare != 0)
+                return nameCompare;
+
+            return a.GetInstanceID().CompareTo(b.GetInstanceID());
+        });
+
+        return trackedBoxes.ToArray();
     }
 
     static float GetPipAreaWidth(RowKind kind, int count)
