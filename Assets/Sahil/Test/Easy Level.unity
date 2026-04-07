@@ -7820,6 +7820,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Cupboard
       objectReference: {fileID: 0}
+    - target: {fileID: 2352169967226737131, guid: 6c1703af002e149168e3283228577a01, type: 3}
+      propertyPath: m_IsActive
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 6065899364038724208, guid: 6c1703af002e149168e3283228577a01, type: 3}
       propertyPath: m_LocalScale.x
       value: 1.5000001
@@ -7834,7 +7838,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 6065899364038724208, guid: 6c1703af002e149168e3283228577a01, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0
+      value: 0.656
       objectReference: {fileID: 0}
     - target: {fileID: 6065899364038724208, guid: 6c1703af002e149168e3283228577a01, type: 3}
       propertyPath: m_LocalRotation.w
