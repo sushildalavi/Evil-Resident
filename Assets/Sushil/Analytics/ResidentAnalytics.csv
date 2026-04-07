@@ -615,3 +615,8 @@ timestamp,scene,event,elapsed_seconds,deaths_this_run,total_deaths,details
 "2026-04-06 17:06:17","Tutorial","run_started",0.00,0,0,"start_screen_dismissed"
 "2026-04-06 17:26:00","NewLevel","run_started",0.00,0,0,"start_screen_dismissed"
 "2026-04-06 17:35:23","NewLevel","run_started",0.00,0,0,"start_screen_dismissed"
+"2026-04-06 17:38:34","NewLevel","run_started",0.00,0,0,"start_screen_dismissed"
+"2026-04-06 18:06:18","Diifficult Level","run_started",0.00,0,0,"start_screen_dismissed"
+"2026-04-06 18:07:03","Diifficult Level","death",42.66,1,1,"Resident one-shot"
+"2026-04-06 18:07:07","Diifficult Level","run_started",0.00,0,1,"start_screen_dismissed"
+"2026-04-06 18:07:36","Diifficult Level","death",29.04,1,2,"Resident one-shot"
