@@ -169,9 +169,12 @@ MonoBehaviour:
     m_Bits: 4294967295
   visibilityPointHeight: 1.15
   requireLineOfSightToChase: 1
+  allowBodyForwardFallback: 1
   facePlayerWhenFrozen: 1
   turnSpeedDegrees: 360
   debugDrawLineOfSight: 0
+  debugLogLookDetectionInBuild: 1
+  debugLookLogInterval: 0.5
   killPlayerOnReach: 1
   killDistance: 0.8
   killReason: The Weeping Angel Reached you.

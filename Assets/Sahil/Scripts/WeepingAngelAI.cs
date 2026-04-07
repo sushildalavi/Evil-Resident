@@ -33,6 +33,8 @@ public class WeepingAngelAI : MonoBehaviour
     public float visibilityPointHeight = 1.15f;
     [Tooltip("If true, angel only chases when it has direct line of sight to player (walls block chase).")]
     public bool requireLineOfSightToChase = true;
+    [Tooltip("If camera cannot be resolved, use player body forward as a fallback so freeze logic still works in builds.")]
+    public bool allowBodyForwardFallback = true;
 
     [Header("Facing")]
     public bool facePlayerWhenFrozen = true;
@@ -59,6 +61,7 @@ public class WeepingAngelAI : MonoBehaviour
     private bool previousInViewport;
     private bool previousLineOfSightClear;
     private bool previousLookedAt;
+    private float nextMissingReferenceLogTime;
 
     private void Awake()
     {
@@ -139,11 +142,26 @@ public class WeepingAngelAI : MonoBehaviour
             }
         }
 
+        if (playerController == null && playerTransform != null)
+            playerController = playerTransform.GetComponent<RohitFPSController>() ?? playerTransform.GetComponentInParent<RohitFPSController>();
+
+        if (playerTransform == null && playerController != null)
+            playerTransform = playerController.transform;
+
+        if (playerController != null)
+        {
+            Camera controllerCamera = ResolveCameraFromController(playerController);
+            if (controllerCamera != null)
+                playerCamera = controllerCamera;
+        }
+
         if (playerCamera == null && autoFindMainCamera)
             playerCamera = Camera.main;
 
-        if (playerController == null && playerTransform != null)
-            playerController = playerTransform.GetComponent<RohitFPSController>();
+        if (playerCamera == null)
+            playerCamera = FindFirstObjectByType<Camera>();
+
+        MaybeLogMissingReferences();
     }
 
     private void ApplySpeedFromPlayerWalk()
@@ -165,7 +183,7 @@ public class WeepingAngelAI : MonoBehaviour
         lineOfSightClear = false;
 
         if (playerCamera == null)
-            return false;
+            return IsLookedAtByPlayerBodyForwardFallback(out inFront, out inViewport, out lineOfSightClear);
 
         Vector3 cameraPos = playerCamera.transform.position;
         Vector3 targetPoint = transform.position + Vector3.up * visibilityPointHeight;
@@ -211,6 +229,53 @@ public class WeepingAngelAI : MonoBehaviour
         if (debugDrawLineOfSight)
             Debug.DrawLine(cameraPos, targetPoint, blocked ? Color.red : Color.green);
 
+        lineOfSightClear = !blocked;
+        return lineOfSightClear;
+    }
+
+    private bool IsLookedAtByPlayerBodyForwardFallback(out bool inFront, out bool inViewport, out bool lineOfSightClear)
+    {
+        inFront = false;
+        inViewport = false;
+        lineOfSightClear = false;
+
+        if (!allowBodyForwardFallback || playerTransform == null)
+            return false;
+
+        Vector3 eyePos = GetPlayerAimPoint();
+        Vector3 targetPoint = transform.position + Vector3.up * visibilityPointHeight;
+        Vector3 toTarget = targetPoint - eyePos;
+
+        float distance = toTarget.magnitude;
+        if (distance > maxReactionDistance)
+            return false;
+        if (distance < 0.001f)
+        {
+            inFront = true;
+            inViewport = true;
+            lineOfSightClear = true;
+            return true;
+        }
+
+        Vector3 dir = toTarget / distance;
+        Vector3 forward = playerTransform.forward;
+        float forwardDot = Vector3.Dot(forward, dir);
+        if (forwardDot <= 0f)
+            return false;
+        inFront = true;
+
+        float fallbackHalfFov = 50f + fieldOfViewTolerance;
+        float angle = Vector3.Angle(forward, dir);
+        if (angle > fallbackHalfFov)
+            return false;
+
+        inViewport = true;
+        bool blocked = Physics.Linecast(eyePos, targetPoint, out RaycastHit hit, lineOfSightObstructionMask, QueryTriggerInteraction.Ignore)
+                       && hit.transform != null
+                       && hit.transform != transform
+                       && !hit.transform.IsChildOf(transform)
+                       && !IsPlayerOrChild(hit.transform)
+                       && !IsCameraOrChild(hit.transform);
         lineOfSightClear = !blocked;
         return lineOfSightClear;
     }
@@ -408,6 +473,40 @@ public class WeepingAngelAI : MonoBehaviour
 
         Transform cameraTransform = playerCamera.transform;
         return candidate == cameraTransform || candidate.IsChildOf(cameraTransform);
+    }
+
+    private static Camera ResolveCameraFromController(RohitFPSController controller)
+    {
+        if (controller == null)
+            return null;
+
+        if (controller.cameraTransform != null)
+        {
+            Camera direct = controller.cameraTransform.GetComponent<Camera>();
+            if (direct != null)
+                return direct;
+        }
+
+        return controller.GetComponentInChildren<Camera>(true);
+    }
+
+    private void MaybeLogMissingReferences()
+    {
+        if (Application.isEditor)
+            return;
+
+        if (Time.unscaledTime < nextMissingReferenceLogTime)
+            return;
+
+        if (playerTransform == null || playerCamera == null)
+        {
+            string playerInfo = playerTransform != null ? playerTransform.name : "null";
+            string cameraInfo = playerCamera != null ? playerCamera.name : "null";
+            string controllerInfo = playerController != null ? playerController.name : "null";
+            Debug.LogWarning($"[WeepingAngelAI:{name}] Missing reference(s) in build. player={playerInfo}, camera={cameraInfo}, controller={controllerInfo}", this);
+        }
+
+        nextMissingReferenceLogTime = Time.unscaledTime + 5f;
     }
 
     private void MaybeLogLookDetection(bool inFront, bool inViewport, bool lineOfSightClear, bool lookedAt)
