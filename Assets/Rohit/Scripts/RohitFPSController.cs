@@ -35,14 +35,14 @@ public class RohitFPSController : MonoBehaviour
     public Transform cameraTransform;
 
     [Header("Interaction")]
-    public float interactDistance = 5f;
-    public float keyInteractDistance = 10f;
-    public float keyProximityRadius = 2.5f;
-    public float fuseProximityRadius = 2.5f;
+    public float interactDistance = 1.5f;
+    public float keyInteractDistance = 2f;
+    public float keyProximityRadius = 1f;
+    public float fuseProximityRadius = 0.5f;
     [Tooltip("Small wall dials are easy to miss with a pure ray hit, so give them a little extra usable range.")]
-    public float puzzleWheelInteractDistance = 8f;
+    public float puzzleWheelInteractDistance = 2f;
     [Tooltip("Player proximity radius used to keep dial prompts stable near the puzzle wall.")]
-    public float puzzleWheelProximityRadius = 3.5f;
+    public float puzzleWheelProximityRadius = 1.5f;
     [Range(0.75f, 0.999f)]
     [Tooltip("How close to the center of view a puzzle dial must be before the prompt snaps to it.")]
     public float puzzleWheelPromptViewDot = 0.88f;
@@ -88,6 +88,13 @@ public class RohitFPSController : MonoBehaviour
 
     void Start()
     {
+        interactDistance = 1.5f;
+        keyInteractDistance = 2f;
+        keyProximityRadius = 1f;
+        fuseProximityRadius = 0.5f;
+        puzzleWheelInteractDistance = 2f;
+        puzzleWheelProximityRadius = 1.5f;
+
         CollectibleHUD.EnsureExists();
 
         controller = GetComponent<CharacterController>();
@@ -362,6 +369,9 @@ public class RohitFPSController : MonoBehaviour
             IInteractable candidate = col.GetComponentInParent<IInteractable>();
             if (candidate != null)
             {
+                if (candidate is FusePickup)
+                    continue;
+
                 float allowedDistance = interactDistance;
                 if (candidate is KeyItem)
                     allowedDistance = Mathf.Max(interactDistance, keyInteractDistance);
@@ -416,7 +426,7 @@ public class RohitFPSController : MonoBehaviour
 
         float bestSqr = float.MaxValue;
         Vector3 playerPos = transform.position;
-        float radius = Mathf.Max(0.1f, keyProximityRadius);
+        float radius = Mathf.Max(0.01f, keyProximityRadius);
         float radiusSqr = radius * radius;
 
         for (int i = 0; i < allKeys.Length; i++)
@@ -457,7 +467,7 @@ public class RohitFPSController : MonoBehaviour
         Vector3 forward = cameraTransform.forward;
         float maxDistance = Mathf.Max(interactDistance, puzzleWheelInteractDistance);
         float minViewDot = Mathf.Clamp(puzzleWheelPromptViewDot, 0.75f, 0.999f);
-        float proximityRadius = Mathf.Max(0.5f, puzzleWheelProximityRadius);
+        float proximityRadius = Mathf.Max(0.01f, puzzleWheelProximityRadius);
         float proximityRadiusSqr = proximityRadius * proximityRadius;
         float bestScore = float.NegativeInfinity;
 
@@ -506,7 +516,7 @@ public class RohitFPSController : MonoBehaviour
 
         float bestSqr = float.MaxValue;
         Vector3 playerPos = transform.position;
-        float radius = Mathf.Max(0.1f, fuseProximityRadius);
+        float radius = Mathf.Max(0.01f, fuseProximityRadius);
         float radiusSqr = radius * radius;
 
         for (int i = 0; i < allFuses.Length; i++)
