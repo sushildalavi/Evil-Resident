@@ -301,7 +301,9 @@ Transform:
   m_LocalPosition: {x: 5.33265, y: -2.36601, z: 5.85}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 1535931304}
+  - {fileID: 1938441145}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &476325102 stripped
@@ -1080,23 +1082,27 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 0}
+    m_TransformParent: {fileID: 217996027}
     m_Modifications:
     - target: {fileID: 2352169967226737131, guid: 6c1703af002e149168e3283228577a01, type: 3}
       propertyPath: m_Name
       value: Cupboard
       objectReference: {fileID: 0}
     - target: {fileID: 6065899364038724208, guid: 6c1703af002e149168e3283228577a01, type: 3}
+      propertyPath: m_LocalScale.x
+      value: 1.5000001
+      objectReference: {fileID: 0}
+    - target: {fileID: 6065899364038724208, guid: 6c1703af002e149168e3283228577a01, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 5.36
+      value: 0.027349949
       objectReference: {fileID: 0}
     - target: {fileID: 6065899364038724208, guid: 6c1703af002e149168e3283228577a01, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -4.02
+      value: -1.65399
       objectReference: {fileID: 0}
     - target: {fileID: 6065899364038724208, guid: 6c1703af002e149168e3283228577a01, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 2.65
+      value: -3.1999998
       objectReference: {fileID: 0}
     - target: {fileID: 6065899364038724208, guid: 6c1703af002e149168e3283228577a01, type: 3}
       propertyPath: m_LocalRotation.w
@@ -1131,6 +1137,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 6c1703af002e149168e3283228577a01, type: 3}
+--- !u!4 &1535931304 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 6065899364038724208, guid: 6c1703af002e149168e3283228577a01, type: 3}
+  m_PrefabInstance: {fileID: 1471662317}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1742466728
 GameObject:
   m_ObjectHideFlags: 0
@@ -1267,8 +1278,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1938441144}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2.63413, y: 0, z: 6}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: -2.6985202, y: 2.36601, z: 0.1500001}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -1284,7 +1295,7 @@ Transform:
   - {fileID: 1946677679}
   - {fileID: 491491172}
   - {fileID: 476325103}
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 217996027}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!4 &1946677679 stripped
 Transform:
@@ -1545,5 +1556,3 @@ SceneRoots:
   m_ObjectHideFlags: 0
   m_Roots:
   - {fileID: 217996027}
-  - {fileID: 1938441145}
-  - {fileID: 1471662317}
