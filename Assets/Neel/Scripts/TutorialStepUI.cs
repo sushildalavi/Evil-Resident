@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
 #endif
@@ -10,6 +11,10 @@ public class TutorialStepUI : MonoBehaviour
     const string InteractionLine = "Try interacting with something that stands out.";
     const string HidingLine = "You can hide in some objects, try finding a few around";
     const string DoorLine = "Great, let's move on to the next level by interacting with the door.";
+    const string LevelSelectSeenKey = "level_select_intro_seen_v1";
+    const string NewTutorial3Line1 = "This is a Weeping Angel";
+    const string NewTutorial3Line2 = "Keep looking in it's eyes, it can't move as long as you're looking at it.";
+    const string NewTutorial3Line3 = "Beware, it moves fast when you look away";
 
     [Header("Step Text")]
     [TextArea] public string movementHint = MovementLine;
@@ -43,6 +48,10 @@ public class TutorialStepUI : MonoBehaviour
     private bool hideExited;
     private bool transitioning;
     private float transitionTimer;
+    private bool isLevelSelectScene;
+    private bool isNewTutorial1Scene;
+    private bool isNewTutorial3Scene;
+    private bool useScene3TimedSequence;
 
     private void OnEnable()
     {
@@ -60,21 +69,50 @@ public class TutorialStepUI : MonoBehaviour
 
     private void Start()
     {
+        string activeSceneName = SceneManager.GetActiveScene().name;
+        isLevelSelectScene = activeSceneName == "Level Select";
+        isNewTutorial1Scene = activeSceneName == "New Tutorial 1";
+        isNewTutorial3Scene = activeSceneName == "New Tutorial 3";
+        if (isLevelSelectScene && ShouldSkipLevelSelectWebGLPrompt())
+        {
+            enabled = false;
+            return;
+        }
+
         // Force canonical tutorial copy so stale scene overrides cannot change top-banner text.
         movementHint = MovementLine;
-        interactionHint = InteractionLine;
+        interactionHint = isLevelSelectScene ? "Try interacting with one of the Doors." : InteractionLine;
         hidingHint = HidingLine;
         doorHint = DoorLine;
 
+        if (isNewTutorial3Scene)
+        {
+            movementHint = NewTutorial3Line1;
+            interactionHint = NewTutorial3Line2;
+            hidingHint = NewTutorial3Line3;
+        }
+
         BuildUI();
         player = FindFirstObjectByType<RohitFPSController>();
-        currentStep = TutorialStep.Movement;
+        currentStep = isNewTutorial1Scene ? TutorialStep.Interaction : TutorialStep.Movement;
         ApplyStepText();
         canvasGroup.alpha = 1f;
+
+        if (isLevelSelectScene)
+            PersistLevelSelectSeenForWebGL();
+
+        if (isNewTutorial3Scene)
+        {
+            useScene3TimedSequence = true;
+            StartCoroutine(PlayNewTutorial3Sequence());
+        }
     }
 
     private void Update()
     {
+        if (useScene3TimedSequence)
+            return;
+
         if (transitioning)
         {
             transitionTimer -= Time.deltaTime;
@@ -106,7 +144,7 @@ public class TutorialStepUI : MonoBehaviour
                 break;
 
             case TutorialStep.Hiding:
-                if (hideEntered && hideExited)
+                if (!isLevelSelectScene && hideEntered && hideExited)
                     AdvanceTo(TutorialStep.DoorAndKey);
                 break;
         }
@@ -119,15 +157,26 @@ public class TutorialStepUI : MonoBehaviour
 
     private void HandlePrimaryInteraction(RohitFPSController source, IInteractable interactable)
     {
+        if (useScene3TimedSequence)
+            return;
+
         if (source == null || source != player)
             return;
 
         if (currentStep == TutorialStep.Interaction)
-            AdvanceTo(TutorialStep.Hiding);
+        {
+            if (isLevelSelectScene)
+                AdvanceTo(TutorialStep.Complete);
+            else
+                AdvanceTo(TutorialStep.Hiding);
+        }
     }
 
     private void HandleHideEntered(RohitFPSController source, HideableObject hideable)
     {
+        if (useScene3TimedSequence)
+            return;
+
         if (source == null || source != player)
             return;
 
@@ -137,6 +186,9 @@ public class TutorialStepUI : MonoBehaviour
 
     private void HandleHideExited(RohitFPSController source, HideableObject hideable)
     {
+        if (useScene3TimedSequence)
+            return;
+
         if (source == null || source != player)
             return;
 
@@ -170,16 +222,54 @@ public class TutorialStepUI : MonoBehaviour
                 instructionText.text = interactionHint;
                 break;
             case TutorialStep.Hiding:
-                instructionText.text = hidingHint;
+                instructionText.text = isLevelSelectScene ? string.Empty : hidingHint;
                 break;
             case TutorialStep.DoorAndKey:
-                instructionText.text = doorHint;
+                instructionText.text = isLevelSelectScene ? string.Empty : doorHint;
                 break;
             default:
                 instructionText.text = string.Empty;
                 canvasGroup.alpha = 0f;
                 break;
         }
+    }
+
+    private bool ShouldSkipLevelSelectWebGLPrompt()
+    {
+        if (Application.platform != RuntimePlatform.WebGLPlayer)
+            return false;
+
+        return PlayerPrefs.GetInt(LevelSelectSeenKey, 0) == 1;
+    }
+
+    private System.Collections.IEnumerator PlayNewTutorial3Sequence()
+    {
+        currentStep = TutorialStep.Movement;
+        ApplyStepText();
+        canvasGroup.alpha = 1f;
+        yield return new WaitForSeconds(4.5f);
+
+        currentStep = TutorialStep.Interaction;
+        ApplyStepText();
+        canvasGroup.alpha = 1f;
+        yield return new WaitForSeconds(5.5f);
+
+        currentStep = TutorialStep.Hiding;
+        ApplyStepText();
+        canvasGroup.alpha = 1f;
+        yield return new WaitForSeconds(5f);
+
+        currentStep = TutorialStep.Complete;
+        ApplyStepText();
+    }
+
+    private void PersistLevelSelectSeenForWebGL()
+    {
+        if (Application.platform != RuntimePlatform.WebGLPlayer)
+            return;
+
+        PlayerPrefs.SetInt(LevelSelectSeenKey, 1);
+        PlayerPrefs.Save();
     }
 
     private bool IsAnyMovementPressed()

@@ -48,12 +48,16 @@ public class WeepingAngelAI : MonoBehaviour
 
     private NavMeshAgent agent;
     private RohitFPSController playerController;
+    private Collider[] angelColliders;
+    private Transform collisionIgnoredForPlayer;
 
     private void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
+        angelColliders = GetComponentsInChildren<Collider>(true);
         ResolveReferences();
         ApplySpeedFromPlayerWalk();
+        ConfigurePlayerCollisionIgnore();
 
         agent.stoppingDistance = stoppingDistance;
         agent.updateUpAxis = true;
@@ -73,6 +77,7 @@ public class WeepingAngelAI : MonoBehaviour
     {
         ResolveReferences();
         ApplySpeedFromPlayerWalk();
+        ConfigurePlayerCollisionIgnore();
 
         if (playerTransform == null)
         {
@@ -237,12 +242,12 @@ public class WeepingAngelAI : MonoBehaviour
         if (playerTransform == null)
             return false;
 
-        if (!HasLineOfSightToPlayer())
-            return false;
-
-        Vector3 toPlayer = playerTransform.position - transform.position;
-        toPlayer.y = 0f;
-        if (toPlayer.sqrMagnitude > killDistance * killDistance)
+        Vector3 selfFlat = transform.position;
+        selfFlat.y = 0f;
+        Vector3 playerFlat = playerTransform.position;
+        playerFlat.y = 0f;
+        float effectiveKillDistance = Mathf.Max(killDistance, GetHorizontalTouchDistance() + 0.05f);
+        if ((playerFlat - selfFlat).sqrMagnitude > effectiveKillDistance * effectiveKillDistance)
             return false;
 
         PlayerDeath death = playerTransform.GetComponent<PlayerDeath>() ?? playerTransform.GetComponentInParent<PlayerDeath>();
@@ -261,6 +266,59 @@ public class WeepingAngelAI : MonoBehaviour
         }
 
         return false;
+    }
+
+    private float GetHorizontalTouchDistance()
+    {
+        float angelRadius = 0.35f;
+        Collider selfCollider = GetComponentInChildren<Collider>();
+        if (selfCollider != null)
+            angelRadius = Mathf.Max(selfCollider.bounds.extents.x, selfCollider.bounds.extents.z);
+
+        float playerRadius = 0.35f;
+        CharacterController cc = playerTransform.GetComponent<CharacterController>() ?? playerTransform.GetComponentInChildren<CharacterController>();
+        if (cc != null)
+            playerRadius = cc.radius;
+        else
+        {
+            Collider playerCollider = playerTransform.GetComponentInChildren<Collider>();
+            if (playerCollider != null)
+                playerRadius = Mathf.Max(playerCollider.bounds.extents.x, playerCollider.bounds.extents.z);
+        }
+
+        return angelRadius + playerRadius;
+    }
+
+    private void ConfigurePlayerCollisionIgnore()
+    {
+        if (playerTransform == null || angelColliders == null || angelColliders.Length == 0)
+            return;
+
+        Transform playerRoot = playerTransform.root != null ? playerTransform.root : playerTransform;
+        if (collisionIgnoredForPlayer == playerRoot)
+            return;
+
+        Collider[] playerColliders = playerRoot.GetComponentsInChildren<Collider>(true);
+        if (playerColliders == null || playerColliders.Length == 0)
+            return;
+
+        for (int i = 0; i < angelColliders.Length; i++)
+        {
+            Collider angelCollider = angelColliders[i];
+            if (angelCollider == null)
+                continue;
+
+            for (int j = 0; j < playerColliders.Length; j++)
+            {
+                Collider playerCollider = playerColliders[j];
+                if (playerCollider == null)
+                    continue;
+
+                Physics.IgnoreCollision(angelCollider, playerCollider, true);
+            }
+        }
+
+        collisionIgnoredForPlayer = playerRoot;
     }
 
     private bool HasLineOfSightToPlayer()

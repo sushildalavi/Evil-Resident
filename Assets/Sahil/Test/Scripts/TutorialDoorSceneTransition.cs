@@ -89,14 +89,30 @@ public class TutorialDoorSceneTransition : MonoBehaviour, IInteractable
 
     void LoadTargetScene()
     {
-        const string tutorial2Path = "Assets/Sahil/Tutorial/New Tutorial 2.unity";
-        int buildIndex = SceneUtility.GetBuildIndexByScenePath(tutorial2Path);
+        string target = string.IsNullOrWhiteSpace(mainGameSceneName) ? string.Empty : mainGameSceneName.Trim();
+        if (string.IsNullOrEmpty(target))
+        {
+            Debug.LogError("[TutorialDoorSceneTransition] No target scene configured.");
+            return;
+        }
+
+        // Path form in build settings (e.g. Assets/.../Scene.unity).
+        int buildIndex = SceneUtility.GetBuildIndexByScenePath(target);
         if (buildIndex >= 0)
         {
             SceneManager.LoadScene(buildIndex);
             return;
         }
 
-        SceneManager.LoadScene(mainGameSceneName);
+        // Name form for tutorial scenes.
+        string tutorialPath = $"Assets/Sahil/Tutorial/{target}.unity";
+        buildIndex = SceneUtility.GetBuildIndexByScenePath(tutorialPath);
+        if (buildIndex >= 0)
+        {
+            SceneManager.LoadScene(buildIndex);
+            return;
+        }
+
+        SceneManager.LoadScene(target);
     }
 }
