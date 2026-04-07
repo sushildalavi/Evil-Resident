@@ -556,7 +556,7 @@ namespace Sushil.AI
         bool IsDifficultyVariantScene()
         {
             string path = SceneManager.GetActiveScene().path;
-            return path == "Assets/Sahil/Test/Easy Level.unity" ||
+            return path == "Assets/Sushil/Easy Level.unity" ||
                    path == "Assets/Sahil/Test/Difficult Level.unity";
         }
 

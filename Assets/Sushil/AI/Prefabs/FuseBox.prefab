@@ -776,8 +776,8 @@ Transform:
   m_GameObject: {fileID: 6519043711620312481}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -23.17, y: 2.36, z: -49.081}
-  m_LocalScale: {x: 2.3381233, y: 1.7588, z: 1}
+  m_LocalPosition: {x: 5.85, y: 2.366, z: -21.394}
+  m_LocalScale: {x: 1.1300999, y: 1.0148815, z: 0.32705545}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4082456555462013302}
@@ -816,6 +816,8 @@ MonoBehaviour:
   - {fileID: 0}
   door: {fileID: 0}
   sparkEffect: {fileID: 0}
+  requiredFuseId: 0
+  isPowered: 0
 --- !u!65 &6595128029461773732
 BoxCollider:
   m_ObjectHideFlags: 0
