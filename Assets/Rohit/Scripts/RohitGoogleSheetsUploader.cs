@@ -1,3 +1,4 @@
+// Analytics uploader — sends play session data to Google Forms
 using System;
 using System.Collections;
 using System.Collections.Generic;
