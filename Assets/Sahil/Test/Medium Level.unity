@@ -4320,7 +4320,7 @@ GameObject:
   m_Component:
   - component: {fileID: 579276686}
   m_Layer: 0
-  m_Name: HorroSpotlightMain
+  m_Name: HorrorSpotlightMain
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

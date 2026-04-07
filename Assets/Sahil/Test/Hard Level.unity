@@ -11085,6 +11085,10 @@ PrefabInstance:
       propertyPath: m_ConstrainProportionsScale
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 3990061695776039152, guid: 2ef12f57cfe004a4f963c5eadb7cd256, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 8593632156659476072, guid: 2ef12f57cfe004a4f963c5eadb7cd256, type: 3}
       propertyPath: m_Name
       value: KeyCircle
