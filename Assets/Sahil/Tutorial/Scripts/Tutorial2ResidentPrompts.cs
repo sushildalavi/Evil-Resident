@@ -5,7 +5,7 @@ using Sushil.AI;
 public class Tutorial2ResidentPrompts : MonoBehaviour
 {
     [Header("Prompt Copy")]
-    [TextArea] public string introPrompt = "This is the resident, Maitain your distance from him";
+    [TextArea] public string introPrompt = "This is the resident, Maintain your distance from him";
     [TextArea] public string spottedPrompt = "If he sees you, then hide";
     [TextArea] public string hidePrompt = "Make sure he is at a safe distance before getting out";
     [TextArea] public string finalPrompt = "Now collect the key and get out without getting caught";

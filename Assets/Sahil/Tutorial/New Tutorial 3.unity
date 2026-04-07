@@ -438,7 +438,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9c8da36f969541ad9f7288af9c2f8c57, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Tutorial2ResidentPrompts
-  introPrompt: This is the resident, Maitain your distance from him
+  introPrompt: This is the resident, Maintain your distance from him
   spottedPrompt: If he sees you, then hide
   hidePrompt: Make sure he is at a safe distance before getting out
   finalPrompt: Now collect the key and get out without getting caught
