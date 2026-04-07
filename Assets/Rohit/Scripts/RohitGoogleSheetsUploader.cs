@@ -1,7 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
-using System.Text;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.SceneManagement;
@@ -11,6 +11,8 @@ using Sushil.Systems;
 
 public class RohitGoogleSheetsUploader : MonoBehaviour
 {
+    const string FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSddm6bMJiB6isB75Egk8VoEgiklER688QyZeiSFwXa_JhFyRA/formResponse";
+
     static RohitGoogleSheetsUploader instance;
     static RohitGoogleSheetsSettings cachedSettings;
 
@@ -51,9 +53,7 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
     void Update()
     {
         var settings = LoadSettings();
-        if (settings == null || !settings.uploadEnabled ||
-            string.IsNullOrWhiteSpace(settings.webAppUrl) ||
-            string.IsNullOrWhiteSpace(settings.sharedSecret))
+        if (settings == null || !settings.uploadEnabled)
             return;
 
         bool active = GameAnalyticsTracker.RunActive;
@@ -98,14 +98,14 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
             CachePositions();
             TryReadDeathReason();
             uploadSentForThisRun = true;
-            PostRun(settings, escaped: false, cachedSurvivalSeconds);
+            PostRun(escaped: false, cachedSurvivalSeconds);
         }
 
         if (escapeNow && !wasEscapeShowing && !uploadSentForThisRun)
         {
             CachePositions();
             uploadSentForThisRun = true;
-            PostRun(settings, escaped: true, cachedSurvivalSeconds);
+            PostRun(escaped: true, cachedSurvivalSeconds);
         }
 
         wasRunActive = active;
@@ -152,7 +152,7 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
     {
         Transform resident = ResolveResidentTransform();
         if (resident == null) return;
-        ClassifyZone(resident.position, out string zone, out string _, out string _);
+        ClassifyZone(resident.position, out string zone, out string _, out string __);
         if (string.IsNullOrEmpty(zone) || zone == "Unknown") return;
         float dt = Time.deltaTime;
         if (residentZoneSeconds.ContainsKey(zone))
@@ -195,102 +195,31 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
         return cachedSettings;
     }
 
-    void PostRun(RohitGoogleSheetsSettings cfg, bool escaped, float survivalSeconds)
+    void PostRun(bool escaped, float survivalSeconds)
     {
         if (SceneManager.GetActiveScene().name == "New Tutorial 2") return;
 
-        string json = BuildPayloadJson(cfg, escaped, survivalSeconds);
-        Debug.Log($"[RohitSheets] Posting: player=({lastPlayerPos.x:F1},{lastPlayerPos.y:F1},{lastPlayerPos.z:F1}) resident=({lastResidentPos.x:F1},{lastResidentPos.y:F1},{lastResidentPos.z:F1}) reason={lastDeathReason} firstKey={firstKeyPickupTime:F1}s patrol={residentPatrolSeconds:F1}s chase={residentChaseSeconds:F1}s");
-        byte[] bodyRaw = Encoding.UTF8.GetBytes(json);
-        var req = new UnityWebRequest(cfg.webAppUrl.Trim(), UnityWebRequest.kHttpVerbPOST);
-        req.uploadHandler = new UploadHandlerRaw(bodyRaw);
-        req.downloadHandler = new DownloadHandlerBuffer();
-        req.SetRequestHeader("Content-Type", "text/plain");
-        var op = req.SendWebRequest();
-        op.completed += _ =>
-        {
-            try
-            {
-                if (req.result != UnityWebRequest.Result.Success)
-                    Debug.LogWarning($"[RohitSheets] POST failed: {req.error} {req.downloadHandler?.text}");
-                else
-                    Debug.Log($"[RohitSheets] OK: {req.downloadHandler?.text}");
-            }
-            finally
-            {
-                req.Dispose();
-            }
-        };
-    }
-
-    string BuildPayloadJson(RohitGoogleSheetsSettings cfg, bool escaped, float survivalSeconds)
-    {
         string sceneName = SceneManager.GetActiveScene().name;
         string platform = Application.platform.ToString();
-        string utc = DateTime.UtcNow.ToString("o", CultureInfo.InvariantCulture);
         string runId = string.IsNullOrEmpty(currentRunId) ? Guid.NewGuid().ToString("N") : currentRunId;
         string survivalStr = survivalSeconds.ToString("F2", CultureInfo.InvariantCulture);
         string distStr = lastDistance.ToString("F2", CultureInfo.InvariantCulture);
-
         string outcome = escaped ? "escape" : "death";
-        string detail = escaped ? "main_door_unlocked" : lastDeathReason;
-        string pickedUpKey = lastKeyCount > 0 ? "yes" : "no";
-        string runEndedBeforeKey = lastKeyCount == 0 ? "yes" : "no";
-        int deathsThisRun = GameAnalyticsTracker.DeathsThisRun;
+        string deathReason = escaped ? "" : lastDeathReason;
 
+        string deathZone = "";
+        if (!escaped)
+            ClassifyZone(lastPlayerPos, out deathZone, out string _d, out string _f);
+
+        string px = escaped ? "" : lastPlayerPos.x.ToString("F2", CultureInfo.InvariantCulture);
+        string py = escaped ? "" : lastPlayerPos.y.ToString("F2", CultureInfo.InvariantCulture);
+        string pz = escaped ? "" : lastPlayerPos.z.ToString("F2", CultureInfo.InvariantCulture);
+
+        string pickedUpKey = lastKeyCount > 0 ? "yes" : "no";
         string firstKeyStr = firstKeyRecorded
             ? firstKeyPickupTime.ToString("F2", CultureInfo.InvariantCulture)
             : "";
 
-        string patrolStr = residentPatrolSeconds.ToString("F2", CultureInfo.InvariantCulture);
-        string investigateStr = residentInvestigateSeconds.ToString("F2", CultureInfo.InvariantCulture);
-        string searchStr = residentSearchSeconds.ToString("F2", CultureInfo.InvariantCulture);
-        string chaseStr = residentChaseSeconds.ToString("F2", CultureInfo.InvariantCulture);
-        float roamSeconds = residentPatrolSeconds + residentInvestigateSeconds + residentSearchSeconds;
-        string roamStr = roamSeconds.ToString("F2", CultureInfo.InvariantCulture);
-
-        string px = lastPlayerPos.x.ToString("F2", CultureInfo.InvariantCulture);
-        string py = lastPlayerPos.y.ToString("F2", CultureInfo.InvariantCulture);
-        string pz = lastPlayerPos.z.ToString("F2", CultureInfo.InvariantCulture);
-        string rx = lastResidentPos.x.ToString("F2", CultureInfo.InvariantCulture);
-        string ry = lastResidentPos.y.ToString("F2", CultureInfo.InvariantCulture);
-        string rz = lastResidentPos.z.ToString("F2", CultureInfo.InvariantCulture);
-
-        var sb = new StringBuilder(1024);
-        sb.Append("{\"secret\":").Append(JsonString(cfg.sharedSecret)).Append(',');
-        sb.Append("\"universal\":{");
-        sb.Append("\"run_id\":").Append(JsonString(runId)).Append(',');
-        sb.Append("\"recorded_at_utc\":").Append(JsonString(utc)).Append(',');
-        sb.Append("\"platform\":").Append(JsonString(platform)).Append(',');
-        sb.Append("\"scene_active\":").Append(JsonString(sceneName));
-        sb.Append("},\"escape_vs_death\":");
-        AppendStringArray(sb, new[]
-        {
-            outcome, survivalStr,
-            deathsThisRun.ToString(CultureInfo.InvariantCulture),
-            px, py, pz, detail, distStr
-        });
-        string deathZone = "";
-        string deathAreaDetail = "";
-        string deathFloor = "";
-        if (!escaped)
-            ClassifyZone(lastPlayerPos, out deathZone, out deathAreaDetail, out deathFloor);
-
-        sb.Append(",\"where_died\":");
-        AppendStringArray(sb, new[]
-        {
-            escaped ? "no" : "yes",
-            escaped ? "" : survivalStr,
-            escaped ? "" : deathZone, escaped ? "" : deathAreaDetail, escaped ? "" : deathFloor,
-            escaped ? "" : detail,
-            escaped ? "" : px, escaped ? "" : py, escaped ? "" : pz
-        });
-        sb.Append(",\"first_key\":");
-        AppendStringArray(sb, new[]
-        {
-            pickedUpKey, firstKeyStr, sceneName, "",
-            "", lastKeyCount.ToString(CultureInfo.InvariantCulture), runEndedBeforeKey
-        });
         string dominantZone = "";
         float dominantZoneSec = 0f;
         foreach (var kvp in residentZoneSeconds)
@@ -305,169 +234,96 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
             ? dominantZoneSec.ToString("F2", CultureInfo.InvariantCulture)
             : "";
         string zonesVisitedStr = residentZoneSeconds.Count.ToString(CultureInfo.InvariantCulture);
+        float roamSeconds = residentPatrolSeconds + residentInvestigateSeconds + residentSearchSeconds;
+        string roamStr = roamSeconds.ToString("F2", CultureInfo.InvariantCulture);
+        string chaseStr = residentChaseSeconds.ToString("F2", CultureInfo.InvariantCulture);
 
-        sb.Append(",\"resident\":");
-        AppendStringArray(sb, new[]
-        {
-            dominantZone, dominantZoneSecStr, zonesVisitedStr, roamStr, investigateStr, chaseStr, rx, ry, rz, ""
-        });
-        sb.Append('}');
-        return sb.ToString();
+        Debug.Log($"[RohitSheets] Posting: outcome={outcome} zone={deathZone} survival={survivalStr}s dominant={dominantZone}");
+
+        WWWForm form = new WWWForm();
+        form.AddField("entry.332868507", runId);
+        form.AddField("entry.928468147", platform);
+        form.AddField("entry.2064445553", sceneName);
+        form.AddField("entry.1017402579", outcome);
+        form.AddField("entry.153072461", survivalStr);
+        form.AddField("entry.359604092", deathReason);
+        form.AddField("entry.391092436", escaped ? "" : deathZone);
+        form.AddField("entry.1277514908", px);
+        form.AddField("entry.943805827", py);
+        form.AddField("entry.470553641", pz);
+        form.AddField("entry.830856127", distStr);
+        form.AddField("entry.1975546752", pickedUpKey);
+        form.AddField("entry.461548707", firstKeyStr);
+        form.AddField("entry.548395472", lastKeyCount.ToString(CultureInfo.InvariantCulture));
+        form.AddField("entry.342081516", dominantZone);
+        form.AddField("entry.1664393630", dominantZoneSecStr);
+        form.AddField("entry.1404079762", zonesVisitedStr);
+        form.AddField("entry.435574418", roamStr);
+        form.AddField("entry.54314593", chaseStr);
+
+        StartCoroutine(SubmitForm(form));
     }
 
-    static void AppendStringArray(StringBuilder sb, string[] items)
+    IEnumerator SubmitForm(WWWForm form)
     {
-        sb.Append('[');
-        for (int i = 0; i < items.Length; i++)
+        using (UnityWebRequest www = UnityWebRequest.Post(FORM_URL, form))
         {
-            if (i > 0) sb.Append(',');
-            sb.Append(JsonString(items[i] ?? ""));
+            yield return www.SendWebRequest();
+            if (www.result != UnityWebRequest.Result.Success)
+                Debug.LogWarning($"[RohitSheets] POST failed: {www.error}");
+            else
+                Debug.Log("[RohitSheets] Form submitted OK");
         }
-        sb.Append(']');
-    }
-
-    static string JsonString(string s) => '"' + JsonEscape(s) + '"';
-
-    static string JsonEscape(string s)
-    {
-        if (string.IsNullOrEmpty(s)) return "";
-        return s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r");
     }
 
     static void ClassifyZone(Vector3 pos, out string zone, out string areaDetail, out string floor)
     {
         float x = pos.x, y = pos.y, z = pos.z;
+        areaDetail = "";
 
         if (x == 0f && y == 0f && z == 0f)
         {
             zone = "Unknown";
-            areaDetail = "";
             floor = "";
             return;
         }
 
-        floor = y < 0f ? "Basement" : y < 4f ? "Ground Floor" : "First Floor";
+        floor = y < 0f ? "Basement" : y < 4f ? "Ground" : "First Floor";
 
         if (x < -15f || z > -4f)
         {
             zone = "Near Escape Door";
-            areaDetail = "Exit area northwest of building";
             return;
         }
 
         if (y < 0f)
         {
-            if (x >= 0f && x <= 6f && z >= -17f && z <= -13f)
-            {
-                zone = "Basement Stairs";
-                areaDetail = "Stairwell connecting to ground floor";
-            }
-            else
-            {
-                zone = "Basement";
-                areaDetail = "Main basement area";
-            }
+            zone = "Basement";
         }
         else if (y < 4f)
         {
             if (x >= -4f && x <= 5f && z >= -19f && z <= -15f)
-            {
-                zone = "Stairs to First Floor";
-                areaDetail = "Central stairwell";
-            }
+                zone = "Stairwell";
             else if (z < -19f)
             {
-                if (x < -3f)
-                {
-                    zone = "Ground Room West";
-                    areaDetail = "West room south side";
-                }
-                else if (x > 4f)
-                {
-                    zone = "Ground Room East";
-                    areaDetail = "East room south side";
-                }
-                else
-                {
-                    zone = "Ground Corridor";
-                    areaDetail = "South corridor near spawn";
-                }
+                if (x < -3f) zone = "Ground Room West";
+                else if (x > 4f) zone = "Ground Room East";
+                else zone = "Ground Corridor";
             }
             else if (z < -15f)
             {
-                if (x < -4f)
-                {
-                    zone = "Ground Room West";
-                    areaDetail = "West room north side";
-                }
-                else if (x > 5f)
-                {
-                    zone = "Ground Room East";
-                    areaDetail = "East room north side";
-                }
-                else
-                {
-                    zone = "Stairs to First Floor";
-                    areaDetail = "Near stairwell";
-                }
+                if (x < -4f) zone = "Ground Room West";
+                else if (x > 5f) zone = "Ground Room East";
+                else zone = "Stairwell";
             }
             else
-            {
-                if (x < -2f)
-                {
-                    zone = "Ground West Wing";
-                    areaDetail = "Northwest open area";
-                }
-                else if (x > 2f)
-                {
-                    zone = "Ground East Wing";
-                    areaDetail = "Northeast open area";
-                }
-                else
-                {
-                    zone = "Ground North Corridor";
-                    areaDetail = "Central north corridor";
-                }
-            }
+                zone = "Ground North Wing";
         }
         else
         {
-            if (z <= -21.5f)
-            {
-                zone = "First Floor South Corridor";
-                areaDetail = "South bridge";
-            }
-            else if (z < -16.5f)
-            {
-                if (x < 2f)
-                {
-                    zone = "First Floor West Room";
-                    areaDetail = "West bedroom";
-                }
-                else
-                {
-                    zone = "First Floor East Room";
-                    areaDetail = "East bedroom";
-                }
-            }
-            else
-            {
-                if (x < 0f)
-                {
-                    zone = "First Floor West Room";
-                    areaDetail = "West room north side";
-                }
-                else if (x > 4f)
-                {
-                    zone = "First Floor East Room";
-                    areaDetail = "East room north side";
-                }
-                else
-                {
-                    zone = "First Floor North Corridor";
-                    areaDetail = "North bridge";
-                }
-            }
+            if (x <= 0.5f) zone = "First Floor West";
+            else if (x >= 3.5f) zone = "First Floor East";
+            else zone = "First Floor Corridor";
         }
     }
 
