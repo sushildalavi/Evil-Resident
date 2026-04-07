@@ -10,9 +10,14 @@ public class FusePickup : MonoBehaviour, IInteractable
     public string GetPrompt(RohitFPSController player)
     {
         if (collected) return "";
-        if (PlayerInventory.instance == null) return "Inventory missing";
-        if (PlayerInventory.instance.HasCarriedFuse)
-            return $"Cannot pick up {PlayerInventory.FuseIdToLabel(fuseId)}: carrying {PlayerInventory.instance.CarriedFuseName}";
+        if (player == null) return "Inventory missing";
+
+        PlayerInventory inventory = player.GetComponent<PlayerInventory>();
+        if (inventory == null) return "Inventory missing";
+
+        if (inventory.HasCarriedFuse)
+            return $"Cannot pick up {PlayerInventory.FuseIdToLabel(fuseId)}: carrying {inventory.CarriedFuseName}";
+
         return $"Press E to pick up {PlayerInventory.FuseIdToLabel(fuseId)}";
     }
 
@@ -23,15 +28,18 @@ public class FusePickup : MonoBehaviour, IInteractable
 
     public void Interact(RohitFPSController player)
     {
-        TryCollect();
+        TryCollect(player);
     }
 
-    void TryCollect()
+    void TryCollect(RohitFPSController player)
     {
         if (collected) return;
-        if (PlayerInventory.instance == null) return;
+        if (player == null) return;
 
-        if (!PlayerInventory.instance.TryPickUpFuse(fuseId))
+        PlayerInventory inventory = player.GetComponent<PlayerInventory>();
+        if (inventory == null) return;
+
+        if (!inventory.TryPickUpFuse(fuseId))
             return;
 
         collected = true;

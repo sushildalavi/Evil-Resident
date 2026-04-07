@@ -73,7 +73,7 @@ public class TutorialStepUI : MonoBehaviour
         isLevelSelectScene = activeSceneName == "Level Select";
         isNewTutorial1Scene = activeSceneName == "New Tutorial 1";
         isNewTutorial3Scene = activeSceneName == "New Tutorial 3";
-        if (isLevelSelectScene && ShouldSkipLevelSelectWebGLPrompt())
+        if (isLevelSelectScene && ShouldSkipLevelSelectPrompt())
         {
             enabled = false;
             return;
@@ -99,7 +99,7 @@ public class TutorialStepUI : MonoBehaviour
         canvasGroup.alpha = 1f;
 
         if (isLevelSelectScene)
-            PersistLevelSelectSeenForWebGL();
+            PersistLevelSelectSeen();
 
         if (isNewTutorial3Scene)
         {
@@ -234,11 +234,8 @@ public class TutorialStepUI : MonoBehaviour
         }
     }
 
-    private bool ShouldSkipLevelSelectWebGLPrompt()
+    private bool ShouldSkipLevelSelectPrompt()
     {
-        if (Application.platform != RuntimePlatform.WebGLPlayer)
-            return false;
-
         return PlayerPrefs.GetInt(LevelSelectSeenKey, 0) == 1;
     }
 
@@ -263,11 +260,8 @@ public class TutorialStepUI : MonoBehaviour
         ApplyStepText();
     }
 
-    private void PersistLevelSelectSeenForWebGL()
+    private void PersistLevelSelectSeen()
     {
-        if (Application.platform != RuntimePlatform.WebGLPlayer)
-            return;
-
         PlayerPrefs.SetInt(LevelSelectSeenKey, 1);
         PlayerPrefs.Save();
     }

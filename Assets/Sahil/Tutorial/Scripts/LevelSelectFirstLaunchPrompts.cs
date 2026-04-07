@@ -47,7 +47,7 @@ public class LevelSelectFirstLaunchPrompts : MonoBehaviour
 
     private void Start()
     {
-        if (ShouldSkipForWebGLRepeat())
+        if (ShouldSkipForRepeat())
         {
             enabled = false;
             return;
@@ -111,7 +111,7 @@ public class LevelSelectFirstLaunchPrompts : MonoBehaviour
         instructionText.color = completedTextColor;
 
         if (nextStep == Step.Complete)
-            PersistSeenFlagForWebGL();
+            PersistSeenFlag();
     }
 
     void ApplyStepText()
@@ -131,19 +131,13 @@ public class LevelSelectFirstLaunchPrompts : MonoBehaviour
         }
     }
 
-    bool ShouldSkipForWebGLRepeat()
+    bool ShouldSkipForRepeat()
     {
-        if (Application.platform != RuntimePlatform.WebGLPlayer)
-            return false;
-
         return PlayerPrefs.GetInt(SeenKey, 0) == 1;
     }
 
-    void PersistSeenFlagForWebGL()
+    void PersistSeenFlag()
     {
-        if (Application.platform != RuntimePlatform.WebGLPlayer)
-            return;
-
         PlayerPrefs.SetInt(SeenKey, 1);
         PlayerPrefs.Save();
     }

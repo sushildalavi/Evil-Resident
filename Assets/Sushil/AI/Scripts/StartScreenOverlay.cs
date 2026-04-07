@@ -171,6 +171,20 @@ namespace Sushil.Systems
             string sceneName = activeScene.name;
             string sceneNameLower = string.IsNullOrWhiteSpace(sceneName) ? string.Empty : sceneName.ToLowerInvariant();
 
+            if (sceneName == "Level Select")
+            {
+                titleText.text = "The Evil Resident";
+                taglineText.gameObject.SetActive(false);
+                riddleText.gameObject.SetActive(false);
+                startHintText.gameObject.SetActive(true);
+                startHintText.text = "Press SPACE to start";
+                return;
+            }
+
+            taglineText.gameObject.SetActive(true);
+            riddleText.gameObject.SetActive(true);
+            startHintText.gameObject.SetActive(true);
+
             if (scenePath == "Assets/Neel/Tutorial.unity")
             {
                 titleText.text = "TUTORIAL";
@@ -201,8 +215,16 @@ namespace Sushil.Systems
                 }
                 else
                     taglineText.text = "Escape from the main door.";
-                riddleText.gameObject.SetActive(true);
-                riddleText.text = "Walls here do not have ears, but they might show something... ;)";
+                if (IsEasyScene(scenePath, sceneNameLower))
+                {
+                    riddleText.gameObject.SetActive(false);
+                    riddleText.text = string.Empty;
+                }
+                else
+                {
+                    riddleText.gameObject.SetActive(true);
+                    riddleText.text = "Walls here do not have ears, but they might show something... ;)";
+                }
                 startHintText.text = "Press ENTER or SPACE to begin";
                 return;
             }
@@ -217,7 +239,14 @@ namespace Sushil.Systems
         bool ShouldSuppressOverlayInScene(Scene scene)
         {
             string sceneName = string.IsNullOrWhiteSpace(scene.name) ? string.Empty : scene.name.ToLowerInvariant();
-            return sceneName.Contains("level select") || sceneName.Contains("tutorial");
+            return sceneName.Contains("tutorial");
+        }
+
+        bool IsEasyScene(string scenePath, string sceneNameLower)
+        {
+            return scenePath == "Assets/Sahil/Test/Easy Level.unity" ||
+                   scenePath == "Assets/Sushil/Easy Level.unity" ||
+                   sceneNameLower.Contains("easy");
         }
 
         void CreateBackground(Transform parent)
