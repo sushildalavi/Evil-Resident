@@ -26,6 +26,8 @@ namespace Sushil.AI
         [Range(0f, 1f)] public float globalPatrolChance = 0.35f;
         public float localPatrolRadius = 14f;
         public bool roamWholeHouse = true;
+        [Tooltip("Minimum distance (m) a newly picked patrol target must be from the resident's current position. Prevents tiny local loops.")]
+        public float minPatrolTravelDistance = 6f;
         [Range(0f, 1f)] public float patrolPointVisitChance = 0.45f;
         [Range(0f, 1f)] public float lastNoiseRoomBiasChance = 0.6f;
         public float lastNoiseRoomBiasDuration = 25f;
@@ -711,6 +713,7 @@ namespace Sushil.AI
                 !isHiddenNow &&
                 playerVerticalSeparation <= Mathf.Max(0.4f, killVerticalTolerance) &&
                 contactDistanceToPlayer <= killDistance + 0.05f &&
+                IsKillContactPathStrictlyClear(playerContactPoint) &&
                 IsCloseKillReachable(playerContactPoint, contactDistanceToPlayer) &&
                 (chaseOrSightThreat || lethalContact))
             {

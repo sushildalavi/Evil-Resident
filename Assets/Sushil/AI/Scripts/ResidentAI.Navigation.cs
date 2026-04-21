@@ -1694,10 +1694,16 @@ namespace Sushil.AI
         {
             point = center;
             float tryRadius = Mathf.Max(radius, 2f);
+            float minTravel = Mathf.Min(minPatrolTravelDistance, tryRadius * 0.5f);
 
             for (int i = 0; i < Mathf.Max(1, roamSampleAttempts); i++)
             {
-                Vector3 candidate = center + Random.insideUnitSphere * tryRadius;
+                // Sample on a ring (not a disk) to avoid clustering near the center.
+                Vector2 ring = Random.insideUnitCircle.normalized;
+                if (ring.sqrMagnitude < 0.0001f) ring = Vector2.right;
+                float r = Random.Range(Mathf.Min(minTravel, tryRadius * 0.35f), tryRadius);
+                Vector3 candidate = center + new Vector3(ring.x * r, 0f, ring.y * r);
+
                 bool sampleDifferentFloor = allowMultiFloorRoam && Random.value < multiFloorRoamChance;
                 if (sampleDifferentFloor)
                 {
@@ -1719,6 +1725,12 @@ namespace Sushil.AI
                 {
                     if (edgeHit.distance < minWallClearance) continue;
                 }
+
+                // Reject candidates too close to the resident's current position so the
+                // patrol actually travels meaningful distances instead of pacing.
+                if (minTravel > 0f &&
+                    Vector3.Distance(transform.position, navHit.position) < minTravel)
+                    continue;
 
                 point = navHit.position;
                 return true;
@@ -3416,6 +3428,59 @@ namespace Sushil.AI
         public bool IsKillContactClear(Vector3 sourcePoint, Vector3 targetPoint)
         {
             return !IsDirectKillLineBlocked(sourcePoint, targetPoint);
+        }
+
+        // Multi-ray majority vote: casts rays at feet/torso/head between resident
+        // and player. Denies the kill only when 2+ rays are blocked by hard
+        // geometry. A single blocked ray (stair railing, low prop) is tolerated
+        // so the resident can still kill across edge-cases while still being
+        // blocked by real occluders like staircase masses or floors between floors.
+        public bool IsKillContactPathStrictlyClear(Vector3 playerContactPoint)
+        {
+            if (player == null) return true;
+
+            Vector3[] residentSamples =
+            {
+                GetResidentThreatPoint(0.25f),
+                GetResidentThreatPoint(0.55f),
+                GetResidentThreatPoint(0.85f),
+            };
+
+            Vector3 playerBase = player.position;
+            Vector3[] playerSamples =
+            {
+                playerBase + Vector3.up * 0.45f,
+                playerContactPoint,
+                playerBase + Vector3.up * 1.55f,
+            };
+
+            int blockedCount = 0;
+            for (int i = 0; i < residentSamples.Length; i++)
+            {
+                Vector3 from = residentSamples[i];
+                Vector3 to = playerSamples[i];
+                Vector3 delta = to - from;
+                float len = delta.magnitude;
+                if (len < 0.12f) continue;
+
+                Vector3 dir = delta / len;
+                const float inset = 0.05f;
+                from += dir * inset;
+                to -= dir * inset;
+                len = Vector3.Distance(from, to);
+                if (len < 0.02f) continue;
+
+                if (!Physics.Linecast(from, to, out RaycastHit hit, blockingGeometryMask, QueryTriggerInteraction.Ignore))
+                    continue;
+                if (hit.distance <= 0.04f || hit.distance >= len - 0.04f)
+                    continue;
+                if (IsHardBlockingCollider(hit.collider))
+                    blockedCount++;
+            }
+
+            // Require 2+ blocked rays to deny the kill. Lets single-ray edge cases
+            // like railings through.
+            return blockedCount < 2;
         }
 
         public bool IsCloseKillReachable(Vector3 targetPoint, float directDistance)

@@ -118,6 +118,8 @@ namespace Sushil.AI
                 return false;
             if (!residentAI.IsKillContactClear(killCenter, targetContact))
                 return false;
+            if (!residentAI.IsKillContactPathStrictlyClear(targetContact))
+                return false;
 
             return residentAI.IsCloseKillReachable(targetContact, Vector3.Distance(killCenter, targetContact));
         }
