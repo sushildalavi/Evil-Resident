@@ -133,6 +133,7 @@ namespace Sushil.Systems
                 return false;
 
             return sceneName == "Level Select" ||
+                   sceneName == "Difficulty Select" ||
                    sceneName == "New Tutorial 1" ||
                    sceneName == "New Tutorial 2" ||
                    sceneName == "New Tutorial 3";

@@ -105,6 +105,16 @@ namespace Sushil.Systems
         {
             showing = false;
             if (root != null) root.SetActive(false);
+
+            Scene activeScene = SceneManager.GetActiveScene();
+            if (IsMenuScene(activeScene.name))
+            {
+                Time.timeScale = 0f;
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                return;
+            }
+
             Time.timeScale = 1f;
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
@@ -188,13 +198,15 @@ namespace Sushil.Systems
             if (productionText != null)
                 productionText.gameObject.SetActive(false);
 
-            if (sceneName == "Level Select")
+            if (sceneName == "Level Select" || sceneName == "Difficulty Select")
             {
                 if (productionText != null)
                     productionText.gameObject.SetActive(true);
                 titleText.text = "The Evil Resident";
                 taglineText.gameObject.SetActive(true);
-                taglineText.text = "Choose a door. The resident will critique your decision later.";
+                taglineText.text = sceneName == "Difficulty Select"
+                    ? "Choose your challenge."
+                    : "Pick where to begin.";
                 riddleText.gameObject.SetActive(false);
                 riddleText.text = string.Empty;
                 startHintText.gameObject.SetActive(true);
@@ -260,7 +272,14 @@ namespace Sushil.Systems
         bool ShouldSuppressOverlayInScene(Scene scene)
         {
             string sceneName = string.IsNullOrWhiteSpace(scene.name) ? string.Empty : scene.name.ToLowerInvariant();
-            return sceneName.Contains("tutorial");
+            return sceneName.Contains("tutorial") ||
+                   sceneName == "level select" ||
+                   sceneName == "difficulty select";
+        }
+
+        static bool IsMenuScene(string sceneName)
+        {
+            return sceneName == "Level Select" || sceneName == "Difficulty Select";
         }
 
         bool IsEasyScene(string scenePath, string sceneNameLower)
