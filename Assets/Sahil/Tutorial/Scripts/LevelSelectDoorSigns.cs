@@ -6,12 +6,33 @@ using Sushil.Systems;
 public class LevelSelectDoorSigns : MonoBehaviour
 {
     const string LevelSelectSceneName = "Level Select";
+    static bool sceneHookInstalled;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    static void Bootstrap()
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void InstallSceneHook()
     {
-        Scene activeScene = SceneManager.GetActiveScene();
-        if (!activeScene.isLoaded || activeScene.name != LevelSelectSceneName)
+        if (sceneHookInstalled)
+            return;
+
+        sceneHookInstalled = true;
+        SceneManager.sceneLoaded += OnSceneLoaded;
+        TryEnsureSigns(SceneManager.GetActiveScene());
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStaticState()
+    {
+        sceneHookInstalled = false;
+    }
+
+    static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        TryEnsureSigns(scene);
+    }
+
+    static void TryEnsureSigns(Scene scene)
+    {
+        if (!scene.isLoaded || scene.name != LevelSelectSceneName)
             return;
 
         var existing = Object.FindFirstObjectByType<LevelSelectDoorSigns>();

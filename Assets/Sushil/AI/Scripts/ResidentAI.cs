@@ -396,10 +396,12 @@ namespace Sushil.AI
             autoDoorOpenCooldown = Mathf.Min(autoDoorOpenCooldown, 0.15f);
             destinationWallClearance = Mathf.Max(destinationWallClearance, 0.34f);
             antiClipProbeRadius = Mathf.Max(antiClipProbeRadius, 0.28f);
-            // Enforce the requested runtime movement speeds directly so prefab/scene
-            // overrides do not drift from the intended feel.
-            patrolMoveSpeed = 1.5f;
-            chaseMoveSpeed = 1.7f;
+            // Use hard difficulty as baseline and scale down easy/medium slightly so
+            // they stay tense but fair.
+            const float hardPatrolSpeed = 1.5f;
+            const float hardChaseSpeed = 1.7f;
+            patrolMoveSpeed = hardPatrolSpeed;
+            chaseMoveSpeed = hardChaseSpeed;
             omnidirectionalVision = false;
             enablePeripheralAwareness = true;
             peripheralAwarenessRangeMultiplier = 0.76f;
@@ -496,10 +498,17 @@ namespace Sushil.AI
                 // corridor (x=4.5–5.5) that is too tight to bake NavMesh at radius 0.5.
                 EnsureSquareFuseCorridorNavLink();
             }
-            if (IsEasyLevelScene())
+            if (IsMediumLevelScene())
             {
-                patrolMoveSpeed = 1.4f;
-                chaseMoveSpeed = 1.62f;
+                patrolMoveSpeed = hardPatrolSpeed * 0.90f;
+                chaseMoveSpeed = hardChaseSpeed * 0.90f;
+            }
+            else if (IsEasyLevelScene())
+            {
+                patrolMoveSpeed = hardPatrolSpeed * 0.85f;
+                chaseMoveSpeed = hardChaseSpeed * 0.85f;
+                // Easy should require tighter contact before a kill triggers.
+                killDistance = Mathf.Min(killDistance, 0.95f);
             }
             if (IsTutorialResidentScene())
             {
@@ -580,6 +589,12 @@ namespace Sushil.AI
             string path = SceneManager.GetActiveScene().path;
             return path == "Assets/Sushil/Easy Level.unity" ||
                    path == "Assets/Sahil/Test/Easy Level.unity";
+        }
+
+        bool IsMediumLevelScene()
+        {
+            string path = SceneManager.GetActiveScene().path;
+            return path == "Assets/Sahil/Test/Medium Level.unity";
         }
 
         bool IsTutorialResidentScene()

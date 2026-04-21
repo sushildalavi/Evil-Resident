@@ -168,7 +168,7 @@ public class RohitFPSController : MonoBehaviour
         Vector3 input = new Vector3(moveInput.x, 0f, moveInput.y);
         input = Vector3.ClampMagnitude(input, 1f);
 
-        float targetSpeed = IsSprintHeld() ? sprintSpeed : walkSpeed;
+        float targetSpeed = walkSpeed;
         Vector3 desiredHorizontal = transform.TransformDirection(input) * targetSpeed;
 
         float moveRate = input.sqrMagnitude > 0.0001f ? acceleration : deceleration;
@@ -736,18 +736,6 @@ public class RohitFPSController : MonoBehaviour
         y += Input.GetAxis("Mouse Y");
 #endif
         return new Vector2(x, y);
-    }
-
-    bool IsSprintHeld()
-    {
-        bool held = false;
-#if ENABLE_LEGACY_INPUT_MANAGER
-        held |= Input.GetKey(KeyCode.LeftShift);
-#endif
-#if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current != null) held |= Keyboard.current.leftShiftKey.isPressed;
-#endif
-        return held;
     }
 
     bool WasJumpPressed()

@@ -15,7 +15,8 @@ public class TutorialStepUI : MonoBehaviour
     const string LevelSelectSeenKey = "level_select_intro_seen_v1";
     const string NewTutorial3Line1 = "This is a Weeping Angel";
     const string NewTutorial3Line2 = "Keep looking in it's eyes, it can't move as long as you're looking at it.";
-    const string NewTutorial3Line3 = "Beware, it moves fast when you look away";
+    const string NewTutorial3Line3 = "You cannot hide from the Weeping Angel.";
+    static bool levelSelectPromptShownThisRuntime;
 
     [Header("Step Text")]
     [TextArea] public string movementHint = MovementLine;
@@ -88,6 +89,7 @@ public class TutorialStepUI : MonoBehaviour
 
         if (isNewTutorial3Scene)
         {
+            textColor = new Color(1f, 0.9f, 0.2f, 1f);
             movementHint = NewTutorial3Line1;
             interactionHint = NewTutorial3Line2;
             hidingHint = NewTutorial3Line3;
@@ -240,7 +242,11 @@ public class TutorialStepUI : MonoBehaviour
 
     private bool ShouldSkipLevelSelectPrompt()
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        return levelSelectPromptShownThisRuntime;
+#else
         return PlayerPrefs.GetInt(LevelSelectSeenKey, 0) == 1;
+#endif
     }
 
     private System.Collections.IEnumerator PlayNewTutorial3Sequence()
@@ -266,8 +272,12 @@ public class TutorialStepUI : MonoBehaviour
 
     private void PersistLevelSelectSeen()
     {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        levelSelectPromptShownThisRuntime = true;
+#else
         PlayerPrefs.SetInt(LevelSelectSeenKey, 1);
         PlayerPrefs.Save();
+#endif
     }
 
     private bool IsAnyMovementPressed()
