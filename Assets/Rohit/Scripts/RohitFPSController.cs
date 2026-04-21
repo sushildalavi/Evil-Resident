@@ -875,17 +875,18 @@ public class RohitFPSController : MonoBehaviour
     public void ExitHide(Vector3 exitPosition)
     {
         HideableObject exiting = currentHideObject;
+        Quaternion exitYaw = transform.rotation;
+        Quaternion exitCameraLocalRotation = cameraTransform != null ? cameraTransform.localRotation : Quaternion.identity;
 
         controller.enabled = false;
         transform.position = exitPosition;
-        if (hasPreHideRotation)
-            transform.rotation = preHideRotation;
+        transform.rotation = exitYaw;
         controller.enabled = true;
 
         if (hasDefaultCameraPose && cameraTransform != null)
         {
             cameraTransform.localPosition = defaultCameraLocalPos;
-            cameraTransform.localRotation = defaultCameraLocalRot;
+            cameraTransform.localRotation = exitCameraLocalRotation;
             xRotation = NormalizePitch(cameraTransform.localEulerAngles.x);
         }
 
