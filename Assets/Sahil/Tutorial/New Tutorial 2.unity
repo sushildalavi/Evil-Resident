@@ -93,7 +93,7 @@ LightmapSettings:
     m_ExportTrainingData: 0
     m_TrainingDataDestination: TrainingData
     m_LightProbeSampleCountMultiplier: 4
-  m_LightingDataAsset: {fileID: 112000002, guid: 32ae51ac52ed44039ac2b5a6f0e901e0, type: 2}
+  m_LightingDataAsset: {fileID: 112000000, guid: 32ae51ac52ed44039ac2b5a6f0e901e0, type: 2}
   m_LightingSettings: {fileID: 0}
 --- !u!196 &4
 NavMeshSettings:
@@ -433,6 +433,34 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 1938441145}
     m_Modifications:
+    - target: {fileID: 820000000000000003, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: m_Intensity
+      value: 20
+      objectReference: {fileID: 0}
+    - target: {fileID: 820000000000000003, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: m_SpotAngle
+      value: 60.113937
+      objectReference: {fileID: 0}
+    - target: {fileID: 820000000000000003, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: m_InnerSpotAngle
+      value: 38.92148
+      objectReference: {fileID: 0}
+    - target: {fileID: 820000000000000003, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: m_Shadows.m_Type
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 3892873042923022663, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: m_Intensity
+      value: 20
+      objectReference: {fileID: 0}
+    - target: {fileID: 3892873042923022663, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: m_SpotAngle
+      value: 60
+      objectReference: {fileID: 0}
+    - target: {fileID: 3892873042923022663, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: m_InnerSpotAngle
+      value: 40
+      objectReference: {fileID: 0}
     - target: {fileID: 4403181079989416031, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
       propertyPath: walkSpeed
       value: 3
@@ -465,21 +493,37 @@ PrefabInstance:
       propertyPath: useCapsulePreCast
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 5201700985114855046, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: intensity
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 5201700985114855046, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: spotAngle
+      value: 80
+      objectReference: {fileID: 0}
+    - target: {fileID: 5201700985114855046, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: torchLight
+      value: 
+      objectReference: {fileID: 775983330}
+    - target: {fileID: 6258170528079046161, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: m_AdditionalLightsShadowResolutionTier
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7517694504785546268, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
       propertyPath: m_LocalScale.z
       value: 1.5667329
       objectReference: {fileID: 0}
     - target: {fileID: 7517694504785546268, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.16586995
+      value: 2.6037998
       objectReference: {fileID: 0}
     - target: {fileID: 7517694504785546268, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -2.79957
+      value: -3.64434
       objectReference: {fileID: 0}
     - target: {fileID: 7517694504785546268, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -9.22
+      value: -11.85
       objectReference: {fileID: 0}
     - target: {fileID: 7517694504785546268, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
       propertyPath: m_LocalRotation.w
@@ -517,11 +561,28 @@ PrefabInstance:
       propertyPath: m_IsActive
       value: 1
       objectReference: {fileID: 0}
+    - target: {fileID: 8588926964195836708, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: intensity
+      value: 5
+      objectReference: {fileID: 0}
+    - target: {fileID: 8588926964195836708, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: spotAngle
+      value: 79.7
+      objectReference: {fileID: 0}
+    - target: {fileID: 8588926964195836708, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: torchLight
+      value: 
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+--- !u!108 &775983330 stripped
+Light:
+  m_CorrespondingSourceObject: {fileID: 3892873042923022663, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+  m_PrefabInstance: {fileID: 775983329}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &851618057
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -1635,7 +1696,6 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 2008487647}
   - {fileID: 204544055}
   - {fileID: 925180010}
   - {fileID: 1973616824}
