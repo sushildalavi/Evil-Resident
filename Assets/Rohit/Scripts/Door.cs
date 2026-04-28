@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
+using System.Collections.Generic;
+using Sushil.Systems;
 
 public class Door : MonoBehaviour, IInteractable
 {
@@ -20,6 +22,8 @@ public class Door : MonoBehaviour, IInteractable
 
     [Header("Lock Settings")]
     public KeyType requiredKey;
+    [Tooltip("If populated, all listed keys are required to unlock this door.")]
+    public List<KeyType> requiredKeys = new List<KeyType>();
     public bool isLocked = true;
 
     [Header("Open Animation")]
@@ -40,6 +44,11 @@ public class Door : MonoBehaviour, IInteractable
     [Header("Audio (Optional)")]
     public AudioClip unlockSound;
     public AudioClip lockedSound;
+
+    [Header("Win Condition (Optional)")]
+    [Tooltip("If enabled, this door behaves like MainDoor when opened by player interaction.")]
+    public bool actLikeMainDoor = false;
+    public GameObject winUI;
 
     [Header("AI / Navigation")]
     public bool blockWhenClosed = true;
@@ -119,6 +128,9 @@ public class Door : MonoBehaviour, IInteractable
         if (autoAddRuntimeNavLink)
             EnsureRuntimeNavLink();
         SetDoorBlocking(true);
+
+        if (winUI != null)
+            winUI.SetActive(false);
     }
 
     void Update()
@@ -146,10 +158,12 @@ public class Door : MonoBehaviour, IInteractable
         if (!isLocked) return "Press E to Open Door";
 
         PlayerInventory inventory = player != null ? player.GetComponent<PlayerInventory>() : null;
-        if (inventory != null && inventory.HasKey(requiredKey))
-            return $"Press E to Unlock ({requiredKey} Key)";
+        List<KeyType> lockKeys = GetEffectiveRequiredKeys();
 
-        return $"Locked - Requires {requiredKey} Key";
+        if (inventory != null && HasAllRequiredKeys(inventory, lockKeys))
+            return $"Press E to Unlock ({FormatKeyList(lockKeys)})";
+
+        return $"Locked - Requires {FormatKeyList(lockKeys)}";
     }
 
     public void Interact(RohitFPSController player)
@@ -159,22 +173,25 @@ public class Door : MonoBehaviour, IInteractable
         if (!isLocked)
         {
             OpenDoor();
+            TriggerWinConditionIfNeeded();
             return;
         }
 
         PlayerInventory inventory = player != null ? player.GetComponent<PlayerInventory>() : null;
-        if (inventory != null && inventory.HasKey(requiredKey))
+        List<KeyType> lockKeys = GetEffectiveRequiredKeys();
+        if (inventory != null && HasAllRequiredKeys(inventory, lockKeys))
         {
             isLocked = false;
             wasUnlockedByKey = true;
             OpenDoor();
             PlaySound(unlockSound);
-            Debug.Log($"Unlocked door with {requiredKey} Key!");
+            Debug.Log($"Unlocked door with {FormatKeyList(lockKeys)}!");
+            TriggerWinConditionIfNeeded();
         }
         else
         {
             PlaySound(lockedSound);
-            Debug.Log($"This door requires the {requiredKey} Key.");
+            Debug.Log($"This door requires {FormatKeyList(lockKeys)}.");
         }
     }
 
@@ -602,6 +619,77 @@ public class Door : MonoBehaviour, IInteractable
             case DoorRotationAxis.Z: return Vector3.forward;
             default: return Vector3.up;
         }
+    }
+
+    List<KeyType> GetEffectiveRequiredKeys()
+    {
+        List<KeyType> keys = new List<KeyType>();
+
+        if (requiredKeys != null)
+        {
+            for (int i = 0; i < requiredKeys.Count; i++)
+            {
+                KeyType key = requiredKeys[i];
+                if (!keys.Contains(key))
+                    keys.Add(key);
+            }
+        }
+
+        if (keys.Count == 0)
+            keys.Add(requiredKey);
+
+        return keys;
+    }
+
+    static bool HasAllRequiredKeys(PlayerInventory inventory, List<KeyType> keys)
+    {
+        if (inventory == null || keys == null || keys.Count == 0)
+            return false;
+
+        for (int i = 0; i < keys.Count; i++)
+        {
+            if (!inventory.HasKey(keys[i]))
+                return false;
+        }
+
+        return true;
+    }
+
+    static string FormatKeyList(List<KeyType> keys)
+    {
+        if (keys == null || keys.Count == 0)
+            return "Unknown Key";
+
+        if (keys.Count == 1)
+            return $"{keys[0]} Key";
+
+        string value = "";
+        for (int i = 0; i < keys.Count; i++)
+        {
+            string token = $"{keys[i]} Key";
+            if (i == 0)
+            {
+                value = token;
+                continue;
+            }
+
+            value += i == keys.Count - 1 ? $" and {token}" : $", {token}";
+        }
+
+        return value;
+    }
+
+    void TriggerWinConditionIfNeeded()
+    {
+        if (!actLikeMainDoor)
+            return;
+
+        if (winUI != null)
+            winUI.SetActive(true);
+
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        EscapeOverlay.Show();
     }
 
     void DisableNearbyBlockingColliders()
