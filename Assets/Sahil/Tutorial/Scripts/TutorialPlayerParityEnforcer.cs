@@ -167,12 +167,36 @@ public class TutorialPlayerParityEnforcer : MonoBehaviour
         if (root == null || minHeight <= 0f)
             return;
 
-        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
-        if (renderers == null || renderers.Length == 0)
+        if (!TryGetRendererBounds(root, out Bounds bounds))
             return;
 
+        float currentHeight = bounds.size.y;
+        if (currentHeight >= minHeight || currentHeight <= 0.001f)
+            return;
+
+        // Preserve ground contact when scaling up models with off-center pivots.
+        float bottomBefore = bounds.min.y;
+        float multiplier = Mathf.Clamp(minHeight / currentHeight, 1f, Mathf.Max(1f, maxScaleMultiplier));
+        root.localScale *= multiplier;
+
+        Bounds scaledBounds;
+        if (!TryGetRendererBounds(root, out scaledBounds))
+            return;
+
+        float bottomAfter = scaledBounds.min.y;
+        float sinkOffset = bottomBefore - bottomAfter;
+        if (Mathf.Abs(sinkOffset) > 0.0001f)
+            root.position += Vector3.up * sinkOffset;
+    }
+
+    static bool TryGetRendererBounds(Transform root, out Bounds bounds)
+    {
+        bounds = new Bounds(root.position, Vector3.zero);
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        if (renderers == null || renderers.Length == 0)
+            return false;
+
         bool hasBounds = false;
-        Bounds bounds = new Bounds(root.position, Vector3.zero);
         for (int i = 0; i < renderers.Length; i++)
         {
             Renderer r = renderers[i];
@@ -190,15 +214,7 @@ public class TutorialPlayerParityEnforcer : MonoBehaviour
             }
         }
 
-        if (!hasBounds)
-            return;
-
-        float currentHeight = bounds.size.y;
-        if (currentHeight >= minHeight || currentHeight <= 0.001f)
-            return;
-
-        float multiplier = Mathf.Clamp(minHeight / currentHeight, 1f, Mathf.Max(1f, maxScaleMultiplier));
-        root.localScale *= multiplier;
+        return hasBounds;
     }
 
     static Light FindTorchLightInPlayer(Transform root)

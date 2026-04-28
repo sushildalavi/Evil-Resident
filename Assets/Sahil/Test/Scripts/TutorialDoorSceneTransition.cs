@@ -4,7 +4,7 @@ using UnityEngine.SceneManagement;
 public class TutorialDoorSceneTransition : MonoBehaviour, IInteractable
 {
     [Header("Key Requirement")]
-    public KeyType requiredKey = KeyType.Rectangle;
+    public KeyType requiredKey = KeyType.Bronze;
     [Tooltip("If true, any collected key can open this tutorial door.")]
     public bool allowAnyCollectedKey = true;
 

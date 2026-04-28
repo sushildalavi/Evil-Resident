@@ -235,7 +235,7 @@ public class PuzzleCodeHintBroadcaster : MonoBehaviour
         {
             KeyItem key = keys[i];
             if (key == null) continue;
-            if (key.keyType != KeyType.Square) continue;
+            if (key.keyType != KeyType.Silver) continue;
 
             roomZoneCenter = key.transform.position;
             return;

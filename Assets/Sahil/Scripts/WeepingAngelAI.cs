@@ -51,6 +51,24 @@ public class WeepingAngelAI : MonoBehaviour
     [Min(0.1f)] public float killDistance = 0.8f;
     public string killReason = "The Weeping Angel Reached you.";
 
+    [Header("Audio")]
+    [Tooltip("Enable movement and kill audio for this specific angel instance.")]
+    public bool enableAngelAudio = false;
+    public AudioSource movementAudioSource;
+    public AudioClip movementClip;
+    [Range(0f, 3f)] public float movementVolume = 0.75f;
+    [Range(0.5f, 2f)] public float movementPitch = 1f;
+    [Min(0.1f)] public float movementMinDistance = 1.75f;
+    [Min(0.2f)] public float movementMaxDistance = 14f;
+    public AudioSource killScreamAudioSource;
+    public AudioClip killScreamClip;
+    [Range(0f, 3f)] public float killScreamVolume = 1f;
+    [Range(0.5f, 2f)] public float killScreamPitch = 1f;
+
+    [Header("Animation")]
+    [Tooltip("Optional movement/idle animation bridge driven by this AI's existing move/freeze logic.")]
+    public WeepingAngelAnimationBridge animationBridge;
+
     private NavMeshAgent agent;
     private RohitFPSController playerController;
     private Collider[] angelColliders;
@@ -62,14 +80,18 @@ public class WeepingAngelAI : MonoBehaviour
     private bool previousLineOfSightClear;
     private bool previousLookedAt;
     private float nextMissingReferenceLogTime;
+    private bool playedKillScream;
 
     private void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
         angelColliders = GetComponentsInChildren<Collider>(true);
+        if (animationBridge == null)
+            animationBridge = GetComponent<WeepingAngelAnimationBridge>();
         ResolveReferences();
         ApplySpeedFromPlayerWalk();
         ConfigurePlayerCollisionIgnore();
+        ConfigureAudioSources();
 
         agent.stoppingDistance = stoppingDistance;
         agent.updateUpAxis = true;
@@ -83,6 +105,16 @@ public class WeepingAngelAI : MonoBehaviour
         turnSpeedDegrees = Mathf.Max(30f, turnSpeedDegrees);
         maxRelativeToPlayerWalkSpeed = Mathf.Clamp(maxRelativeToPlayerWalkSpeed, 0.1f, 1f);
         killDistance = Mathf.Max(0.1f, killDistance);
+        movementMinDistance = Mathf.Max(0.1f, movementMinDistance);
+        movementMaxDistance = Mathf.Max(movementMinDistance + 0.1f, movementMaxDistance);
+        movementPitch = Mathf.Clamp(movementPitch, 0.5f, 2f);
+        killScreamPitch = Mathf.Clamp(killScreamPitch, 0.5f, 2f);
+    }
+
+    private void OnDisable()
+    {
+        StopMovementAudio();
+        UpdateAnimationState(false);
     }
 
     private void Update()
@@ -122,7 +154,9 @@ public class WeepingAngelAI : MonoBehaviour
             return;
         }
 
-        MoveTowardPlayer();
+        bool moved = MoveTowardPlayer();
+        UpdateMovementAudio(moved);
+        UpdateAnimationState(moved);
     }
 
     private void ResolveReferences()
@@ -280,12 +314,12 @@ public class WeepingAngelAI : MonoBehaviour
         return lineOfSightClear;
     }
 
-    private void MoveTowardPlayer()
+    private bool MoveTowardPlayer()
     {
         if (requireLineOfSightToChase && !HasLineOfSightToPlayer())
         {
             StopImmediate();
-            return;
+            return false;
         }
 
         Vector3 toPlayer = playerTransform.position - transform.position;
@@ -294,7 +328,7 @@ public class WeepingAngelAI : MonoBehaviour
         if (toPlayer.sqrMagnitude <= stoppingDistance * stoppingDistance)
         {
             StopImmediate();
-            return;
+            return false;
         }
 
         if (agent.enabled && agent.isOnNavMesh)
@@ -310,6 +344,7 @@ public class WeepingAngelAI : MonoBehaviour
         }
 
         RotateToward(playerTransform.position);
+        return true;
     }
 
     private void StopImmediate()
@@ -320,6 +355,15 @@ public class WeepingAngelAI : MonoBehaviour
             agent.velocity = Vector3.zero;
             agent.ResetPath();
         }
+
+        StopMovementAudio();
+        UpdateAnimationState(false);
+    }
+
+    private void UpdateAnimationState(bool shouldMove)
+    {
+        if (animationBridge != null)
+            animationBridge.SetMoving(shouldMove);
     }
 
     private void RotateToward(Vector3 worldTarget)
@@ -350,13 +394,17 @@ public class WeepingAngelAI : MonoBehaviour
         if (death != null)
         {
             if (!death.isDead)
+            {
+                PlayKillScream2D();
                 death.Kill(killReason);
+            }
             return true;
         }
 
         RohitFPSController rohit = playerTransform.GetComponent<RohitFPSController>() ?? playerTransform.GetComponentInParent<RohitFPSController>();
         if (rohit != null && !rohit.isHidden)
         {
+            PlayKillScream2D();
             ResidentAI.KillRohitController(rohit, killReason);
             return true;
         }
@@ -531,5 +579,84 @@ public class WeepingAngelAI : MonoBehaviour
         previousLineOfSightClear = lineOfSightClear;
         previousLookedAt = lookedAt;
         hasPreviousLookDebugState = true;
+    }
+
+    private void ConfigureAudioSources()
+    {
+        if (!enableAngelAudio)
+            return;
+
+        if (movementAudioSource == null)
+            movementAudioSource = gameObject.AddComponent<AudioSource>();
+
+        movementAudioSource.clip = movementClip;
+        movementAudioSource.playOnAwake = false;
+        movementAudioSource.loop = true;
+        movementAudioSource.spatialBlend = 1f;
+        movementAudioSource.volume = Mathf.Max(0f, movementVolume);
+        movementAudioSource.pitch = movementPitch;
+        movementAudioSource.minDistance = movementMinDistance;
+        movementAudioSource.maxDistance = movementMaxDistance;
+
+        if (killScreamAudioSource == null)
+            killScreamAudioSource = gameObject.AddComponent<AudioSource>();
+
+        killScreamAudioSource.playOnAwake = false;
+        killScreamAudioSource.loop = false;
+        killScreamAudioSource.spatialBlend = 0f;
+        killScreamAudioSource.ignoreListenerPause = true;
+        killScreamAudioSource.clip = killScreamClip;
+        killScreamAudioSource.volume = Mathf.Max(0f, killScreamVolume);
+        killScreamAudioSource.pitch = killScreamPitch;
+    }
+
+    private void UpdateMovementAudio(bool shouldPlay)
+    {
+        if (!enableAngelAudio || movementClip == null)
+            return;
+
+        if (movementAudioSource == null)
+            ConfigureAudioSources();
+        if (movementAudioSource == null)
+            return;
+
+        movementAudioSource.clip = movementClip;
+        movementAudioSource.volume = Mathf.Max(0f, movementVolume);
+        movementAudioSource.pitch = movementPitch;
+        movementAudioSource.minDistance = movementMinDistance;
+        movementAudioSource.maxDistance = movementMaxDistance;
+
+        if (shouldPlay)
+        {
+            if (!movementAudioSource.isPlaying)
+                movementAudioSource.Play();
+        }
+        else
+        {
+            StopMovementAudio();
+        }
+    }
+
+    private void StopMovementAudio()
+    {
+        if (movementAudioSource != null && movementAudioSource.isPlaying)
+            movementAudioSource.Pause();
+    }
+
+    private void PlayKillScream2D()
+    {
+        if (!enableAngelAudio || playedKillScream || killScreamClip == null)
+            return;
+
+        if (killScreamAudioSource == null)
+            ConfigureAudioSources();
+        if (killScreamAudioSource == null)
+            return;
+
+        killScreamAudioSource.spatialBlend = 0f;
+        killScreamAudioSource.ignoreListenerPause = true;
+        killScreamAudioSource.pitch = killScreamPitch;
+        killScreamAudioSource.PlayOneShot(killScreamClip, Mathf.Max(0f, killScreamVolume));
+        playedKillScream = true;
     }
 }

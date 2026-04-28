@@ -8,9 +8,9 @@ public class CollectibleHUD : MonoBehaviour
 {
     public enum CollectibleType
     {
-        CircleKey,
-        RectangleKey,
-        SquareKey,
+        GoldKey = 0,
+        BronzeKey = 1,
+        SilverKey = 2,
         Fuse1,
         Fuse2,
         Fuse3,
@@ -78,17 +78,17 @@ public class CollectibleHUD : MonoBehaviour
 
     static readonly KeyType[] KeyOrder =
     {
-        KeyType.Circle,
-        KeyType.Rectangle,
-        KeyType.Square
+        KeyType.Silver,
+        KeyType.Bronze,
+        KeyType.Gold
     };
 
     static readonly Color KeysBase = Rgba(100, 180, 255, 1f);
     static readonly Color FusesBase = Rgba(255, 180, 50, 1f);
     static readonly Color CompleteBase = Rgba(80, 200, 120, 1f);
-    static readonly Color CircleKeyColor = Color.blue;
-    static readonly Color RectangleKeyColor = Color.green;
-    static readonly Color SquareKeyColor = Color.red;
+    static readonly Color SilverKeyColor = Color.blue;
+    static readonly Color BronzeKeyColor = Color.green;
+    static readonly Color GoldKeyColor = Color.red;
     static readonly Color[] DefaultFuseColors =
     {
         Color.yellow,
@@ -880,14 +880,14 @@ public class CollectibleHUD : MonoBehaviour
     {
         switch (type)
         {
-            case CollectibleType.CircleKey:
-                keyType = KeyType.Circle;
+            case CollectibleType.GoldKey:
+                keyType = KeyType.Gold;
                 return true;
-            case CollectibleType.RectangleKey:
-                keyType = KeyType.Rectangle;
+            case CollectibleType.BronzeKey:
+                keyType = KeyType.Bronze;
                 return true;
-            case CollectibleType.SquareKey:
-                keyType = KeyType.Square;
+            case CollectibleType.SilverKey:
+                keyType = KeyType.Silver;
                 return true;
             default:
                 keyType = default;
@@ -899,9 +899,9 @@ public class CollectibleHUD : MonoBehaviour
     {
         switch (index)
         {
-            case 0: return CollectibleType.CircleKey;
-            case 1: return CollectibleType.RectangleKey;
-            default: return CollectibleType.SquareKey;
+            case 0: return CollectibleType.SilverKey;
+            case 1: return CollectibleType.BronzeKey;
+            default: return CollectibleType.GoldKey;
         }
     }
 
@@ -921,9 +921,9 @@ public class CollectibleHUD : MonoBehaviour
     {
         switch (type)
         {
-            case CollectibleType.CircleKey: return "+ CIRCLE KEY";
-            case CollectibleType.RectangleKey: return "+ RECTANGLE KEY";
-            case CollectibleType.SquareKey: return "+ SQUARE KEY";
+            case CollectibleType.GoldKey: return "+ GOLD KEY";
+            case CollectibleType.BronzeKey: return "+ BRONZE KEY";
+            case CollectibleType.SilverKey: return "+ SILVER KEY";
             default: return "+ FUSE";
         }
     }
@@ -941,12 +941,12 @@ public class CollectibleHUD : MonoBehaviour
     {
         switch (keyType)
         {
-            case KeyType.Circle:
-                return CircleKeyColor;
-            case KeyType.Rectangle:
-                return RectangleKeyColor;
-            case KeyType.Square:
-                return SquareKeyColor;
+            case KeyType.Gold:
+                return GoldKeyColor;
+            case KeyType.Bronze:
+                return BronzeKeyColor;
+            case KeyType.Silver:
+                return SilverKeyColor;
             default:
                 return KeysBase;
         }

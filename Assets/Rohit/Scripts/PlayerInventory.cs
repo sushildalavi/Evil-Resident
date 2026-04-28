@@ -34,9 +34,9 @@ public class PlayerInventory : MonoBehaviour
     public bool HasKey(KeyType keyType) => collectedKeys.Contains(keyType);
 
     public bool HasAllKeys() =>
-        collectedKeys.Contains(KeyType.Circle) &&
-        collectedKeys.Contains(KeyType.Rectangle) &&
-        collectedKeys.Contains(KeyType.Square);
+        collectedKeys.Contains(KeyType.Gold) &&
+        collectedKeys.Contains(KeyType.Bronze) &&
+        collectedKeys.Contains(KeyType.Silver);
 
     public void AddKey(KeyType keyType)
     {
@@ -46,9 +46,9 @@ public class PlayerInventory : MonoBehaviour
 
     public int KeyCount => collectedKeys.Count;
 
-    public bool HasCircle => collectedKeys.Contains(KeyType.Circle);
-    public bool HasRectangle => collectedKeys.Contains(KeyType.Rectangle);
-    public bool HasSquare => collectedKeys.Contains(KeyType.Square);
+    public bool HasGold => collectedKeys.Contains(KeyType.Gold);
+    public bool HasBronze => collectedKeys.Contains(KeyType.Bronze);
+    public bool HasSilver => collectedKeys.Contains(KeyType.Silver);
     public int FuseCount => fuseCount;
     public bool HasCarriedFuse => carriedFuseId.HasValue;
     public FuseId? CarriedFuseId => carriedFuseId;

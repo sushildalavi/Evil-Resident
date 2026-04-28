@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
+using UnityEngine.SceneManagement;
+using System.Collections;
 
 public class FuseDoor : MonoBehaviour, IInteractable
 {
@@ -20,6 +22,11 @@ public class FuseDoor : MonoBehaviour, IInteractable
     [Header("Audio (Optional)")]
     public AudioClip openSound;
     public AudioClip lockedSound;
+
+    [Header("Scene Transition (Optional)")]
+    public bool loadSceneOnOpen = false;
+    public string targetSceneName = "Level Select";
+    public float sceneLoadDelay = 0f;
 
     [Header("AI / Navigation")]
     public bool blockWhenClosed = true;
@@ -45,6 +52,7 @@ public class FuseDoor : MonoBehaviour, IInteractable
     private NavMeshLink navLinkForwardBack;
     private NavMeshLink navLinkLeftRight;
     private bool isBlockingNow;
+    private bool loadingScene;
 
     void Start()
     {
@@ -114,6 +122,9 @@ public class FuseDoor : MonoBehaviour, IInteractable
         if (navLinkForwardBack != null) navLinkForwardBack.activated = true;
         if (navLinkLeftRight != null) navLinkLeftRight.activated = true;
         PlaySound(openSound);
+
+        if (loadSceneOnOpen && !loadingScene)
+            StartCoroutine(LoadTargetSceneRoutine());
     }
 
     bool AreRequiredFuseBoxesFull()
@@ -256,5 +267,38 @@ public class FuseDoor : MonoBehaviour, IInteractable
     {
         if (clip != null && audioSource != null)
             audioSource.PlayOneShot(clip);
+    }
+
+    IEnumerator LoadTargetSceneRoutine()
+    {
+        loadingScene = true;
+
+        float wait = Mathf.Max(0f, sceneLoadDelay);
+        if (wait > 0f)
+            yield return new WaitForSecondsRealtime(wait);
+
+        string target = string.IsNullOrWhiteSpace(targetSceneName)
+            ? string.Empty
+            : targetSceneName.Trim();
+
+        if (string.IsNullOrEmpty(target))
+            yield break;
+
+        int buildIndex = SceneUtility.GetBuildIndexByScenePath(target);
+        if (buildIndex >= 0)
+        {
+            SceneManager.LoadScene(buildIndex);
+            yield break;
+        }
+
+        string tutorialPath = $"Assets/Sahil/Tutorial/{target}.unity";
+        buildIndex = SceneUtility.GetBuildIndexByScenePath(tutorialPath);
+        if (buildIndex >= 0)
+        {
+            SceneManager.LoadScene(buildIndex);
+            yield break;
+        }
+
+        SceneManager.LoadScene(target);
     }
 }

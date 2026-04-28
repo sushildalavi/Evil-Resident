@@ -1,6 +1,6 @@
 public enum KeyType
 {
-    Circle,
-    Rectangle,
-    Square
+    Gold = 0,    // Formerly Circle
+    Bronze = 1,  // Formerly Rectangle
+    Silver = 2   // Formerly Square
 }

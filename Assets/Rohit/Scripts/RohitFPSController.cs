@@ -808,11 +808,11 @@ public class RohitFPSController : MonoBehaviour
 
         if (keyHudText == null || inventory == null || !keyHudText.gameObject.activeInHierarchy) return;
 
-        string circle = inventory.HasCircle ? "<color=green>[O]</color>" : "<color=red>[O]</color>";
-        string rectangle = inventory.HasRectangle ? "<color=green>[R]</color>" : "<color=red>[R]</color>";
-        string square = inventory.HasSquare ? "<color=green>[S]</color>" : "<color=red>[S]</color>";
+        string silver = inventory.HasSilver ? "<color=green>[SILVER]</color>" : "<color=red>[SILVER]</color>";
+        string bronze = inventory.HasBronze ? "<color=green>[BRONZE]</color>" : "<color=red>[BRONZE]</color>";
+        string gold = inventory.HasGold ? "<color=green>[GOLD]</color>" : "<color=red>[GOLD]</color>";
 
-        keyHudText.text = $"Keys: {circle} {rectangle} {square}";
+        keyHudText.text = $"Keys: {silver} {bronze} {gold}";
     }
 
     public void HideAt(Transform hidePoint, HideableObject hideObject)
