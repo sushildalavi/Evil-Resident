@@ -34,10 +34,7 @@ namespace Sushil.Systems
             if (quote != null) quote.text = quotes[Random.Range(0, quotes.Length)];
             if (hint != null)
             {
-                Scene active = SceneManager.GetActiveScene();
-                hint.text = ShouldReturnToLevelSelectOnEscapeRestart(active)
-                    ? "Press R to return to Level Select"
-                    : "Press R to play again";
+                hint.text = "Press R to Play Again   ·   Press Q for Main Menu";
             }
 
             root.SetActive(true);
@@ -157,6 +154,8 @@ namespace Sushil.Systems
 
                 if (WasRestartPressed())
                     Restart();
+                else if (WasMainMenuPressed())
+                    GoToMainMenu();
             }
 
             void Restart()
@@ -176,6 +175,18 @@ namespace Sushil.Systems
                 }
 
                 SceneManager.LoadScene(active.buildIndex);
+            }
+
+            void GoToMainMenu()
+            {
+                IsShowing = false;
+                if (root != null) root.SetActive(false);
+                Time.timeScale = 1f;
+                int levelSelectBuildIndex = SceneUtility.GetBuildIndexByScenePath("Assets/Sahil/Tutorial/Level Select.unity");
+                if (levelSelectBuildIndex >= 0)
+                    SceneManager.LoadScene(levelSelectBuildIndex);
+                else
+                    SceneManager.LoadScene("Level Select");
             }
         }
 
@@ -198,6 +209,18 @@ namespace Sushil.Systems
 #endif
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null) pressed |= Keyboard.current.rKey.wasPressedThisFrame;
+#endif
+            return pressed;
+        }
+
+        static bool WasMainMenuPressed()
+        {
+            bool pressed = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            pressed |= Input.GetKeyDown(KeyCode.Q);
+#endif
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null) pressed |= Keyboard.current.qKey.wasPressedThisFrame;
 #endif
             return pressed;
         }

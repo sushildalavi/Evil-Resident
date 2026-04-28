@@ -243,7 +243,7 @@ namespace Sushil.Systems
 
             // Three buttons. RESUME = primary (red), RESTART = secondary (cream),
             // MAIN MENU = tertiary (muted) — visual hierarchy via accent colors.
-            CreateButton(cardObj.transform, "RESUME  (Esc)",
+            CreateButton(cardObj.transform, "RESUME  (Tab)",
                 new Vector2(0.08f, 0.50f), new Vector2(0.92f, 0.62f),
                 () => { if (isPaused) TogglePause(); },
                 new Color(0.92f, 0.18f, 0.18f, 0.9f));   // primary red
@@ -406,12 +406,11 @@ namespace Sushil.Systems
         {
             bool pressed = false;
 #if ENABLE_LEGACY_INPUT_MANAGER
-            pressed |= Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Tab);
+            pressed |= Input.GetKeyDown(KeyCode.Tab);
 #endif
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null)
-                pressed |= Keyboard.current.escapeKey.wasPressedThisFrame ||
-                           Keyboard.current.tabKey.wasPressedThisFrame;
+                pressed |= Keyboard.current.tabKey.wasPressedThisFrame;
 #endif
             return pressed;
         }

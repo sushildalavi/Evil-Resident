@@ -132,8 +132,16 @@ namespace Sushil.AI
             if (!agent.isOnNavMesh || !NavMesh.SamplePosition(resident.transform.position, out _, 6f, NavMesh.AllAreas))
                 return;
 
+            TryResetAndResumeAgent(agent);
+        }
+
+        static void TryResetAndResumeAgent(NavMeshAgent agent)
+        {
+            if (agent == null || !agent.enabled || !agent.gameObject.activeInHierarchy || !agent.isOnNavMesh)
+                return;
             agent.ResetPath();
-            agent.isStopped = false;
+            if (agent.enabled && agent.gameObject.activeInHierarchy && agent.isOnNavMesh)
+                agent.isStopped = false;
         }
     }
 }

@@ -9,6 +9,9 @@ namespace Sushil.Systems
 {
     public static class GameOverOverlay
     {
+        const string MainMenuScenePath = "Assets/Sahil/Tutorial/Level Select.unity";
+        const string MainMenuSceneName = "Level Select";
+
         static GameObject overlayRoot;
         static Text titleText;
         static Text reasonText;
@@ -27,7 +30,7 @@ namespace Sushil.Systems
 
             titleText.text = "GAME\nOVER";
             reasonText.text = BuildReasonText(reason);
-            hintText.text = "Press R to Restart";
+            hintText.text = "Press R to Restart   ·   Press Q for Main Menu";
             Time.timeScale = 0f;
             AudioListener.pause = true;
             overlayRoot.SetActive(true);
@@ -208,6 +211,8 @@ namespace Sushil.Systems
 
                 if (WasRestartPressed())
                     RestartCurrentScene();
+                else if (WasMainMenuPressed())
+                    GoToMainMenu();
             }
 
             void RestartCurrentScene()
@@ -219,6 +224,20 @@ namespace Sushil.Systems
 
                 Scene active = SceneManager.GetActiveScene();
                 SceneManager.LoadScene(active.buildIndex);
+            }
+
+            void GoToMainMenu()
+            {
+                IsShowing = false;
+                if (overlayRoot != null) overlayRoot.SetActive(false);
+                Time.timeScale = 1f;
+                AudioListener.pause = false;
+
+                int buildIndex = SceneUtility.GetBuildIndexByScenePath(MainMenuScenePath);
+                if (buildIndex >= 0)
+                    SceneManager.LoadScene(buildIndex);
+                else
+                    SceneManager.LoadScene(MainMenuSceneName);
             }
         }
 
@@ -247,6 +266,18 @@ namespace Sushil.Systems
 #endif
 #if ENABLE_INPUT_SYSTEM
             if (Keyboard.current != null) pressed |= Keyboard.current.rKey.wasPressedThisFrame;
+#endif
+            return pressed;
+        }
+
+        static bool WasMainMenuPressed()
+        {
+            bool pressed = false;
+#if ENABLE_LEGACY_INPUT_MANAGER
+            pressed |= Input.GetKeyDown(KeyCode.Q);
+#endif
+#if ENABLE_INPUT_SYSTEM
+            if (Keyboard.current != null) pressed |= Keyboard.current.qKey.wasPressedThisFrame;
 #endif
             return pressed;
         }

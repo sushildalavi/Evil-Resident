@@ -63,18 +63,22 @@ public class CollectibleHUD : MonoBehaviour
     const int DefaultKeyCount = 3;
     const int DefaultFuseCount = 3;
     const int MaxSupportedFuses = 8;
-    const float HudPadding = 24f;
-    const float RootGap = 8f;
-    const float RowHeight = 42f;
-    const float RowMinWidth = 258f;
-    const float LabelWidth = 56f;
+    // Compact "ornate-frame" layout (Resident Evil / Outlast style).
+    // Each row reads as a metal frame containing individual slot panels:
+    //   [ icon + LABEL ] [ slot ] [ slot ] [ slot ] [ counter ]
+    const float HudPadding = 22f;
+    const float RootGap = 4f;
+    const float RowHeight = 38f;          // small, non-intrusive
+    const float RowMinWidth = 280f;
+    const float LabelWidth = 70f;         // icon + label combined
     const float CounterWidth = 42f;
-    const float DividerWidth = 1f;
-    const float DividerHeight = 18f;
-    const float HorizontalPadding = 14f;
-    const float ItemGap = 6f;
-    const float GroupGap = 10f;
-    const float AccentBarWidth = 3f;
+    const float DividerWidth = 0f;        // no dividers — slots are individually framed
+    const float DividerHeight = 0f;
+    const float HorizontalPadding = 4f;   // tiny outer padding (frame does the visual work)
+    const float ItemGap = 3f;
+    const float GroupGap = 4f;            // tight gaps between slots
+    const float AccentBarWidth = 0f;      // accent bar removed (frame replaces it)
+    const float SlotSize = 28f;           // each pip slot is a 28×28 mini-frame
 
     static readonly KeyType[] KeyOrder =
     {
@@ -83,23 +87,27 @@ public class CollectibleHUD : MonoBehaviour
         KeyType.Gold
     };
 
-    static readonly Color KeysBase = Rgba(100, 180, 255, 1f);
-    static readonly Color FusesBase = Rgba(255, 180, 50, 1f);
+    static readonly Color KeysBase = Rgba(214, 176, 108, 1f);
+    static readonly Color FusesBase = Rgba(232, 195, 90, 1f);
     static readonly Color CompleteBase = Rgba(80, 200, 120, 1f);
-    static readonly Color SilverKeyColor = Color.blue;
-    static readonly Color BronzeKeyColor = Color.green;
-    static readonly Color GoldKeyColor = Color.red;
+    static readonly Color SilverKeyColor = Rgba(192, 199, 209, 1f);
+    static readonly Color BronzeKeyColor = Rgba(166, 112, 74, 1f);
+    static readonly Color GoldKeyColor = Rgba(233, 198, 94, 1f);
     static readonly Color[] DefaultFuseColors =
     {
         Color.yellow,
         Color.blue,
         new Color(0.6f, 0.2f, 1f, 1f)
     };
-    static readonly Color RowBackgroundColor = new Color(0.02f, 0.03f, 0.055f, 0.82f);
-    static readonly Color RowSheenColor = new Color(1f, 1f, 1f, 0.05f);
-    static readonly Color RowShadowColor = new Color(0f, 0f, 0f, 0.42f);
-    static readonly Color PipBandBaseColor = new Color(1f, 1f, 1f, 0.045f);
-    static readonly Color CounterPlateBaseColor = new Color(1f, 1f, 1f, 0.05f);
+    // Dark-metal frame palette inspired by Resident Evil-style HUDs.
+    static readonly Color RowBackgroundColor = new Color(0.05f, 0.05f, 0.06f, 0.96f);     // dark stone behind frame
+    static readonly Color RowSheenColor = new Color(1f, 1f, 1f, 0.025f);                  // very subtle highlight
+    static readonly Color RowShadowColor = new Color(0f, 0f, 0f, 0.95f);                  // strong drop shadow
+    static readonly Color SlotBackgroundColor = new Color(0.02f, 0.02f, 0.03f, 0.98f);    // empty slot interior
+    static readonly Color SlotFrameColor = new Color(0.32f, 0.30f, 0.28f, 1f);            // worn metal frame border
+    static readonly Color SlotInnerEdgeColor = new Color(0.55f, 0.52f, 0.48f, 0.45f);     // brighter inner-edge highlight
+    static readonly Color CounterPlateBaseColor = new Color(0.18f, 0.04f, 0.04f, 0.85f);  // reddish counter plate
+    static readonly Color PipBandBaseColor = new Color(0f, 0f, 0f, 0f);                   // transparent — slots are individually framed
     static readonly Color UncollectedFill = new Color(1f, 1f, 1f, 0f);
     static readonly Color ToastBackgroundColor = new Color(80f / 255f, 200f / 255f, 120f / 255f, 0.15f);
     static readonly Color ToastBorderColor = new Color(80f / 255f, 200f / 255f, 120f / 255f, 0.3f);
@@ -279,7 +287,7 @@ public class CollectibleHUD : MonoBehaviour
         trackedKeys.Clear();
         trackedKeys.AddRange(KeyOrder);
         targetKeyCount = DefaultKeyCount;
-        targetFuseCount = IsKeyOnlyEscapeScene() ? 0 : DefaultFuseCount;
+        targetFuseCount = (IsKeyOnlyEscapeScene() || IsEasyLevelScene()) ? 0 : DefaultFuseCount;
 
         BuildRowPips(keyRow, targetKeyCount);
         BuildRowPips(fuseRow, targetFuseCount);
@@ -294,6 +302,7 @@ public class CollectibleHUD : MonoBehaviour
         List<KeyType> detectedKeys = ResolveTrackedKeys();
         int detectedFuses = ResolveFuseTargetCount();
         bool keyOnlyEscapeScene = IsKeyOnlyEscapeScene();
+        bool hideFusesInEasy = IsEasyLevelScene();
 
         if (ShouldUseProjectDefaults())
         {
@@ -303,7 +312,7 @@ public class CollectibleHUD : MonoBehaviour
                 detectedKeys.AddRange(KeyOrder);
             }
 
-            detectedFuses = keyOnlyEscapeScene
+            detectedFuses = (keyOnlyEscapeScene || hideFusesInEasy)
                 ? 0
                 : Mathf.Max(detectedFuses, DefaultFuseCount);
         }
@@ -311,7 +320,7 @@ public class CollectibleHUD : MonoBehaviour
         if (detectedKeys.Count == 0)
             detectedKeys.AddRange(KeyOrder);
 
-        detectedFuses = keyOnlyEscapeScene
+        detectedFuses = (keyOnlyEscapeScene || hideFusesInEasy)
             ? 0
             : Mathf.Clamp(Mathf.Max(detectedFuses, DefaultFuseCount), 0, MaxSupportedFuses);
 
@@ -408,15 +417,17 @@ public class CollectibleHUD : MonoBehaviour
 
         Image accentBar = CreateSolidImage("AccentBar", rowRect, Color.white);
         Image sheen = CreateSolidImage("Sheen", rowRect, RowSheenColor);
-        Text label = CreateText("Label", rowRect, labelText, 12, TextAnchor.MiddleLeft);
-        AddTextShadow(label, new Color(0f, 0f, 0f, 0.55f), new Vector2(0f, -1f));
+        Text label = CreateText("Label", rowRect, labelText, 18, TextAnchor.MiddleLeft);  // was 12
+        label.fontStyle = FontStyle.Bold;
+        AddTextShadow(label, new Color(0f, 0f, 0f, 0.85f), new Vector2(1f, -1f));
         Image dividerLeft = CreateSolidImage("DividerLeft", rowRect, Color.white);
         Image dividerRight = CreateSolidImage("DividerRight", rowRect, Color.white);
         Image pipBand = CreateSolidImage("PipBand", rowRect, PipBandBaseColor);
         RectTransform pipHost = CreateRect("PipHost", rowRect);
         Image counterPlate = CreateSolidImage("CounterPlate", rowRect, CounterPlateBaseColor);
-        Text counter = CreateText("Counter", rowRect, "0/0", 12, TextAnchor.MiddleCenter);
-        AddTextShadow(counter, new Color(0f, 0f, 0f, 0.55f), new Vector2(0f, -1f));
+        Text counter = CreateText("Counter", rowRect, "0/0", 18, TextAnchor.MiddleCenter);  // was 12
+        counter.fontStyle = FontStyle.Bold;
+        AddTextShadow(counter, new Color(0f, 0f, 0f, 0.85f), new Vector2(1f, -1f));
 
         return new RowView
         {
@@ -442,6 +453,13 @@ public class CollectibleHUD : MonoBehaviour
         ClearChildren(row.pipHost);
         row.pips.Clear();
 
+        // First pass: build a framed slot backdrop for each pip position so empty
+        // slots are visible too (matches the Resident-Evil-style HUD aesthetic).
+        for (int i = 0; i < count; i++)
+        {
+            CreateSlotFrame(row.pipHost, i);
+        }
+
         for (int i = 0; i < count; i++)
         {
             PipView pip = row.kind == RowKind.Keys
@@ -454,7 +472,7 @@ public class CollectibleHUD : MonoBehaviour
     PipView CreateKeyPip(int index, Transform parent)
     {
         RectTransform rect = CreateRect($"KeyPip_{index}", parent);
-        rect.sizeDelta = index == 1 ? new Vector2(14f, 10f) : new Vector2(14f, 14f);
+        rect.sizeDelta = new Vector2(28f, 28f);
         CollectibleType type = MapKeyIndex(index);
         Color pipColor = GetCollectibleDisplayColor(type);
 
@@ -462,13 +480,10 @@ public class CollectibleHUD : MonoBehaviour
         fill.color = UncollectedFill;
         fill.raycastTarget = false;
 
-        if (index == 0)
-            fill.sprite = GetCircleSprite();
-        else
-            fill.sprite = GetRoundedRectSprite();
+        fill.sprite = index == 0 ? GetCircleSprite() : GetRoundedRectSprite();
 
         Outline outline = rect.gameObject.AddComponent<Outline>();
-        outline.effectDistance = new Vector2(1f, -1f);
+        outline.effectDistance = new Vector2(2f, -2f);
         outline.useGraphicAlpha = false;
 
         return new PipView
@@ -486,17 +501,17 @@ public class CollectibleHUD : MonoBehaviour
     PipView CreateFusePip(int index, Transform parent)
     {
         RectTransform rect = CreateRect($"FusePip_{index}", parent);
-        rect.sizeDelta = new Vector2(8f, 18f);
+        rect.sizeDelta = new Vector2(16f, 36f);
         CollectibleType type = MapFuseIndex(index);
         Color pipColor = GetCollectibleDisplayColor(type);
 
         Image fill = rect.gameObject.AddComponent<Image>();
         fill.color = UncollectedFill;
-        fill.sprite = GetRoundedRectSprite();
         fill.raycastTarget = false;
+        fill.sprite = GetRoundedRectSprite();
 
         Outline outline = rect.gameObject.AddComponent<Outline>();
-        outline.effectDistance = new Vector2(1f, -1f);
+        outline.effectDistance = new Vector2(2f, -2f);
         outline.useGraphicAlpha = false;
 
         return new PipView
@@ -550,33 +565,59 @@ public class CollectibleHUD : MonoBehaviour
 
     float LayoutRow(RowView row, int count)
     {
-        float pipAreaWidth = GetPipAreaWidth(row.kind, count);
-        float width = Mathf.Max(RowMinWidth, (HorizontalPadding * 2f) + LabelWidth + GroupGap + DividerWidth + GroupGap + pipAreaWidth + GroupGap + DividerWidth + GroupGap + CounterWidth);
+        // Each pip gets its own SlotSize square + ItemGap between them.
+        float slotsAreaWidth = (count * SlotSize) + Mathf.Max(0, count - 1) * ItemGap;
+        float width = Mathf.Max(RowMinWidth,
+            HorizontalPadding + LabelWidth + GroupGap + slotsAreaWidth + GroupGap + CounterWidth + HorizontalPadding);
 
         row.root.sizeDelta = new Vector2(width, RowHeight);
         row.background.color = RowBackgroundColor;
 
-        StretchLeft(row.accentBar.rectTransform, 0f, 0f, AccentBarWidth);
+        // Frame the entire row with a worn-metal border (two stacked outlines).
+        row.outline.effectColor = SlotFrameColor;
+        row.outline.effectDistance = new Vector2(2f, -2f);
+        row.shadow.effectColor = RowShadowColor;
+        row.shadow.effectDistance = new Vector2(0f, -3f);
+
+        // Accent bar disabled — frame replaces it.
+        StretchLeft(row.accentBar.rectTransform, 0f, 0f, 0f);
+        row.accentBar.color = new Color(0f, 0f, 0f, 0f);
         SetTopStretch(row.sheen.rectTransform, 14f, 7f, 14f, 1f);
 
-        SetLeftCenter(row.label.rectTransform, HorizontalPadding + 8f, LabelWidth, 16f);
-        SetLeftCenter(row.dividerLeft.rectTransform, HorizontalPadding + 8f + LabelWidth + GroupGap, DividerWidth, DividerHeight);
+        // Label slot (icon + label combined) on the left.
+        float labelX = HorizontalPadding;
+        SetLeftCenter(row.label.rectTransform, labelX, LabelWidth, RowHeight - 8f);
 
-        float pipX = HorizontalPadding + 8f + LabelWidth + GroupGap + DividerWidth + GroupGap;
-        SetLeftCenter(row.pipBand.rectTransform, pipX - 8f, pipAreaWidth + 16f, 24f);
-        SetLeftCenter(row.pipHost, pipX, pipAreaWidth, 18f);
+        // Hide the unused dividers.
+        row.dividerLeft.color = new Color(0f, 0f, 0f, 0f);
+        row.dividerRight.color = new Color(0f, 0f, 0f, 0f);
+        SetLeftCenter(row.dividerLeft.rectTransform, 0f, 0f, 0f);
+        SetLeftCenter(row.dividerRight.rectTransform, 0f, 0f, 0f);
 
-        SetLeftCenter(row.dividerRight.rectTransform, pipX + pipAreaWidth + GroupGap, DividerWidth, DividerHeight);
-        SetLeftCenter(row.counterPlate.rectTransform, width - HorizontalPadding - CounterWidth - 8f, CounterWidth + 16f, 24f);
-        SetLeftCenter(row.counter.rectTransform, width - HorizontalPadding - CounterWidth, CounterWidth, 16f);
+        // Pip-band area is purely geometric — slots are individually framed.
+        float slotsX = labelX + LabelWidth + GroupGap;
+        row.pipBand.color = PipBandBaseColor; // transparent
+        SetLeftCenter(row.pipBand.rectTransform, slotsX, slotsAreaWidth, SlotSize);
+        SetLeftCenter(row.pipHost, slotsX, slotsAreaWidth, SlotSize);
 
+        // Counter "plate" — square frame on the right with reddish interior.
+        float counterX = width - HorizontalPadding - CounterWidth;
+        SetLeftCenter(row.counterPlate.rectTransform, counterX, CounterWidth, RowHeight - 8f);
+        SetLeftCenter(row.counter.rectTransform, counterX, CounterWidth, RowHeight - 8f);
+
+        // Pip placement — each pip occupies its own SlotSize square.
         for (int i = 0; i < row.pips.Count; i++)
         {
             PipView pip = row.pips[i];
-            float step = row.kind == RowKind.Keys ? 19f : 13f;
-            float widthOffset = row.kind == RowKind.Keys && i == 1 ? 14f : (row.kind == RowKind.Fuses ? 8f : 14f);
-            float height = row.kind == RowKind.Fuses ? 18f : (i == 1 ? 10f : 14f);
-            SetLeftCenter(pip.root, i * step, widthOffset, height);
+            float step = SlotSize + ItemGap;
+            // Inner content sits inside the slot frame with 4-px inset all around.
+            float contentInset = 4f;
+            float contentSize = SlotSize - (contentInset * 2f);
+            // Keys = circular silhouette in the slot. Fuses = vertical bar.
+            float pipWidth = row.kind == RowKind.Fuses ? contentSize * 0.55f : contentSize;
+            float pipHeight = contentSize;
+            float xOffset = i * step + (SlotSize - pipWidth) * 0.5f;
+            SetLeftCenter(pip.root, xOffset, pipWidth, pipHeight);
         }
 
         return width;
@@ -793,6 +834,23 @@ public class CollectibleHUD : MonoBehaviour
             return false;
 
         return true;
+    }
+
+    bool IsEasyLevelScene()
+    {
+        Scene active = SceneManager.GetActiveScene();
+        string sceneName = active.name;
+        string scenePath = active.path;
+
+        if (!string.IsNullOrWhiteSpace(sceneName) &&
+            sceneName.ToLowerInvariant().Contains("easy level"))
+            return true;
+
+        if (!string.IsNullOrWhiteSpace(scenePath) &&
+            scenePath.ToLowerInvariant().Contains("/easy level.unity"))
+            return true;
+
+        return false;
     }
 
     bool ShouldUseProjectDefaults()
@@ -1022,9 +1080,35 @@ public class CollectibleHUD : MonoBehaviour
         if (count <= 0)
             return 0f;
 
-        float itemWidth = kind == RowKind.Keys ? 14f : 8f;
-        float step = kind == RowKind.Keys ? 19f : 13f;
+        // Match the larger pip sizes + step in LayoutRow / CreateKeyPip / CreateFusePip.
+        float itemWidth = kind == RowKind.Keys ? 28f : 16f;
+        float step      = kind == RowKind.Keys ? 30f : 18f;
         return itemWidth + ((count - 1) * step);
+    }
+
+    // Builds an empty bordered slot panel — used as a backdrop for each pip so empty
+    // slots still read as filled-in frame boxes in the HUD (Resident-Evil aesthetic).
+    void CreateSlotFrame(Transform parent, int index)
+    {
+        var slotObj = new GameObject($"Slot_{index}", typeof(RectTransform));
+        slotObj.transform.SetParent(parent, false);
+        var rect = slotObj.GetComponent<RectTransform>();
+        float step = SlotSize + ItemGap;
+        SetLeftCenter(rect, index * step, SlotSize, SlotSize);
+
+        // Slot interior — near-black, gives the framed-recess look.
+        var interior = slotObj.AddComponent<Image>();
+        interior.sprite = GetRoundedRectSprite();
+        interior.color = SlotBackgroundColor;
+        interior.raycastTarget = false;
+
+        // Two stacked outlines: outer worn-metal frame + inner brighter highlight.
+        var frameOuter = slotObj.AddComponent<Outline>();
+        frameOuter.effectColor = SlotFrameColor;
+        frameOuter.effectDistance = new Vector2(1.5f, -1.5f);
+        var frameInner = slotObj.AddComponent<Outline>();
+        frameInner.effectColor = SlotInnerEdgeColor;
+        frameInner.effectDistance = new Vector2(0.8f, -0.8f);
     }
 
     static RectTransform CreateRect(string name, Transform parent)

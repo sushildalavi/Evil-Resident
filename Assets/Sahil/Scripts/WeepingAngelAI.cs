@@ -335,7 +335,7 @@ public class WeepingAngelAI : MonoBehaviour
             return false;
         }
 
-        if (agent.enabled && agent.isOnNavMesh)
+        if (IsAgentReady())
         {
             agent.isStopped = false;
             agent.SetDestination(playerTransform.position);
@@ -353,7 +353,7 @@ public class WeepingAngelAI : MonoBehaviour
 
     private void StopImmediate()
     {
-        if (agent != null && agent.enabled)
+        if (IsAgentReady())
         {
             agent.isStopped = true;
             agent.velocity = Vector3.zero;
@@ -362,6 +362,14 @@ public class WeepingAngelAI : MonoBehaviour
 
         StopMovementAudio();
         UpdateAnimationState(false);
+    }
+
+    private bool IsAgentReady()
+    {
+        return agent != null &&
+               agent.enabled &&
+               agent.gameObject.activeInHierarchy &&
+               agent.isOnNavMesh;
     }
 
     private void UpdateAnimationState(bool shouldMove)

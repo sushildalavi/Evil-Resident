@@ -407,7 +407,7 @@ public class RohitFPSController : MonoBehaviour
                 float allowedDistance = interactDistance;
                 if (candidate is KeyItem)
                     allowedDistance = Mathf.Max(interactDistance, keyInteractDistance);
-                else if (candidate is FusePickup || candidate is FuseItem)
+                else if (candidate is FusePickup || candidate is FuseItem || candidate is FuseBox)
                     allowedDistance = Mathf.Max(interactDistance, fuseInteractDistance);
                 else if (candidate is PuzzleWheel)
                     allowedDistance = Mathf.Max(interactDistance, puzzleWheelInteractDistance);
@@ -588,7 +588,7 @@ public class RohitFPSController : MonoBehaviour
         if (interactable is KeyItem)
             return Mathf.Max(interactDistance, keyInteractDistance);
 
-        if (interactable is FusePickup || interactable is FuseItem)
+        if (interactable is FusePickup || interactable is FuseItem || interactable is FuseBox)
             return Mathf.Max(interactDistance, fuseInteractDistance);
 
         return interactDistance;

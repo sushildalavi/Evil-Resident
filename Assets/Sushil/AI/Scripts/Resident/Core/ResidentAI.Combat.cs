@@ -32,12 +32,42 @@ namespace Sushil.AI
             return false;
         }
 
+        // Cached scream clip — same WA_Scream sound the Weeping Angel uses, copied to
+        // Resources/Audio/KillScream.wav so it can be loaded by either AI without
+        // duplicating the asset reference per-prefab.
+        static AudioClip cachedKillScreamClip;
+        static bool killScreamLoadAttempted;
+
         bool StartKillAttack(Transform targetTransform, PlayerDeath death, RohitFPSController rohit, string reason)
         {
             killTriggered = true;
+            PlayKillScream();
             if (killAttackRoutine != null) StopCoroutine(killAttackRoutine);
             killAttackRoutine = StartCoroutine(PerformKillAttack(targetTransform, death, rohit, reason));
             return true;
+        }
+
+        void PlayKillScream()
+        {
+            if (!killScreamLoadAttempted)
+            {
+                cachedKillScreamClip = Resources.Load<AudioClip>("Audio/KillScream");
+                killScreamLoadAttempted = true;
+            }
+            if (cachedKillScreamClip == null) return;
+
+            // 2D playback (no spatial blend) so it always reads at full volume,
+            // ignores AudioListener pause, and doesn't get muted while Time.timeScale = 0.
+            var oneShot = new GameObject("ResidentKillScream", typeof(AudioSource));
+            DontDestroyOnLoad(oneShot);
+            var src = oneShot.GetComponent<AudioSource>();
+            src.clip = cachedKillScreamClip;
+            src.spatialBlend = 0f;
+            src.volume = 1f;
+            src.pitch = 1f;
+            src.ignoreListenerPause = true;
+            src.Play();
+            Destroy(oneShot, cachedKillScreamClip.length + 0.25f);
         }
 
         IEnumerator PerformKillAttack(Transform targetTransform, PlayerDeath death, RohitFPSController rohit, string reason)

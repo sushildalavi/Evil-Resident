@@ -402,7 +402,16 @@ namespace Sushil.AI
             // Remove bait-like behavior: no bias to noise rooms or unlocked key doors.
             lastNoiseRoomBiasChance = 0f;
             unlockedKeyDoorBiasChance = 0f;
-            patrolPointVisitChance = 0f;
+            // Allow patrol-point visits when authored — adds variety beyond pure free-roam.
+            patrolPointVisitChance = Mathf.Max(patrolPointVisitChance, 0.45f);
+            // Shorter required travel = more frequent re-routing = more "wandering" feel.
+            minPatrolTravelDistance = Mathf.Min(minPatrolTravelDistance, 4f);
+            // Wider local roam radius gives the resident more random destinations to pick.
+            localPatrolRadius = Mathf.Max(localPatrolRadius, 18f);
+            // Bump patrol pause so the resident occasionally stops + looks around — feels alive.
+            pauseOutsideChance = Mathf.Max(pauseOutsideChance, 0.30f);
+            pauseMin = Mathf.Min(pauseMin, 0.6f);
+            pauseMax = Mathf.Max(pauseMax, 1.4f);
             // Use hard difficulty as baseline and scale down easy/medium slightly so
             // they stay tense but fair.
             const float hardPatrolSpeed = 1.6f;
@@ -423,8 +432,9 @@ namespace Sushil.AI
             relentlessVisualChase = false;
             loseChaseWhenFar = true;
             // Hard-difficulty baseline. Medium and Easy cap these down further below.
-            sightRange = Mathf.Clamp(sightRange, 28f, 32f);
-            fovDegrees = Mathf.Max(fovDegrees, 150f);
+            // HARD baseline — wide-eyed predator: spots the player from across most rooms.
+            sightRange = Mathf.Clamp(sightRange, 34f, 40f);
+            fovDegrees = Mathf.Max(fovDegrees, 165f);
             strictWallOcclusionVision = true;
             proximityChaseDistance = Mathf.Clamp(proximityChaseDistance, 5.5f, 6.5f);
             visionAcquireSeconds = Mathf.Clamp(visionAcquireSeconds, 0.06f, 0.1f);
@@ -446,7 +456,7 @@ namespace Sushil.AI
             // non-existent floor, leaving the resident stationary during patrol.
             multiFloorRoamChance = Mathf.Clamp(multiFloorRoamChance, 0.2f, 0.42f);
             multiFloorRoamHeight = Mathf.Max(multiFloorRoamHeight, 7f);
-            pauseOutsideChance = 0f;
+            // pauseOutsideChance is set above (Mathf.Max ≥ 0.30) for patrol "look around" feel.
             stairVisualLift = Mathf.Max(stairVisualLift, 0.1f);
             stairSwingReduction = Mathf.Clamp(stairSwingReduction, 0.55f, 0.8f);
             stairTraverseAssistSpeed = Mathf.Max(stairTraverseAssistSpeed, 1.5f);
@@ -462,8 +472,10 @@ namespace Sushil.AI
             killAttackLeftArmBraceDegrees = Mathf.Max(killAttackLeftArmBraceDegrees, 48f);
             chaseForwardLeanDegrees = Mathf.Min(chaseForwardLeanDegrees, 1.4f);
             // Keep the takedown range tight even if the scene has a larger serialized value.
-            killDistance = Mathf.Clamp(killDistance, 0.9f, 1.0f);
-            killVerticalTolerance = Mathf.Clamp(killVerticalTolerance, 0.75f, 0.95f);
+            // Hard-difficulty default. Slightly tighter range so kills feel like real
+            // "got me" contact, not a pre-emptive grab from a metre away.
+            killDistance = Mathf.Clamp(killDistance, 0.75f, 0.85f);
+            killVerticalTolerance = Mathf.Clamp(killVerticalTolerance, 0.7f, 0.85f);
             roamWholeHouseWhenPlayerLost = false;
             wholeHouseSearchDuration = Mathf.Min(wholeHouseSearchDuration, 10f);
             lostSightLastKnownBias = Mathf.Max(lostSightLastKnownBias, 0.95f);
@@ -483,7 +495,7 @@ namespace Sushil.AI
             }
             if (IsSahilTestNewLevel())
             {
-                sightRange = Mathf.Clamp(sightRange, 28f, 32f);
+                sightRange = Mathf.Clamp(sightRange, 34f, 40f);
                 visionAcquireSeconds = Mathf.Clamp(visionAcquireSeconds, 0.06f, 0.1f);
                 visionLoseSeconds = Mathf.Clamp(visionLoseSeconds, 0.2f, 0.26f);
                 allowProximityChaseWithoutNoise = true;
@@ -511,13 +523,17 @@ namespace Sushil.AI
             {
                 patrolMoveSpeed = hardPatrolSpeed * 0.85f;
                 chaseMoveSpeed = hardChaseSpeed * 0.85f;
-                sightRange = Mathf.Min(sightRange, 26f);                  // was 19 — now nearly hard's 28
-                proximityChaseDistance = Mathf.Min(proximityChaseDistance, 5.5f);  // was 4.1
-                closeAwarenessDistance = Mathf.Min(closeAwarenessDistance, 5.0f);  // was 4.0
-                chaseMemorySeconds = Mathf.Min(chaseMemorySeconds, 4.5f);          // was 2.8
-                lostSightPursuitSeconds = Mathf.Min(lostSightPursuitSeconds, 5.0f);// was 3.2
-                maxChaseDistance = Mathf.Min(maxChaseDistance, 17f);               // was 11.5
-                farLoseDelay = Mathf.Min(farLoseDelay, 1.3f);                      // was 0.9
+                sightRange = Mathf.Min(sightRange, 32f);  // was 26 — bigger so chases trigger from farther
+                proximityChaseDistance = Mathf.Min(proximityChaseDistance, 6f);
+                closeAwarenessDistance = Mathf.Min(closeAwarenessDistance, 5.5f);
+                chaseMemorySeconds = Mathf.Min(chaseMemorySeconds, 4.5f);
+                lostSightPursuitSeconds = Mathf.Min(lostSightPursuitSeconds, 5.0f);
+                maxChaseDistance = Mathf.Min(maxChaseDistance, 17f);
+                farLoseDelay = Mathf.Min(farLoseDelay, 1.3f);
+                // Medium kill range: between Easy (0.70) and Hard (0.85). Tighter than
+                // before so the resident has to actually be in arm's reach, not 1m+ away.
+                killDistance = Mathf.Min(killDistance, 0.78f);
+                killVerticalTolerance = Mathf.Min(killVerticalTolerance, 0.75f);
             }
             else if (IsEasyLevelScene())
             {

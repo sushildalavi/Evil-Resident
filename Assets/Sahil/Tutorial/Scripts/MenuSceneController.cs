@@ -154,9 +154,11 @@ public class MenuSceneController : MonoBehaviour
                 new Color(0.95f, 0.92f, 0.85f, 0.95f),
                 new Vector2(0.10f, 0.625f), new Vector2(0.90f, 0.685f));
 
-            CreateText(content, "Quote", "\"He hears every footstep.\"", 22, FontStyle.Italic,
-                new Color(0.78f, 0.78f, 0.82f, 0.85f),
-                new Vector2(0.10f, 0.55f), new Vector2(0.90f, 0.60f));
+            CreateText(content, "Quote",
+                "Collect the keys.  Power the fuses.  Escape the house.",
+                20, FontStyle.Italic,
+                new Color(0.85f, 0.85f, 0.88f, 0.9f),
+                new Vector2(0.06f, 0.55f), new Vector2(0.94f, 0.60f));
 
             CreateButton(content, "TutorialButton", "TUTORIAL",
                 new Vector2(0.5f, 0.40f), LoadTutorial,
@@ -198,10 +200,12 @@ public class MenuSceneController : MonoBehaviour
                 accentColor: new Color(0.92f, 0.10f, 0.10f, 0.85f));
         }
 
-        // Footer tagline at the bottom of the panel.
-        CreateText(content, "Footer", "·  Don't blink.  ·", 18, FontStyle.Italic,
-            new Color(0.55f, 0.10f, 0.10f, 0.7f),
-            new Vector2(0.10f, 0.02f), new Vector2(0.90f, 0.07f));
+        // Footer tip — practical advice for new players.
+        CreateText(content, "Footer",
+            "TIP:  Use a mouse and earphones for the best experience.",
+            16, FontStyle.Italic,
+            new Color(0.85f, 0.65f, 0.20f, 0.75f),
+            new Vector2(0.04f, 0.02f), new Vector2(0.96f, 0.075f));
     }
 
     // Thin red horizontal divider line.
