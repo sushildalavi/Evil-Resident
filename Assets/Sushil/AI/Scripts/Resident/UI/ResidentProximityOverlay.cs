@@ -40,6 +40,8 @@ namespace Sushil.Systems
         PlayerHide playerHide;
         ResidentAI[] residents;
         float nextRefreshTime;
+        // NavMeshPath cannot be `new`'d in a field initializer — Unity throws.
+        NavMeshPath _pathBuf;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Bootstrap()
@@ -224,7 +226,7 @@ namespace Sushil.Systems
 
         float GetPathDistance(Vector3 from, Vector3 to)
         {
-            var path = new NavMeshPath();
+            var path = _pathBuf ??= new NavMeshPath();
             if (!NavMesh.CalculatePath(from, to, NavMesh.AllAreas, path)) return -1f;
             if (path.status != NavMeshPathStatus.PathComplete || path.corners == null || path.corners.Length < 2) return -1f;
 

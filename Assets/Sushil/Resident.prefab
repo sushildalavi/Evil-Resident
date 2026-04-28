@@ -323,7 +323,7 @@ MonoBehaviour:
   enforcedAgentRadius: 0.35
   enforcedAgentHeight: 2.2
   obstacleExtraPadding: 0.05
-  keepAgentSnappedToNavMesh: 1
+  keepAgentSnappedToNavMesh: 0
   navSnapSearchRadius: 1.6
   navSnapWarpDistance: 0.45
   destinationSampleRadius: 2.2
@@ -342,10 +342,6 @@ MonoBehaviour:
   antiClipProbeRadius: 0.2
   enforceNavMeshBoundaryAntiClip: 1
   antiClipPenetrationEpsilon: 0.05
-  hidingInspectPoints: []
-  checkHidingChance: 0.7
-  inspectPauseMin: 0.8
-  inspectPauseMax: 1.4
   sightRange: 28
   fovDegrees: 120
   strictWallOcclusionVision: 1
@@ -363,12 +359,6 @@ MonoBehaviour:
   noiseTrackingHasUncertainty: 1
   noiseTrackingMinError: 0.8
   noiseTrackingMaxError: 2.2
-  distractOnThrowNoise: 1
-  throwReleaseNoiseType: throw
-  throwImpactNoiseType: throwImpact
-  throwNoiseHearingBoost: 1.8
-  minThrowHearingRadius: 25
-  distractionSightSuppressSeconds: 2.5
   limitVisualChaseTime: 0
   maxVisualChaseSeconds: 7
   chaseMemorySeconds: 5
@@ -382,9 +372,6 @@ MonoBehaviour:
   searchRadius: 4
   roomSuspicionPortion: 0.65
   outwardSearchMultiplier: 2.3
-  fakeLeaveChance: 0.6
-  throwDistractionSearchDuration: 5.5
-  forceFakeLeaveAfterPlayerHides: 1
   hideTriggeredSearchDuration: 7.5
   lastSeenSearchDurationBoost: 2
   roamWholeHouseWhenPlayerLost: 1
@@ -412,9 +399,6 @@ MonoBehaviour:
   autoOpenNearbyDoors: 0
   autoDoorOpenRange: 2.2
   autoDoorOpenCooldown: 0.25
-  killPlayerIfFoundHidden: 1
-  hiddenTakedownDistance: 1.4
-  hiddenTakedownConfirmSeconds: 0.45
   visualRoot: {fileID: 0}
   autoFindVisualRoot: 1
   walkBobAmplitude: 0.03

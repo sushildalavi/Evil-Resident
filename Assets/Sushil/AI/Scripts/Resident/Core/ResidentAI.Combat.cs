@@ -117,26 +117,6 @@ namespace Sushil.AI
             GameOverOverlay.Show(reason);
         }
 
-        void TryHandleHiddenTakedown(bool force = false)
-        {
-            if (!killPlayerIfFoundHidden || player == null) return;
-            if (!IsPlayerHidden()) { hiddenTakedownTimer = 0f; return; }
-            if (!GetCurrentHideSpotPosition(out Vector3 hidePos)) { hiddenTakedownTimer = 0f; return; }
-
-            float d = Vector3.Distance(transform.position, hidePos);
-            if (d > Mathf.Max(0.6f, hiddenTakedownDistance))
-            {
-                hiddenTakedownTimer = 0f;
-                return;
-            }
-
-            hiddenTakedownTimer += force ? hiddenTakedownConfirmSeconds : Time.deltaTime;
-            if (hiddenTakedownTimer < hiddenTakedownConfirmSeconds) return;
-            hiddenTakedownTimer = 0f;
-
-            TryKillTarget(player.gameObject, "Resident found you hiding");
-        }
-
         void UpdateKillAttackAnimation()
         {
             float now = Time.time;

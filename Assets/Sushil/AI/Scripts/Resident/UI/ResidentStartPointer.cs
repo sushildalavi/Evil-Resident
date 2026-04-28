@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.AI;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using Sushil.AI;
@@ -27,6 +28,7 @@ namespace Sushil.Systems
     {
         enum PresentationMode { Hidden, OnScreen, OffScreen }
         enum FloorRelation { Same, Upstairs, Downstairs }
+        enum ThreatLevel { Safe, Sensed, Seen }
 
         static ResidentStartPointer instance;
         static Sprite haloSprite;
@@ -54,15 +56,18 @@ namespace Sushil.Systems
 
         [Header("Distance Text")]
         public bool showDistanceText = true;
+        public bool usePathDistance = true;
+        [Tooltip("Extra displayed distance added per floor gap when a complete NavMesh path is unavailable.")]
+        public float fallbackFloorDistancePenalty = 9f;
         [Range(10f, 28f)] public float textSize = 14f;
         [Range(2f, 40f)] public float textOffset = 22f;
         public bool useBracketedText = true;
 
         [Header("Visibility")]
-        public float maxDisplayDistance = 40f;
-        public float hideWhenCloserThan = 0.5f;
+        public float maxDisplayDistance = 999f;
+        public float hideWhenCloserThan = 0f;
         public bool keepVisibleWhileOccluded = true;
-        public bool keepVisibleWhileHiding = false;
+        public bool keepVisibleWhileHiding = true;
 
         [Header("Opacity")]
         [Range(0f, 1f)] public float visibleAlpha = 1f;
@@ -72,10 +77,9 @@ namespace Sushil.Systems
         public LayerMask occlusionMask = ~0;
 
         [Header("State Colors")]
-        public Color patrolColor = new Color(0.88f, 0.9f, 0.94f, 1f);
-        public Color investigateColor = new Color(1f, 0.82f, 0.38f, 1f);
-        public Color searchColor = new Color(1f, 0.58f, 0.2f, 1f);
-        public Color chaseColor = new Color(0.97f, 0.16f, 0.22f, 1f);
+        public Color safeColor = new Color(0.2f, 0.95f, 0.35f, 1f);
+        public Color sensedColor = new Color(1f, 0.58f, 0.12f, 1f);
+        public Color seenColor = new Color(1f, 0.08f, 0.1f, 1f);
 
         [Header("Text Style")]
         public Color textColor = new Color(1f, 0.96f, 0.88f, 0.92f);
@@ -150,6 +154,9 @@ namespace Sushil.Systems
         PlayerHide playerHide;
         ResidentAI[] residents;
         float nextRefreshTime;
+        float nextForceRefreshTime;
+        // NavMeshPath cannot be `new`'d in a field initializer — Unity throws.
+        NavMeshPath _distPathBuf;
 
         float pulseTimer;
         float tickRotation;
@@ -180,6 +187,7 @@ namespace Sushil.Systems
             public Vector3 WorldAnchor;
             public float Distance;
             public ResidentAI.State AIState;
+            public ThreatLevel Threat;
             public bool Occluded;
             public bool PlayerHiding;
             public FloorRelation Floor;
@@ -217,7 +225,11 @@ namespace Sushil.Systems
             SceneManager.sceneLoaded -= OnSceneLoaded;
         }
 
-        void OnSceneLoaded(Scene s, LoadSceneMode m) => ResolveReferences(true);
+        void OnSceneLoaded(Scene s, LoadSceneMode m)
+        {
+            ResolveReferences(true);
+            nextRefreshTime = 0f; // force re-resolve on next LateUpdate too
+        }
         void Start() => ResolveReferences(true);
 
         // ------------------------------ Main pipeline ------------------------------
@@ -265,6 +277,11 @@ namespace Sushil.Systems
             if (player == null || cam == null || !cam.isActiveAndEnabled) return false;
 
             ResidentAI nearest = PickNearest(out float distance);
+            if (nearest == null)
+            {
+                ResolveReferences(true);
+                nearest = PickNearest(out distance);
+            }
             if (nearest == null) return false;
             if (distance < hideWhenCloserThan || distance > maxDisplayDistance) return false;
 
@@ -273,6 +290,7 @@ namespace Sushil.Systems
             data.Distance = distance;
             data.WorldAnchor = nearest.transform.position + Vector3.up * worldAnchorHeight;
             data.AIState = nearest.state;
+            data.Threat = GetThreatLevel(nearest);
             data.Occluded = IsOccluded(nearest);
             data.PlayerHiding = IsPlayerHidden();
 
@@ -354,11 +372,11 @@ namespace Sushil.Systems
 
         void UpdateThreatVisuals(TargetData t)
         {
-            targetColor = GetStateColor(t.AIState);
+            targetColor = GetThreatColor(t.Threat);
 
             pulseTimer += Time.unscaledDeltaTime / Mathf.Max(0.1f, pulsePeriod);
             float phase = Mathf.Sin(pulseTimer * Mathf.PI * 2f);
-            float amt = pulseAmount + (t.AIState == ResidentAI.State.Chase ? chasePulseAccent : 0f);
+            float amt = pulseAmount + (t.Threat == ThreatLevel.Seen ? chasePulseAccent : 0f);
             targetSizeMultiplier = 1f + phase * amt;
         }
 
@@ -532,15 +550,137 @@ namespace Sushil.Systems
 
         // ------------------------------ Helpers ------------------------------
 
-        Color GetStateColor(ResidentAI.State state)
+        ThreatLevel GetThreatLevel(ResidentAI resident)
         {
-            switch (state)
+            if (resident == null)
+                return ThreatLevel.Safe;
+
+            float rawDistance = player != null
+                ? Vector3.Distance(player.position, resident.transform.position)
+                : float.PositiveInfinity;
+
+            if (resident.IndicatorSeesPlayer || HasResidentLiveSight(resident, rawDistance))
+                return ThreatLevel.Seen;
+
+            if (resident.IndicatorSensesPlayer ||
+                resident.state == ResidentAI.State.Search ||
+                resident.state == ResidentAI.State.Investigate ||
+                resident.state == ResidentAI.State.Chase ||
+                HasResidentLiveSense(resident, rawDistance))
+                return ThreatLevel.Sensed;
+
+            return ThreatLevel.Safe;
+        }
+
+        bool HasResidentLiveSight(ResidentAI resident, float rawDistance)
+        {
+            if (resident == null || player == null || IsPlayerHidden())
+                return false;
+
+            float sightRange = Mathf.Max(2.5f, resident.sightRange);
+            if (rawDistance > sightRange)
+                return false;
+
+            Vector3 toPlayer = player.position - resident.transform.position;
+            toPlayer.y = 0f;
+            if (toPlayer.sqrMagnitude < 0.001f)
+                return true;
+
+            Vector3 residentForward = resident.transform.forward;
+            residentForward.y = 0f;
+            if (residentForward.sqrMagnitude < 0.001f)
+                residentForward = Vector3.forward;
+
+            float angle = Vector3.Angle(residentForward.normalized, toPlayer.normalized);
+            if (!resident.omnidirectionalVision && angle > resident.fovDegrees * 0.5f)
+                return false;
+
+            return HasAnyClearResidentToPlayerLine(resident);
+        }
+
+        bool HasResidentLiveSense(ResidentAI resident, float rawDistance)
+        {
+            if (resident == null || player == null || IsPlayerHidden())
+                return false;
+
+            float senseRange = Mathf.Max(
+                resident.closeAwarenessDistance,
+                resident.proximityChaseDistance,
+                resident.killDistance + 1.5f);
+            return rawDistance <= senseRange && HasAnyClearResidentToPlayerLine(resident);
+        }
+
+        bool HasAnyClearResidentToPlayerLine(ResidentAI resident)
+        {
+            if (resident == null || player == null)
+                return false;
+
+            Vector3 origin = resident.transform.position + Vector3.up * 1.35f;
+            Vector3 lateral = player.right;
+            lateral.y = 0f;
+            if (lateral.sqrMagnitude < 0.0001f)
+                lateral = Vector3.right;
+            lateral = lateral.normalized * 0.18f;
+
+            Vector3[] targets =
             {
-                case ResidentAI.State.Chase:       return chaseColor;
-                case ResidentAI.State.Search:      return searchColor;
-                case ResidentAI.State.Investigate: return investigateColor;
-                default:                           return patrolColor;
+                player.position + Vector3.up * 1.45f,
+                player.position + Vector3.up * 1.1f,
+                player.position + Vector3.up * 0.75f,
+                player.position + Vector3.up * 1.1f + lateral,
+                player.position + Vector3.up * 1.1f - lateral
+            };
+
+            for (int i = 0; i < targets.Length; i++)
+            {
+                if (HasClearResidentToPlayerLine(resident, origin, targets[i]))
+                    return true;
             }
+
+            return false;
+        }
+
+        bool HasClearResidentToPlayerLine(ResidentAI resident, Vector3 origin, Vector3 target)
+        {
+            Vector3 dir = target - origin;
+            float dist = dir.magnitude;
+            if (dist <= 0.05f)
+                return true;
+
+            dir /= dist;
+            RaycastHit[] hits = Physics.RaycastAll(origin, dir, dist + 0.05f, ~0, QueryTriggerInteraction.Ignore);
+            if (hits.Length == 0)
+                return true;
+
+            System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+            for (int i = 0; i < hits.Length; i++)
+            {
+                Collider col = hits[i].collider;
+                if (col == null)
+                    continue;
+
+                Transform tr = col.transform;
+                if (tr == resident.transform || tr.IsChildOf(resident.transform))
+                    continue;
+                if (tr == player || tr.IsChildOf(player) ||
+                    tr.GetComponentInParent<RohitFPSController>() != null ||
+                    tr.GetComponentInParent<PlayerDeath>() != null)
+                    return true;
+
+                return false;
+            }
+
+            return false;
+        }
+
+        Color GetThreatColor(ThreatLevel threat)
+        {
+            return threat switch
+            {
+                ThreatLevel.Seen => seenColor,
+                ThreatLevel.Sensed => sensedColor,
+                _ => safeColor
+            };
         }
 
         ResidentAI PickNearest(out float bestDistance)
@@ -553,11 +693,37 @@ namespace Sushil.Systems
             {
                 var r = residents[i];
                 if (r == null || !r.gameObject.activeInHierarchy) continue;
-                float d = Vector3.Distance(player.position, r.transform.position);
+                float d = GetResidentDisplayDistance(r);
                 if (d < bestDistance) { bestDistance = d; best = r; }
             }
             if (best == null) bestDistance = -1f;
             return best;
+        }
+
+        float GetResidentDisplayDistance(ResidentAI resident)
+        {
+            if (resident == null || player == null)
+                return float.PositiveInfinity;
+
+            float raw = Vector3.Distance(player.position, resident.transform.position);
+            if (!usePathDistance)
+                return raw;
+
+            NavMeshPath path = _distPathBuf ??= new NavMeshPath();
+            if (NavMesh.CalculatePath(player.position, resident.transform.position, NavMesh.AllAreas, path) &&
+                path.status == NavMeshPathStatus.PathComplete &&
+                path.corners != null &&
+                path.corners.Length > 1)
+            {
+                float sum = 0f;
+                for (int i = 1; i < path.corners.Length; i++)
+                    sum += Vector3.Distance(path.corners[i - 1], path.corners[i]);
+                return Mathf.Max(raw, sum);
+            }
+
+            float floorGap = Mathf.Max(0f, Mathf.Abs(resident.transform.position.y - player.position.y) - floorHeightThreshold);
+            float floorPenalty = Mathf.Ceil(floorGap / Mathf.Max(0.5f, floorHeightThreshold)) * fallbackFloorDistancePenalty;
+            return raw + floorPenalty;
         }
 
         bool IsOccluded(ResidentAI nearest)
@@ -588,38 +754,69 @@ namespace Sushil.Systems
 
         bool IsGameplayUIBlocking()
         {
-            return StartScreenOverlay.IsShowing
-                || PauseOverlay.IsPaused
+            return PauseOverlay.IsPaused
                 || GameOverOverlay.IsShowing
                 || EscapeOverlay.IsShowing;
         }
 
         void ResolveReferences(bool force)
         {
-            if (force || cam == null || !cam.isActiveAndEnabled)
+            if (!force && Time.unscaledTime >= nextForceRefreshTime)
             {
-                Camera main = Camera.main;
-                if (main == null) main = FindFirstObjectByType<Camera>();
-                if (main != null) cam = main;
+                force = true;
+                nextForceRefreshTime = Time.unscaledTime + 2f;
             }
 
+            // Camera: try every possible lookup — tag is often wrong or missing
+            if (force || cam == null || !cam.isActiveAndEnabled)
+            {
+                Camera found = Camera.main;
+                if (found == null) found = FindFirstObjectByType<Camera>();
+                if (found == null)
+                {
+                    Camera[] all = FindObjectsByType<Camera>(FindObjectsSortMode.None);
+                    if (all != null)
+                        foreach (var c in all) { if (c != null && c.isActiveAndEnabled) { found = c; break; } }
+                }
+                if (found != null) cam = found;
+            }
+
+            // Player: try Rohit, then PlayerDeath, then PlayerHide, then "Player" tag
             if (force || player == null)
             {
                 var rohit = FindFirstObjectByType<RohitFPSController>();
                 if (rohit != null) { player = rohit.transform; rohitPlayer = rohit; }
+
+                if (player == null)
+                {
+                    var death = FindFirstObjectByType<PlayerDeath>();
+                    if (death != null) player = death.transform;
+                }
+
+                if (player == null)
+                {
+                    var hide = FindFirstObjectByType<PlayerHide>();
+                    if (hide != null) player = hide.transform;
+                }
+
                 if (player == null)
                 {
                     var tagged = GameObject.FindGameObjectWithTag("Player");
                     if (tagged != null) player = tagged.transform;
                 }
+
                 if (player != null)
                 {
                     if (rohitPlayer == null) rohitPlayer = player.GetComponent<RohitFPSController>();
-                    if (playerHide == null) playerHide = player.GetComponent<PlayerHide>();
+                    if (playerHide  == null) playerHide  = player.GetComponent<PlayerHide>();
                 }
             }
 
-            if (force || residents == null || residents.Length == 0)
+            // Residents: re-fetch if empty or any entry was destroyed
+            bool needsResidentRefresh = force || residents == null || residents.Length == 0;
+            if (!needsResidentRefresh)
+                foreach (var r in residents) { if (r == null) { needsResidentRefresh = true; break; } }
+            if (needsResidentRefresh)
                 residents = FindObjectsByType<ResidentAI>(FindObjectsSortMode.None);
         }
 
@@ -629,7 +826,7 @@ namespace Sushil.Systems
         {
             canvas = gameObject.AddComponent<Canvas>();
             canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-            canvas.sortingOrder = short.MaxValue - 5;
+            canvas.sortingOrder = short.MaxValue;
 
             var scaler = gameObject.AddComponent<CanvasScaler>();
             scaler.uiScaleMode = CanvasScaler.ScaleMode.ConstantPixelSize;
@@ -668,15 +865,15 @@ namespace Sushil.Systems
 
             onScreenHaloRect = AddImage("Halo", onScreenRect, GetHaloSprite(), out onScreenHalo,
                 new Vector2(onScreenSize * haloScale, onScreenSize * haloScale));
-            onScreenHalo.color = new Color(patrolColor.r, patrolColor.g, patrolColor.b, 0f);
+            onScreenHalo.color = new Color(safeColor.r, safeColor.g, safeColor.b, 0f);
 
             onScreenTickRect = AddImage("TickRing", onScreenRect, GetTickRingSprite(), out onScreenTickRing,
                 new Vector2(onScreenSize, onScreenSize));
-            onScreenTickRing.color = patrolColor;
+            onScreenTickRing.color = safeColor;
 
             onScreenCoreRect = AddImage("Core", onScreenRect, GetCoreDotSprite(), out onScreenCoreDot,
                 new Vector2(onScreenSize * 0.32f, onScreenSize * 0.32f));
-            onScreenCoreDot.color = patrolColor;
+            onScreenCoreDot.color = safeColor;
 
             onScreenFloorRect = AddImage("FloorGlyph", onScreenRect, GetChevronSprite(), out onScreenFloorGlyph,
                 new Vector2(onScreenSize * floorGlyphScale, onScreenSize * floorGlyphScale));
@@ -699,11 +896,11 @@ namespace Sushil.Systems
 
             offScreenHaloRect = AddImage("Halo", offScreenRect, GetHaloSprite(), out offScreenHalo,
                 new Vector2(offScreenSize * haloScale * 0.85f, offScreenSize * haloScale * 0.85f));
-            offScreenHalo.color = new Color(patrolColor.r, patrolColor.g, patrolColor.b, 0f);
+            offScreenHalo.color = new Color(safeColor.r, safeColor.g, safeColor.b, 0f);
 
             offScreenChevronRect = AddImage("Chevron", offScreenRect, GetChevronSprite(), out offScreenChevron,
                 new Vector2(offScreenSize, offScreenSize));
-            offScreenChevron.color = patrolColor;
+            offScreenChevron.color = safeColor;
 
             // Floor glyph for off-screen: sibling of the rotating chevron rect (so it doesn't rotate with the arrow).
             offScreenFloorRect = AddImage("FloorGlyph", offScreenGroup.transform, GetChevronSprite(), out offScreenFloorGlyph,

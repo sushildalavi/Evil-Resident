@@ -414,13 +414,7 @@ PrefabInstance:
       addedObject: {fileID: 1976112491}
     - targetCorrespondingSourceObject: {fileID: 5566487683917300211, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
       insertIndex: -1
-      addedObject: {fileID: 1976112490}
-    - targetCorrespondingSourceObject: {fileID: 5566487683917300211, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
-      insertIndex: -1
       addedObject: {fileID: 1976112499}
-    - targetCorrespondingSourceObject: {fileID: 5566487683917300211, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1976112498}
   m_SourcePrefab: {fileID: 100100000, guid: 4c8ef013e050847e09707be666cdd0d3, type: 3}
 --- !u!1 &1760147522
 GameObject:
@@ -610,22 +604,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9fcabd1f893e346238a330ad10612eb1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Sushil.Systems.PlayerDeath
---- !u!114 &1976112490
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1976112474}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8bbada3c4edd14650b91964603bc9441, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sushil.Demo.ThrowableNoise
-  impactNoise: 10
-  minImpactSpeed: 2
-  noiseType: throwImpact
-  lifeSeconds: 6
 --- !u!114 &1976112491
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -640,29 +618,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Sushil.Demo.NoiseTester
   noiseKey: 110
   intensity: 8
-  emitFromThrowPoint: 1
---- !u!114 &1976112498
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1976112474}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9b5c67a49bf994a0e8f6f05bde94238e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::Sushil.Demo.PlayerThrow
-  throwablePrefab: {fileID: 0}
-  throwOrigin: {fileID: 0}
-  fallbackCamera: {fileID: 0}
-  throwForce: 10
-  throwUpward: 2
-  cooldown: 0.6
-  impactNoise: 10
-  minImpactSpeed: 2
-  projectileLifeSeconds: 6
-  noiseType: throwImpact
 --- !u!114 &1976112499
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -742,14 +697,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: Resident
       objectReference: {fileID: 0}
-    - target: {fileID: 8855339063735690731, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
-      propertyPath: 'hidingInspectPoints.Array.data[0]'
-      value: 
-      objectReference: {fileID: 21015936}
-    - target: {fileID: 8855339063735690731, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
-      propertyPath: 'hidingInspectPoints.Array.data[1]'
-      value: 
-      objectReference: {fileID: 1781451158}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

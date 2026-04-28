@@ -290,12 +290,6 @@ MonoBehaviour:
   - {fileID: 3943687579379485176}
   - {fileID: 7493155655881476944}
   - {fileID: 2609430310668176407}
-  hidingInspectPoints:
-  - {fileID: 0}
-  - {fileID: 0}
-  checkHidingChance: 0.7
-  inspectPauseMin: 0.8
-  inspectPauseMax: 1.4
   sightRange: 18
   fovDegrees: 120
   requireNoiseToChase: 1
@@ -306,7 +300,6 @@ MonoBehaviour:
   minHearingRadius: 6
   searchDuration: 8
   searchRadius: 4
-  fakeLeaveChance: 0.6
   pauseOutsideChance: 0.25
   pauseMin: 0.8
   pauseMax: 1.5

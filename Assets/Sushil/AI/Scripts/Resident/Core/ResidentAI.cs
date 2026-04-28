@@ -69,7 +69,7 @@ namespace Sushil.AI
         public float obstacleExtraPadding = 0.05f;
 
         [Header("Navigation Stability")]
-        public bool keepAgentSnappedToNavMesh = true;
+        public bool keepAgentSnappedToNavMesh = false;
         public float navSnapSearchRadius = 1.6f;
         public float navSnapWarpDistance = 0.45f;
         public float destinationSampleRadius = 2.2f;
@@ -104,12 +104,6 @@ namespace Sushil.AI
         [Tooltip("Minimum penetration depth before anti-clip forces recovery.")]
         public float antiClipPenetrationEpsilon = 0.03f;
 
-        [Header("Hiding Spot Checks (Alpha)")]
-        public List<Transform> hidingInspectPoints = new();
-        [Range(0f, 1f)] public float checkHidingChance = 0.4f;
-        public float inspectPauseMin = 0.8f;
-        public float inspectPauseMax = 1.4f;
-
         [Header("Vision")]
         public float sightRange = 12f;
         public float fovDegrees = 110f;
@@ -143,13 +137,6 @@ namespace Sushil.AI
         public float noiseTrackingMinError = 0.8f;
         public float noiseTrackingMaxError = 2.2f;
 
-        [Header("Distraction")]
-        public bool distractOnThrowNoise = true;
-        public string throwReleaseNoiseType = "throw";
-        public string throwImpactNoiseType = "throwImpact";
-        public float throwNoiseHearingBoost = 1.8f;
-        public float minThrowHearingRadius = 25f;
-        public float distractionSightSuppressSeconds = 2.5f;
         [Tooltip("Maximum root-height difference allowed for proximity chase without direct sight.")]
         public float proximityChaseVerticalTolerance = 2.1f;
         
@@ -178,7 +165,6 @@ namespace Sushil.AI
         public float searchRadius = 4f;
         [Range(0f, 1f)] public float roomSuspicionPortion = 0.65f;
         public float outwardSearchMultiplier = 2.3f;
-        public float throwDistractionSearchDuration = 5.5f;
         public float hideTriggeredSearchDuration = 7.5f;
         public float lastSeenSearchDurationBoost = 2f;
 
@@ -224,11 +210,6 @@ namespace Sushil.AI
         public bool autoOpenNearbyDoors = false;
         public float autoDoorOpenRange = 2.2f;
         public float autoDoorOpenCooldown = 0.25f;
-
-        [Header("Hide Spot Takedown")]
-        public bool killPlayerIfFoundHidden = true;
-        public float hiddenTakedownDistance = 1.4f;
-        public float hiddenTakedownConfirmSeconds = 0.45f;
 
         [Header("Motion Animation")]
         public Transform visualRoot;
@@ -330,10 +311,8 @@ namespace Sushil.AI
         private Vector3 killAttackFocusPoint;
         private float chaseStuckTimer;
         private float nextDoorOpenTime;
-        private bool hasSuspectedHideSpot;
-        private bool avoidHideableAreasThisSearch;
-        private Vector3 suspectedHideSpot;
-        private float hiddenTakedownTimer;
+        private float nextChaseRepathAt;
+        private CapsuleCollider residentCapsuleCollider;
         private static readonly Collider[] movementBlockerHits = new Collider[32];
         private static readonly Collider[] capsuleBlockerHits = new Collider[32];
         private readonly List<Collider> cachedHideableColliders = new();
@@ -359,16 +338,26 @@ namespace Sushil.AI
         private Vector3 investigateTargetPos;
         private Vector3 playerSpawnPosition;
         private bool hasPlayerSpawnPosition;
+        private float nextDetectionFeedbackAt;
         private bool wholeHouseSearchMode;
         private Vector3 wholeHouseSearchLastKnownPos;
         private static Material faceVoidSharedMaterial;
         private static Material faceEyeSharedMaterial;
+
+        public bool IndicatorSeesPlayer { get; private set; }
+        public bool IndicatorSensesPlayer { get; private set; }
         private static Material facePupilSharedMaterial;
         private static Material faceToothSharedMaterial;
 
         void Reset() { agent = GetComponent<NavMeshAgent>(); }
 
-        void OnEnable() => NoiseSystem.OnNoise += OnNoise;
+        void OnEnable()
+        {
+            NoiseSystem.OnNoise += OnNoise;
+            // Reset so a re-enabled resident can perform kills again.
+            killTriggered = false;
+            nextChaseRepathAt = 0f;
+        }
         void OnDisable() => NoiseSystem.OnNoise -= OnNoise;
 
         void Start()
@@ -382,6 +371,12 @@ namespace Sushil.AI
             }
 
             // Forced tuning (requested): keep doorway/room entry stable.
+            randomizeSpawnOnStart = false;
+            // Recovery warps must stay on so the resident can unstick itself from
+            // doorframes and geometry. StabilizeAgentOnNavMesh is separately gated
+            // by keepAgentSnappedToNavMesh so no visible snap-teleport occurs.
+            allowRuntimeRecoveryWarps = true;
+            keepAgentSnappedToNavMesh = false;
             minWallClearance = 0.45f;
             destinationRetrySamples = 16;
             destinationRetryRadius = 4.0f;
@@ -419,6 +414,7 @@ namespace Sushil.AI
             loseChaseWhenFar = true;
             sightRange = Mathf.Clamp(sightRange, 21f, 24f);
             fovDegrees = Mathf.Max(fovDegrees, 132f);
+            strictWallOcclusionVision = true;
             proximityChaseDistance = Mathf.Clamp(proximityChaseDistance, 4.6f, 5.4f);
             visionAcquireSeconds = Mathf.Clamp(visionAcquireSeconds, 0.06f, 0.1f);
             visionLoseSeconds = Mathf.Clamp(visionLoseSeconds, 0.2f, 0.28f);
@@ -435,7 +431,9 @@ namespace Sushil.AI
             unlockedKeyDoorBiasRadius = Mathf.Max(unlockedKeyDoorBiasRadius, 5.5f);
             unlockedKeyDoorTraverseRange = Mathf.Max(unlockedKeyDoorTraverseRange, 3.6f);
             searchRadius = Mathf.Max(searchRadius, 6.5f);
-            multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.78f);
+            // Cap multi-floor chance: too high a value wastes most sample attempts on a
+            // non-existent floor, leaving the resident stationary during patrol.
+            multiFloorRoamChance = Mathf.Clamp(multiFloorRoamChance, 0.2f, 0.42f);
             multiFloorRoamHeight = Mathf.Max(multiFloorRoamHeight, 7f);
             pauseOutsideChance = 0f;
             stairVisualLift = Mathf.Max(stairVisualLift, 0.1f);
@@ -453,10 +451,8 @@ namespace Sushil.AI
             killAttackLeftArmBraceDegrees = Mathf.Max(killAttackLeftArmBraceDegrees, 48f);
             chaseForwardLeanDegrees = Mathf.Min(chaseForwardLeanDegrees, 1.4f);
             // Keep the takedown range tight even if the scene has a larger serialized value.
-            killDistance = Mathf.Clamp(killDistance, 1.02f, 1.12f);
-            killVerticalTolerance = Mathf.Clamp(killVerticalTolerance, 0.9f, 1.05f);
-            hiddenTakedownDistance = Mathf.Min(hiddenTakedownDistance, 1.2f);
-            hiddenTakedownConfirmSeconds = Mathf.Max(hiddenTakedownConfirmSeconds, 0.6f);
+            killDistance = Mathf.Clamp(killDistance, 0.9f, 1.0f);
+            killVerticalTolerance = Mathf.Clamp(killVerticalTolerance, 0.75f, 0.95f);
             roamWholeHouseWhenPlayerLost = false;
             wholeHouseSearchDuration = Mathf.Min(wholeHouseSearchDuration, 10f);
             lostSightLastKnownBias = Mathf.Max(lostSightLastKnownBias, 0.95f);
@@ -469,7 +465,7 @@ namespace Sushil.AI
                 unlockedKeyDoorBiasChance = Mathf.Max(unlockedKeyDoorBiasChance, 0.9f);
                 unlockedKeyDoorBiasRadius = Mathf.Max(unlockedKeyDoorBiasRadius, 7f);
                 unlockedKeyDoorTraverseRange = Mathf.Max(unlockedKeyDoorTraverseRange, 4.2f);
-                multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.92f);
+                multiFloorRoamChance = Mathf.Clamp(multiFloorRoamChance, 0.35f, 0.55f);
                 multiFloorRoamHeight = Mathf.Max(multiFloorRoamHeight, 8.8f);
                 roomSuspicionPortion = Mathf.Max(roomSuspicionPortion, 0.82f);
                 roamSampleAttempts = Mathf.Max(roamSampleAttempts, 36);
@@ -491,7 +487,7 @@ namespace Sushil.AI
                 farLoseDelay = Mathf.Max(farLoseDelay, 1.15f);
                 killDistance = Mathf.Clamp(killDistance, 0.98f, 1.08f);
                 killVerticalTolerance = Mathf.Clamp(killVerticalTolerance, 0.95f, 1.1f);
-                multiFloorRoamChance = Mathf.Max(multiFloorRoamChance, 0.9f);
+                multiFloorRoamChance = Mathf.Clamp(multiFloorRoamChance, 0.3f, 0.52f);
                 multiFloorRoamHeight = Mathf.Max(multiFloorRoamHeight, 8.5f);
                 closeAwarenessDistance = Mathf.Max(closeAwarenessDistance, 4.8f);
                 closeAwarenessVerticalTolerance = Mathf.Clamp(closeAwarenessVerticalTolerance, 1.35f, 1.55f);
@@ -502,20 +498,47 @@ namespace Sushil.AI
             }
             if (IsMediumLevelScene())
             {
-                patrolMoveSpeed = hardPatrolSpeed * 0.90f;
-                chaseMoveSpeed = hardChaseSpeed * 0.90f;
+                patrolMoveSpeed = hardPatrolSpeed * 0.82f;
+                chaseMoveSpeed = hardChaseSpeed * 0.82f;
+                sightRange = Mathf.Min(sightRange, 19f);
+                proximityChaseDistance = Mathf.Min(proximityChaseDistance, 4.1f);
+                closeAwarenessDistance = Mathf.Min(closeAwarenessDistance, 4.0f);
+                chaseMemorySeconds = Mathf.Min(chaseMemorySeconds, 2.8f);
+                lostSightPursuitSeconds = Mathf.Min(lostSightPursuitSeconds, 3.2f);
+                maxChaseDistance = Mathf.Min(maxChaseDistance, 11.5f);
+                farLoseDelay = Mathf.Min(farLoseDelay, 0.9f);
             }
             else if (IsEasyLevelScene())
             {
-                patrolMoveSpeed = hardPatrolSpeed * 0.85f;
-                chaseMoveSpeed = hardChaseSpeed * 0.85f;
-                // Easy should require tighter contact before a kill triggers.
-                killDistance = Mathf.Min(killDistance, 0.95f);
+                patrolMoveSpeed = hardPatrolSpeed * 0.68f;
+                chaseMoveSpeed = hardChaseSpeed * 0.68f;
+                sightRange = Mathf.Min(sightRange, 16f);
+                fovDegrees = Mathf.Min(fovDegrees, 118f);
+                proximityChaseDistance = Mathf.Min(proximityChaseDistance, 3.2f);
+                closeAwarenessDistance = Mathf.Min(closeAwarenessDistance, 3.2f);
+                peripheralAwarenessVerticalTolerance = Mathf.Min(peripheralAwarenessVerticalTolerance, 1.45f);
+                proximityChaseVerticalTolerance = Mathf.Min(proximityChaseVerticalTolerance, 1.65f);
+                chaseMemorySeconds = Mathf.Min(chaseMemorySeconds, 2.0f);
+                lostSightPursuitSeconds = Mathf.Min(lostSightPursuitSeconds, 2.4f);
+                maxChaseDistance = Mathf.Min(maxChaseDistance, 9.5f);
+                farLoseDelay = Mathf.Min(farLoseDelay, 0.65f);
+                killDistance = Mathf.Min(killDistance, 0.70f);
+                killVerticalTolerance = Mathf.Min(killVerticalTolerance, 0.65f);
             }
             if (IsTutorialResidentScene())
             {
-                patrolMoveSpeed = 1.1f;
-                chaseMoveSpeed = 1.28f;
+                patrolMoveSpeed = 0.85f;
+                chaseMoveSpeed = 1.0f;
+                sightRange = Mathf.Min(sightRange, 13f);
+                fovDegrees = Mathf.Min(fovDegrees, 105f);
+                proximityChaseDistance = Mathf.Min(proximityChaseDistance, 2.6f);
+                closeAwarenessDistance = Mathf.Min(closeAwarenessDistance, 2.7f);
+                chaseMemorySeconds = Mathf.Min(chaseMemorySeconds, 1.5f);
+                lostSightPursuitSeconds = Mathf.Min(lostSightPursuitSeconds, 1.8f);
+                maxChaseDistance = Mathf.Min(maxChaseDistance, 8f);
+                farLoseDelay = Mathf.Min(farLoseDelay, 0.45f);
+                killDistance = Mathf.Min(killDistance, 0.60f);
+                killVerticalTolerance = Mathf.Min(killVerticalTolerance, 0.55f);
             }
             // Keep hard geometry validation enabled so chase logic cannot cut through walls.
             validatePathAgainstGeometry = true;
@@ -530,6 +553,8 @@ namespace Sushil.AI
             agent.baseOffset = 0f;
             CacheHideables();
             SetupNavigationCollisionFixes();
+            if (IsBasementStairIssueScene())
+                EnsureBasementStairNavLinks();
             SetupMotionRig();
             roamCenter = ComputeRoamCenter();
             ResolvePlayerReference();
@@ -546,7 +571,8 @@ namespace Sushil.AI
                 agent.height = enforcedAgentHeight;
                 agent.autoTraverseOffMeshLink = true;
             }
-            var cc = GetComponent<CapsuleCollider>();
+            residentCapsuleCollider = GetComponent<CapsuleCollider>();
+            var cc = residentCapsuleCollider;
             if (cc != null)
             {
                 cc.radius = enforcedAgentRadius;
@@ -599,6 +625,14 @@ namespace Sushil.AI
             return path == "Assets/Sahil/Test/Medium Level.unity";
         }
 
+        bool IsBasementStairIssueScene()
+        {
+            string path = SceneManager.GetActiveScene().path;
+            return path == "Assets/Sahil/Test/Medium Level.unity" ||
+                   path == "Assets/Sahil/Test/Hard Level.unity" ||
+                   path == "Assets/Sahil/Test/Difficult Level.unity";
+        }
+
         bool IsTutorialResidentScene()
         {
             string path = SceneManager.GetActiveScene().path;
@@ -648,15 +682,11 @@ namespace Sushil.AI
 
             bool isHiddenNow = IsPlayerHidden();
 
-            // If player hides during chase, immediately lose them and switch to search.
+            // If player hides during chase, immediately lose them and resume a normal search.
             if (state == State.Chase && isHiddenNow)
             {
                 float hideSearchDuration = hideTriggeredSearchDuration + lastSeenSearchDurationBoost;
-                if (!TryBeginSearchAwayFromHideSpot(hideSearchDuration))
-                {
-                    MarkSuspectedHideSpot();
-                    BeginWholeHouseSearch(player.position, hideSearchDuration);
-                }
+                BeginSearchAfterPlayerHides(hideSearchDuration);
                 forcedNextSearchDuration = Mathf.Max(forcedNextSearchDuration, hideSearchDuration);
                 ChangeState(State.Search);
                 wasPlayerHiddenLastFrame = isHiddenNow;
@@ -673,6 +703,13 @@ namespace Sushil.AI
                 canSee = true;
             }
             bool proximityChaseAllowed = ShouldForceProximityChase(isHiddenNow);
+            IndicatorSeesPlayer = !isHiddenNow && (canSee || rawCanSee);
+            IndicatorSensesPlayer = !IndicatorSeesPlayer &&
+                                    !isHiddenNow &&
+                                    (proximityChaseAllowed ||
+                                     state == State.Chase ||
+                                     state == State.Search ||
+                                     state == State.Investigate);
             if (canSee)
             {
                 lastSeenPlayerPos = player.position;
@@ -689,6 +726,7 @@ namespace Sushil.AI
                 lastSeenPlayerPos = player.position;
                 lastSeenPlayerTime = Time.time;
                 StartVisualChaseWindow();
+                NotifyDetectionFeedback();
                 ChangeState(State.Chase);
             }
 
@@ -700,23 +738,44 @@ namespace Sushil.AI
             Vector3 playerFlat = playerContactPoint;
             playerFlat.y = 0f;
             float contactDistanceToPlayer = Vector3.Distance(residentContactPoint, playerContactPoint);
+            float horizontalContactDistance = Vector3.Distance(residentFlat, playerFlat);
             float playerVerticalSeparation = Mathf.Abs(playerContactPoint.y - residentContactPoint.y);
             bool squareFuseKillBlocked = IsSquareFuseKillBlocked(residentContactPoint, playerContactPoint);
 
+            // All thresholds scale from killDistance so easy mode (killDistance=0.84) is
+            // tighter than hard mode (killDistance≈1.0). Note: contact distances are
+            // measured to the closest point on the player's capsule bounds — the player
+            // CENTER is ~0.4-0.5m further away than these numbers suggest.
             bool lethalContact =
-                contactDistanceToPlayer <= Mathf.Max(0.95f, killDistance * 0.92f) ||
-                Vector3.Distance(residentFlat, playerFlat) <= Mathf.Max(1.05f, killDistance);
+                contactDistanceToPlayer <= killDistance * 0.95f ||
+                horizontalContactDistance <= killDistance * 0.9f;
             bool chaseOrSightThreat = state == State.Chase || rawCanSee || stablePlayerVisible || proximityChaseAllowed;
+
+            // Point-blank override: skip all geometry/path checks when the resident has
+            // physically closed the gap. Being stuck in a doorframe or slightly off the
+            // NavMesh must not prevent the kill at this range.
+            bool pointBlankKill = (chaseOrSightThreat || lethalContact) &&
+                horizontalContactDistance < killDistance * 0.6f &&
+                playerVerticalSeparation <= Mathf.Max(0.4f, killVerticalTolerance);
+
+            bool closeVisibleKill = !pointBlankKill &&
+                chaseOrSightThreat &&
+                horizontalContactDistance <= killDistance &&
+                contactDistanceToPlayer <= killDistance + 0.15f &&
+                IsKillContactClear(residentContactPoint, playerContactPoint) &&
+                IsKillContactPathStrictlyClear(playerContactPoint);
 
             if (!killTriggered &&
                 !squareFuseKillBlocked &&
                 !isHiddenNow &&
                 playerVerticalSeparation <= Mathf.Max(0.4f, killVerticalTolerance) &&
-                contactDistanceToPlayer <= killDistance + 0.05f &&
-                IsKillContactPathStrictlyClear(playerContactPoint) &&
-                IsCloseKillReachable(playerContactPoint, contactDistanceToPlayer) &&
+                (pointBlankKill ||
+                 (contactDistanceToPlayer <= killDistance + 0.05f &&
+                  IsCloseKillReachable(playerContactPoint, contactDistanceToPlayer)) ||
+                 closeVisibleKill) &&
                 (chaseOrSightThreat || lethalContact))
             {
+                NotifyImmediateResidentThreat(rawCanSee || canSee || closeVisibleKill);
                 TryKillTarget(player.gameObject, "Resident one-shot");
             }
 
@@ -755,7 +814,6 @@ namespace Sushil.AI
             }
             if (newState != State.Search)
             {
-                hiddenTakedownTimer = 0f;
                 wholeHouseSearchMode = false;
             }
 
@@ -771,25 +829,20 @@ namespace Sushil.AI
 
         void OnNoise(Vector3 pos, float intensity, string type)
         {
+            if (!isActiveAndEnabled) return;
             // If already killed player, ignore noise
             if (killTriggered) return;
 
             if (intensity < minNoiseIntensity) return;
 
-            bool distractionNoise = IsDistractionNoise(type);
             bool forceChaseNoise = globalNoiseForcesChase && IsGlobalPlayerNoise(type);
 
             float dist = Vector3.Distance(transform.position, pos);
             float hearingRadius = Mathf.Max(minHearingRadius, intensity * hearingScale);
-            if (distractionNoise)
-            {
-                hearingRadius = Mathf.Max(minThrowHearingRadius, hearingRadius * throwNoiseHearingBoost);
-            }
             if (!forceChaseNoise && dist > hearingRadius) return;
 
             Vector3 targetPos = pos;
-            float sampleRadius = distractionNoise ? 10f : 3f;
-            if (NavMesh.SamplePosition(pos, out var navHit, sampleRadius, NavMesh.AllAreas))
+            if (NavMesh.SamplePosition(pos, out var navHit, 3f, NavMesh.AllAreas))
                 targetPos = navHit.position;
 
             lastNoisePos = targetPos;
@@ -797,25 +850,6 @@ namespace Sushil.AI
             hasNoise = true;
             lastHeardNoiseTime = Time.time;
 
-            // During chase, thrown noises can pull the resident off the player briefly.
-            if (distractionNoise)
-            {
-                if (distractOnThrowNoise)
-                {
-                    // Do not break active eye-contact chase for distraction noises.
-                    if (state == State.Chase && CanSeePlayer()) return;
-
-                    ignoreSightUntilTime = Time.time + Mathf.Max(0f, distractionSightSuppressSeconds);
-
-                    if (state == State.Chase)
-                        forcedNextSearchDuration = throwDistractionSearchDuration;
-
-                    ChangeState(State.Investigate); // always go investigate thrown noise source
-                }
-                return;
-            }
-
-            // Non-throw noises can force chase even without LOS/range (for manual noise key).
             investigateTargetPos = targetPos;
             hasInvestigateTarget = true;
 
@@ -835,6 +869,20 @@ namespace Sushil.AI
 
             float requestedDuration = minimumDuration > 0f ? minimumDuration : wholeHouseSearchDuration;
             forcedNextSearchDuration = Mathf.Max(forcedNextSearchDuration, requestedDuration);
+        }
+
+        void NotifyDetectionFeedback()
+        {
+            if (Time.time < nextDetectionFeedbackAt)
+                return;
+            nextDetectionFeedbackAt = Time.time + 2.25f;
+        }
+
+        public void NotifyImmediateResidentThreat(bool seen)
+        {
+            IndicatorSeesPlayer = seen;
+            IndicatorSensesPlayer = !seen;
+            nextDetectionFeedbackAt = Time.time + 1.25f;
         }
 
         void ResolvePlayerReference()
@@ -914,9 +962,16 @@ namespace Sushil.AI
                         }
 
                         if (!TryGetRandomRoamPoint(center, radius, out targetPos) &&
-                            !TryGetRandomRoamPoint(roamCenter, freeRoamRadius, out targetPos))
+                            !TryGetRandomRoamPoint(roamCenter, freeRoamRadius, out targetPos) &&
+                            !TryGetRandomRoamPoint(transform.position, Mathf.Max(localPatrolRadius, 8f), out targetPos) &&
+                            !TryGetRandomRoamPoint(transform.position, Mathf.Max(3f, localPatrolRadius * 0.5f), out targetPos))
                         {
-                            yield return null;
+                            if (IsAgentReady())
+                            {
+                                agent.isStopped = false;
+                                agent.ResetPath();
+                            }
+                            yield return new WaitForSeconds(0.15f);
                             continue;
                         }
                     }
@@ -1007,66 +1062,13 @@ namespace Sushil.AI
                         approachTime += Time.deltaTime;
                         if (UpdateRoamStallState(ref lastApproachPos, ref approachStallTimer))
                             break;
-                        TryHandleHiddenTakedown();
                         yield return null;
                     }
                 }
-            }
-
-            if (hasSuspectedHideSpot && IsAgentReady())
-            {
-                agent.isStopped = false;
-                TrySetDestination(suspectedHideSpot);
-
-                float t0 = 0f;
-                Vector3 lastHidePos = transform.position;
-                float hideStallTimer = 0f;
-                while (state == State.Search && t0 < 3f && IsAgentReady() && !HasReachedDestination(0.35f))
-                {
-                    t0 += Time.deltaTime;
-                    if (UpdateRoamStallState(ref lastHidePos, ref hideStallTimer))
-                        break;
-                    TryHandleHiddenTakedown();
-                    yield return null;
-                }
-
-                // Still check right after reaching/sampling the suspected hide spot.
-                TryHandleHiddenTakedown(force: true);
             }
 
             while (state == State.Search && elapsed < activeSearchDuration)
             {
-                TryHandleHiddenTakedown();
-
-                // Sometimes go check a hiding inspect point
-                if (!avoidHideableAreasThisSearch &&
-                    hidingInspectPoints.Count > 0 &&
-                    Random.value < checkHidingChance)
-                {
-                    if (TryGetRandomInspectPoint(out var inspectPoint) && IsAgentReady())
-                    {
-                        agent.isStopped = false;
-                        TrySetDestination(inspectPoint.position);
-                    }
-
-                    // Wait up to ~2 seconds or until close enough
-                    float t = 0f;
-                    Vector3 lastInspectPos = transform.position;
-                    float inspectStallTimer = 0f;
-                    while (state == State.Search && t < 2.0f && IsAgentReady() &&
-                           !HasReachedDestination(0.35f))
-                    {
-                        t += Time.deltaTime;
-                        if (UpdateRoamStallState(ref lastInspectPos, ref inspectStallTimer))
-                            break;
-                        TryHandleHiddenTakedown();
-                        yield return null;
-                    }
-
-                    elapsed += 1f;
-                    continue;
-                }
-
                 // Normal wandering around the noise center
                 Vector3 unlockedDoorRoomPoint = transform.position;
                 bool usedUnlockedDoorRoom = ShouldBiasToUnlockedKeyDoorRoom() &&
@@ -1082,9 +1084,7 @@ namespace Sushil.AI
                         : roamCenter;
                     float radius = Mathf.Max(freeRoamRadius, searchRadius * outwardSearchMultiplier);
 
-                    if ((avoidHideableAreasThisSearch &&
-                         TryGetSearchRelocationPointAwayFromHideSpot(suspectedHideSpot, out var roamPoint)) ||
-                        TryGetRandomRoamPoint(searchCenter, radius, out roamPoint) ||
+                    if (TryGetRandomRoamPoint(searchCenter, radius, out var roamPoint) ||
                         TryGetRandomRoamPoint(roamCenter, Mathf.Max(radius, freeRoamRadius), out roamPoint))
                     {
                         TrySetDestination(roamPoint);
@@ -1094,20 +1094,17 @@ namespace Sushil.AI
                 {
                     float localPhase = activeSearchDuration * Mathf.Clamp01(roomSuspicionPortion);
                     float radius = elapsed < localPhase ? searchRadius : (searchRadius * outwardSearchMultiplier);
-                    if ((avoidHideableAreasThisSearch &&
-                         TryGetSearchRelocationPointAwayFromHideSpot(suspectedHideSpot, out var roamPoint)) ||
-                        TryGetRandomRoamPoint(center, radius, out roamPoint))
+                    if (TryGetRandomRoamPoint(center, radius, out var roamPoint))
                         TrySetDestination(roamPoint);
                 }
 
-                yield return new WaitForSeconds(Random.Range(0.6f, 1.2f));
-                elapsed += 1f;
+                float searchWait = Random.Range(0.6f, 1.2f);
+                yield return new WaitForSeconds(searchWait);
+                elapsed += searchWait;
             }
 
             hasNoise = false;
             hasInvestigateTarget = false;
-            hasSuspectedHideSpot = false;
-            avoidHideableAreasThisSearch = false;
             wholeHouseSearchMode = false;
             ChangeState(State.Patrol);
         }
@@ -1126,9 +1123,7 @@ namespace Sushil.AI
                 // Hiding is the only hard stop when persistent chase is enabled.
                 if (IsPlayerHidden())
                 {
-                    lastNoisePos = player.position;
-                    lastNoiseIntensity = Mathf.Max(lastNoiseIntensity, 6f);
-                    hasNoise = true;
+                    BeginSearchAfterPlayerHides(hideTriggeredSearchDuration + lastSeenSearchDurationBoost);
                     ChangeState(State.Search);
                     yield break;
                 }
@@ -1168,15 +1163,16 @@ namespace Sushil.AI
                 if (IsAgentReady())
                 {
                     agent.isStopped = false;
-                    Vector3 chaseTarget = canSee
-                        ? player.position
-                        : lastSeenPlayerPos;
-                    bool moved = TrySetDestination(chaseTarget) ||
-                                 TryUseSquareFuseCorridorBridge(chaseTarget, allowWarp: false);
-                    if (!moved)
+                    Vector3 chaseTarget = canSee ? player.position : lastSeenPlayerPos;
+                    // Throttle expensive re-pathing to ~10 Hz; UpdateDoorwayAssist still
+                    // runs every frame so doorway nudges remain responsive.
+                    bool moved = agent.hasPath;
+                    if (Time.time >= nextChaseRepathAt)
                     {
-                        // Fallback for doorway edge-cases: push to nearest valid nav point near target.
-                        if (NavMesh.SamplePosition(chaseTarget, out var fallbackHit, 2.5f, NavMesh.AllAreas))
+                        nextChaseRepathAt = Time.time + 0.1f;
+                        moved = TrySetDestination(chaseTarget) ||
+                                TryUseSquareFuseCorridorBridge(chaseTarget, allowWarp: false);
+                        if (!moved && NavMesh.SamplePosition(chaseTarget, out var fallbackHit, 2.5f, NavMesh.AllAreas))
                             moved = TrySetDestination(fallbackHit.position);
                     }
                     UpdateDoorwayAssist(true, moved, chaseTarget);
@@ -1215,7 +1211,8 @@ namespace Sushil.AI
             {
                 if (!NavMesh.SamplePosition(transform.position, out var startHit, 8f, NavMesh.AllAreas))
                     return;
-                transform.position = startHit.position;
+                if (Vector3.Distance(transform.position, startHit.position) > 0.12f)
+                    return;
             }
 
             KeyItem[] keys = FindObjectsByType<KeyItem>(FindObjectsSortMode.None);
@@ -1262,16 +1259,8 @@ namespace Sushil.AI
 
             if (!found) return;
 
-            bool previousUpdatePosition = agent.updatePosition;
-            bool previousUpdateRotation = agent.updateRotation;
-            agent.updatePosition = false;
-            agent.updateRotation = false;
-            agent.Warp(best);
-            transform.position = best;
-            agent.nextPosition = best;
-            agent.updatePosition = previousUpdatePosition;
-            agent.updateRotation = previousUpdateRotation;
-            roamCenter = ComputeRoamCenter();
+            // Runtime spawn randomization was removed because it looks like teleporting
+            // when the Resident is visible near scene start.
         }
 
         IEnumerator DelayedSpawnRandomization()
@@ -1694,7 +1683,7 @@ namespace Sushil.AI
             // Lateral hip sway — minimal, uncanny stillness of the creature
             float hipSway = Mathf.Sin(motionPhase) * move01 * 0.010f;
 
-            // Persistent idle micro-sway: very slow breathing-like rock even when still
+            // Persistent idle micro-sway: very slow breathing-like motion even when still.
             float idleSwayPhase = Time.time * 0.45f;
             float idleSway = Mathf.Sin(idleSwayPhase) * (1f - move01) * 0.004f;
 

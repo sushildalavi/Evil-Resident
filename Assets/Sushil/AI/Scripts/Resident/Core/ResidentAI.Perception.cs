@@ -7,53 +7,20 @@ namespace Sushil.AI
 {
     public partial class ResidentAI
     {
-        void MarkSuspectedHideSpot()
+        void BeginSearchAfterPlayerHides(float minimumDuration)
         {
-            if (!GetCurrentHideSpotPosition(out Vector3 hidePos))
-                hidePos = player != null ? player.position : transform.position;
-
-            if (NavMesh.SamplePosition(hidePos, out var hit, 2.5f, NavMesh.AllAreas))
-                hidePos = hit.position;
-
-            suspectedHideSpot = hidePos;
-            hasSuspectedHideSpot = true;
-        }
-
-        bool TryBeginSearchAwayFromHideSpot(float minimumDuration)
-        {
-            if (!ShouldRelocateSearchAwayFromHideSpot())
-                return false;
-
-            if (!GetCurrentHideSpotPosition(out Vector3 hidePos))
-                return false;
-
-            if (NavMesh.SamplePosition(hidePos, out var hit, 2.5f, NavMesh.AllAreas))
-                hidePos = hit.position;
-
-            if (!TryGetSearchRelocationPointAwayFromHideSpot(hidePos, out Vector3 searchOrigin))
-                return false;
-
-            hasSuspectedHideSpot = false;
-            avoidHideableAreasThisSearch = true;
-            suspectedHideSpot = hidePos;
-            BeginWholeHouseSearch(searchOrigin, minimumDuration);
-            return true;
-        }
-
-        bool GetCurrentHideSpotPosition(out Vector3 pos)
-        {
-            pos = Vector3.zero;
-            if (rohitFPS != null && rohitFPS.isHidden && rohitFPS.currentHideObject != null)
+            if (!TryGetRandomRoamPoint(roamCenter, Mathf.Max(freeRoamRadius, searchRadius * outwardSearchMultiplier), out Vector3 searchOrigin) &&
+                !TryGetRandomRoamPoint(transform.position, Mathf.Max(localPatrolRadius, searchRadius * outwardSearchMultiplier), out searchOrigin))
             {
-                pos = rohitFPS.currentHideObject.transform.position;
-                return true;
+                searchOrigin = roamCenter != Vector3.zero ? roamCenter : transform.position;
             }
-            if (playerHide != null && playerHide.IsHidden && player != null)
-            {
-                pos = player.position;
-                return true;
-            }
-            return false;
+
+            investigateTargetPos = searchOrigin;
+            hasInvestigateTarget = true;
+            lastNoisePos = searchOrigin;
+            lastNoiseIntensity = Mathf.Max(lastNoiseIntensity, minNoiseIntensity + 1f);
+            hasNoise = true;
+            forcedNextSearchDuration = Mathf.Max(forcedNextSearchDuration, minimumDuration);
         }
 
         void StartVisualChaseWindow()
@@ -81,16 +48,6 @@ namespace Sushil.AI
             }
 
             return stablePlayerVisible;
-        }
-
-        bool IsDistractionNoise(string noiseType)
-        {
-            string incoming = NormalizeNoiseType(noiseType);
-            if (incoming.Contains("throw") || incoming.Contains("rock"))
-                return true;
-
-            return incoming == NormalizeNoiseType(throwReleaseNoiseType) ||
-                   incoming == NormalizeNoiseType(throwImpactNoiseType);
         }
 
         string NormalizeNoiseType(string noiseType)
@@ -181,7 +138,7 @@ namespace Sushil.AI
             flatOffset.y = 0f;
             if (playerVerticalSeparation <= Mathf.Max(0.45f, closeAwarenessVerticalTolerance) &&
                 flatOffset.magnitude <= Mathf.Max(closeAwarenessDistance, killDistance + 1.8f))
-                return true;
+                return HasAnyPlayerBodyLineOfSight(eye, 0.18f);
 
             float awarenessRange = Mathf.Max(killDistance + 1.0f, sightRange * Mathf.Clamp01(peripheralAwarenessRangeMultiplier));
             if (flatOffset.magnitude > awarenessRange)
@@ -213,17 +170,21 @@ namespace Sushil.AI
         bool HasLineOfSightToTargetPoint(Vector3 eye, Vector3 target)
         {
             Vector3 dir = (target - eye).normalized;
-            float rayDist = Mathf.Min(sightRange, Vector3.Distance(eye, target) + 0.5f);
+            float rayDist = Vector3.Distance(eye, target) + 0.08f;
 
             int mask = strictWallOcclusionVision ? ~0 : losMask.value;
             if (!strictWallOcclusionVision && mask == 0) mask = ~0;
             RaycastHit[] hits = Physics.RaycastAll(eye, dir, rayDist, mask, QueryTriggerInteraction.Ignore);
-            if (hits.Length == 0) return false;
+            if (hits.Length == 0) return true;
             System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
 
             for (int i = 0; i < hits.Length; i++)
             {
-                Transform hitT = hits[i].collider.transform;
+                // collider can be null if the object was destroyed between the cast and this loop
+                Collider hitCol = hits[i].collider;
+                if (hitCol == null) continue;
+                Transform hitT = hitCol.transform;
+                if (hitT == null) continue;
                 if (hitT == transform || hitT.IsChildOf(transform)) continue;
 
                 if (hitT == player) return true;
@@ -231,6 +192,36 @@ namespace Sushil.AI
                 if (hitT.GetComponentInParent<RohitFPSController>() != null) return true;
                 if (hitT.GetComponentInParent<PlayerDeath>() != null) return true;
                 return false;
+            }
+
+            return false;
+        }
+
+        bool HasAnyPlayerBodyLineOfSight(Vector3 eye, float lateralRadius)
+        {
+            if (player == null)
+                return false;
+
+            Vector3 lateral = player.right;
+            lateral.y = 0f;
+            if (lateral.sqrMagnitude < 0.0001f)
+                lateral = Vector3.right;
+            lateral = lateral.normalized * Mathf.Max(0f, lateralRadius);
+
+            Vector3[] targetPoints =
+            {
+                GetPlayerClosestBodyPoint(eye),
+                player.position + Vector3.up * 1.45f,
+                player.position + Vector3.up * 1.1f,
+                player.position + Vector3.up * 0.75f,
+                player.position + Vector3.up * 1.1f + lateral,
+                player.position + Vector3.up * 1.1f - lateral
+            };
+
+            for (int i = 0; i < targetPoints.Length; i++)
+            {
+                if (HasLineOfSightToTargetPoint(eye, targetPoints[i]))
+                    return true;
             }
 
             return false;
@@ -251,6 +242,9 @@ namespace Sushil.AI
             float horizontalDistance = Vector3.Distance(residentFlat, playerFlat);
             float playerVerticalSeparation = Mathf.Abs(playerPoint.y - residentPoint.y);
             if (playerVerticalSeparation > Mathf.Max(0.55f, proximityChaseVerticalTolerance))
+                return false;
+
+            if (!HasAnyPlayerBodyLineOfSight(residentPoint, 0.18f))
                 return false;
 
             float emergencyCloseThreatDistance = Mathf.Max(1.45f, killDistance + 0.2f);

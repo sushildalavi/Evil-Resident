@@ -9,7 +9,22 @@ namespace Sushil.AI
     public partial class ResidentAI
     {
         NavMeshLink squareFuseCorridorNavLink;
+        readonly List<NavMeshLink> basementStairNavLinks = new();
         Coroutine stairDestinationReissueRoutine;
+
+        // Reusable NavMeshPath instances — avoids per-call allocation in hot paths.
+        // CRITICAL: NavMeshPath cannot be `new`'d in a field initializer (Unity throws
+        // InitializeNavMeshPath exception), so they're lazily allocated on first use.
+        NavMeshPath _partialPathBuf;
+        NavMeshPath _completePathBuf;
+        NavMeshPath _progressPathBuf;
+        NavMeshPath _traversePathBuf;
+        NavMeshPath _killReachPathBuf;
+        NavMeshPath GetPartialPathBuf()   { return _partialPathBuf   ??= new NavMeshPath(); }
+        NavMeshPath GetCompletePathBuf()  { return _completePathBuf  ??= new NavMeshPath(); }
+        NavMeshPath GetProgressPathBuf()  { return _progressPathBuf  ??= new NavMeshPath(); }
+        NavMeshPath GetTraversePathBuf()  { return _traversePathBuf  ??= new NavMeshPath(); }
+        NavMeshPath GetKillReachPathBuf() { return _killReachPathBuf ??= new NavMeshPath(); }
 
         // Adds a NavMeshLink to bridge the square-fuse corridor gap.
         // Do not rebuild the full NavMesh here: NewLevel contains interactive doors,
@@ -49,6 +64,61 @@ namespace Sushil.AI
             squareFuseCorridorNavLink.costModifier   = -1f;
             squareFuseCorridorNavLink.agentTypeID    = agent.agentTypeID;
             Debug.Log($"[ResidentAI] SquareFuse runtime link active: {approachPoint} -> {roomPoint} (width {squareFuseCorridorNavLink.width:F2}).");
+        }
+
+        void EnsureBasementStairNavLinks()
+        {
+            if (agent == null || basementStairNavLinks.Count > 0)
+                return;
+
+            Vector3[] anchors =
+            {
+                new Vector3(1.0f, -3.85f, -19.94f),
+                new Vector3(1.0f, -1.85f, -21.44f),
+                new Vector3(1.0f,  0.15f, -22.94f),
+                new Vector3(1.0f,  2.15f, -24.44f)
+            };
+
+            Vector3? previous = null;
+            for (int i = 0; i < anchors.Length; i++)
+            {
+                if (!NavMesh.SamplePosition(anchors[i], out var hit, 2.4f, NavMesh.AllAreas))
+                {
+                    previous = null;
+                    continue;
+                }
+
+                if (previous.HasValue)
+                    CreateBasementStairNavLink(previous.Value, hit.position, i);
+
+                previous = hit.position;
+            }
+        }
+
+        void CreateBasementStairNavLink(Vector3 from, Vector3 to, int index)
+        {
+            string linkName = $"BasementStairNavLink_{index}";
+            GameObject linkGO = GameObject.Find(linkName);
+            if (linkGO != null && linkGO.TryGetComponent(out NavMeshLink existingLink))
+            {
+                basementStairNavLinks.Add(existingLink);
+                return;
+            }
+
+            linkGO = new GameObject(linkName);
+            Vector3 center = (from + to) * 0.5f;
+            linkGO.transform.position = center;
+
+            NavMeshLink link = linkGO.AddComponent<NavMeshLink>();
+            link.startPoint = from - center;
+            link.endPoint = to - center;
+            link.width = 1.35f;
+            link.bidirectional = true;
+            link.autoUpdate = true;
+            link.activated = true;
+            link.costModifier = -1f;
+            link.agentTypeID = agent.agentTypeID;
+            basementStairNavLinks.Add(link);
         }
 
         bool UpdateRoamStallState(ref Vector3 lastPosition, ref float stallTimer)
@@ -733,30 +803,8 @@ namespace Sushil.AI
 
         void TryCompleteSquareFuseOffMeshLink()
         {
-            if (!IsAgentReady() || !agent.isOnOffMeshLink)
-                return;
-
-            OffMeshLinkData linkData = agent.currentOffMeshLinkData;
-            Vector3 start = linkData.startPos;
-            Vector3 end = linkData.endPos;
-            if (!IsSquareFusePortalContext(start) && !IsSquareFusePortalContext(end))
-                return;
-
-            Vector3 intendedDestination = agent.hasPath ? agent.destination : transform.position;
-            if (state == State.Chase && player != null)
-                intendedDestination = player.position;
-
-            if (!NavMesh.SamplePosition(end, out var endHit, 1.0f, NavMesh.AllAreas))
-                return;
-
-            agent.Warp(endHit.position);
-            transform.position = endHit.position;
-            agent.nextPosition = endHit.position;
-            lastSafePosition = endHit.position;
-            hasSafePosition = true;
-            ignoreAntiClipUntilTime = Time.time + 0.35f;
-            agent.CompleteOffMeshLink();
-            ReissuePrimaryDestination(intendedDestination);
+            // Intentionally empty: do not manually complete OffMeshLinks with Warp.
+            // The NavMeshAgent can traverse links itself without a visible snap.
         }
 
         bool TryUseSquareFuseCorridorBridge(Vector3 desired, bool allowWarp)
@@ -772,34 +820,7 @@ namespace Sushil.AI
                 if (IsSquareFuseTraverseContext(desired))
                     return agent.SetDestination(bridgeDestination);
 
-                if (!allowWarp)
-                    return false;
-
-                if (!NavMesh.SamplePosition(bridgeDestination, out var warpHit, 0.9f, NavMesh.AllAreas))
-                    return false;
-
-                agent.Warp(warpHit.position);
-                transform.position = warpHit.position;
-                agent.nextPosition = warpHit.position;
-                lastSafePosition = warpHit.position;
-                hasSafePosition = true;
-                ignoreAntiClipUntilTime = Time.time + 0.35f;
-                if (TrySetDestination(desired))
-                    return true;
-
-                if (IsSquareFuseTraverseContext(desired))
-                {
-                    if (TrySampleSquareFuseBridgePoint(2, out var interiorPoint) && agent.SetDestination(interiorPoint))
-                        return true;
-                    if (TrySampleSquareFuseBridgePoint(1, out var doorwayPoint) && agent.SetDestination(doorwayPoint))
-                        return true;
-                }
-
-                if (NavMesh.SamplePosition(desired, out var sampledDesired, Mathf.Max(destinationSampleRadius, 2.8f), NavMesh.AllAreas))
-                    return agent.SetDestination(sampledDesired.position);
-
-                agent.ResetPath();
-                return false;
+                return agent.SetDestination(bridgeDestination);
             }
 
             return agent.SetDestination(bridgeDestination);
@@ -961,14 +982,10 @@ namespace Sushil.AI
             if (nearOpenDoor)
             {
                 assisted = TryAdvanceThroughOpenDoor(openDoor, assistTarget);
-                if (!assisted && doorwayWarpAssist)
-                    assisted = TryWarpThroughOpenDoor(openDoor, assistTarget);
             }
             if (!assisted)
             {
                 assisted = TryDoorwayAssistAdvance(assistTarget);
-                if (!assisted && doorwayWarpAssist)
-                    TryDoorwayWarpAdvance(assistTarget);
             }
 
             if (!assisted && TryUseSquareFuseCorridorBridge(assistTarget, allowWarp: false))
@@ -989,9 +1006,6 @@ namespace Sushil.AI
             if (hasOpenDoor)
             {
                 if (TryAdvanceThroughOpenDoor(openDoor, targetPos))
-                    return true;
-
-                if (doorwayWarpAssist && TryWarpThroughOpenDoor(openDoor, targetPos))
                     return true;
             }
 
@@ -1048,51 +1062,7 @@ namespace Sushil.AI
 
         void TryDoorwayWarpAdvance(Vector3 targetPos)
         {
-            if (!IsAgentReady()) return;
-
-            Vector3 from = transform.position;
-            Vector3 dir = targetPos - from;
-            dir.y = 0f;
-            if (dir.sqrMagnitude < 0.01f) return;
-            dir.Normalize();
-
-            int checks = Mathf.Max(1, doorwayWarpChecks);
-            float step = Mathf.Max(0.25f, doorwayWarpStep);
-
-            for (int i = 1; i <= checks; i++)
-            {
-                Vector3 probe = from + dir * (step * i);
-                if (!NavMesh.SamplePosition(probe, out var hit, doorwayAssistSampleRadius, NavMesh.AllAreas))
-                    continue;
-                if (Vector3.Distance(from, hit.position) < 0.45f)
-                    continue;
-
-                if (Vector3.Distance(hit.position, targetPos) > Mathf.Max(2f, doorwayAssistRange + 2f))
-                    continue;
-
-                if (requireClearPathForWarp)
-                {
-                    Vector3 a = from + Vector3.up * 1.0f;
-                    Vector3 b = hit.position + Vector3.up * 1.0f;
-                    if (Physics.Linecast(a, b, out RaycastHit blockHit, ~0, QueryTriggerInteraction.Ignore))
-                    {
-                        Transform ht = blockHit.collider != null ? blockHit.collider.transform : null;
-                        if (ht != null)
-                        {
-                            if (!(ht == transform || ht.IsChildOf(transform)))
-                                continue;
-                        }
-                    }
-                }
-
-                if (!CanTraverseWarpSegment(from, hit.position))
-                    continue;
-
-                agent.Warp(hit.position);
-                transform.position = hit.position;
-                ignoreAntiClipUntilTime = Time.time + 0.35f;
-                return;
-            }
+            TryDoorwayAssistAdvance(targetPos);
         }
 
         bool TryGetOpenDoorwayContext(Vector3 worldPos, out Door door)
@@ -1401,13 +1371,13 @@ namespace Sushil.AI
             if (agent == null)
                 return false;
 
-            NavMeshPath partialPath = new NavMeshPath();
+            NavMeshPath partialPath = GetPartialPathBuf();
             if (!NavMesh.CalculatePath(transform.position, desired, NavMesh.AllAreas, partialPath))
                 return false;
             if (partialPath.status != NavMeshPathStatus.PathPartial || partialPath.corners == null || partialPath.corners.Length < 2)
                 return false;
 
-            NavMeshPath completePath = new NavMeshPath();
+            NavMeshPath completePath = GetCompletePathBuf();
             for (int i = partialPath.corners.Length - 1; i >= 1; i--)
             {
                 Vector3 baseCorner = partialPath.corners[i];
@@ -1468,7 +1438,7 @@ namespace Sushil.AI
             float[] fractions = { 0.94f, 0.82f, 0.7f, 0.58f, 0.46f, 0.34f, 0.24f };
             float[] widths = { 0f, 0.45f, -0.45f, 0.9f, -0.9f };
 
-            NavMeshPath path = new NavMeshPath();
+            NavMeshPath path = GetProgressPathBuf();
             float bestScore = float.MaxValue;
             bool found = false;
             Vector3 best = desired;
@@ -1513,20 +1483,7 @@ namespace Sushil.AI
 
         bool TryWarpThroughOpenDoor(Door door, Vector3 targetPos)
         {
-            if (door == null || !IsAgentReady()) return false;
-            if (!door.IsOpen)
-                return false;
-            if (!TryGetBestDoorTraversalPoint(door, targetPos, favorDesiredSide: true, requireCompletePath: false, out var best, out _))
-                return false;
-            if (!CanTraverseWarpSegment(transform.position, best))
-                return false;
-
-            agent.Warp(best);
-            transform.position = best;
-            agent.nextPosition = best;
-            agent.ResetPath();
-            ignoreAntiClipUntilTime = Time.time + 0.35f;
-            return TrySetDestination(targetPos) || TrySetDestination(best);
+            return TryAdvanceThroughOpenDoor(door, targetPos);
         }
 
         bool TryAdvanceThroughOpenDoor(Door door, Vector3 targetPos)
@@ -1674,29 +1631,17 @@ namespace Sushil.AI
             return true;
         }
 
-        bool TryGetRandomInspectPoint(out Transform point)
-        {
-            point = null;
-            if (hidingInspectPoints == null || hidingInspectPoints.Count == 0) return false;
-
-            List<Transform> valid = new List<Transform>();
-            for (int i = 0; i < hidingInspectPoints.Count; i++)
-            {
-                if (hidingInspectPoints[i] != null) valid.Add(hidingInspectPoints[i]);
-            }
-            if (valid.Count == 0) return false;
-
-            point = valid[Random.Range(0, valid.Count)];
-            return point != null;
-        }
-
         bool TryGetRandomRoamPoint(Vector3 center, float radius, out Vector3 point)
         {
             point = center;
             float tryRadius = Mathf.Max(radius, 2f);
             float minTravel = Mathf.Min(minPatrolTravelDistance, tryRadius * 0.5f);
+            // Guarantee same-floor attempts in the second half of the loop so the
+            // resident always has fallback options even in single-floor scenes.
+            int totalAttempts = Mathf.Max(1, roamSampleAttempts);
+            int multiFloorWindow = totalAttempts / 2;
 
-            for (int i = 0; i < Mathf.Max(1, roamSampleAttempts); i++)
+            for (int i = 0; i < totalAttempts; i++)
             {
                 // Sample on a ring (not a disk) to avoid clustering near the center.
                 Vector2 ring = Random.insideUnitCircle.normalized;
@@ -1704,7 +1649,9 @@ namespace Sushil.AI
                 float r = Random.Range(Mathf.Min(minTravel, tryRadius * 0.35f), tryRadius);
                 Vector3 candidate = center + new Vector3(ring.x * r, 0f, ring.y * r);
 
-                bool sampleDifferentFloor = allowMultiFloorRoam && Random.value < multiFloorRoamChance;
+                // First half of attempts may target a different floor; second half is
+                // always same-floor so we never exhaust all attempts on a missing floor.
+                bool sampleDifferentFloor = allowMultiFloorRoam && i < multiFloorWindow && Random.value < multiFloorRoamChance;
                 if (sampleDifferentFloor)
                 {
                     float verticalOffset = Random.Range(
@@ -1732,124 +1679,14 @@ namespace Sushil.AI
                     Vector3.Distance(transform.position, navHit.position) < minTravel)
                     continue;
 
-                point = navHit.position;
-                return true;
-            }
-
-            return false;
-        }
-
-        bool TryGetSearchRelocationPointAwayFromHideSpot(Vector3 hideSpot, out Vector3 point)
-        {
-            point = transform.position;
-
-            Vector3 away = transform.position - hideSpot;
-            away.y = 0f;
-            if (away.sqrMagnitude < 0.25f)
-            {
-                away = roamCenter - hideSpot;
-                away.y = 0f;
-            }
-            if (away.sqrMagnitude < 0.25f)
-            {
-                Vector2 random = Random.insideUnitCircle;
-                away = new Vector3(random.x, 0f, random.y);
-            }
-
-            away.Normalize();
-
-            float minHideDistance = Mathf.Max(10.5f, searchRadius * 2.35f);
-            float minHideableDistance = Mathf.Max(4.5f, searchRadius * 1.05f);
-            float primaryRadius = Mathf.Max(searchRadius * outwardSearchMultiplier, 8f);
-            float roamRadius = Mathf.Max(freeRoamRadius * 0.55f, 16f);
-
-            Vector3[] centers =
-            {
-                hideSpot + away * minHideDistance,
-                roamCenter,
-                transform.position + away * (minHideDistance * 0.85f),
-                ComputeRoamCenter()
-            };
-
-            float[] radii =
-            {
-                primaryRadius,
-                roamRadius,
-                Mathf.Max(primaryRadius * 0.85f, 7f),
-                roamRadius
-            };
-
-            for (int i = 0; i < centers.Length; i++)
-            {
-                Vector3 center = centers[i];
-                float radius = radii[Mathf.Min(i, radii.Length - 1)];
-
-                for (int attempt = 0; attempt < 3; attempt++)
-                {
-                    if (!TryGetRandomRoamPoint(center, radius, out Vector3 candidate))
-                        continue;
-
-                    if (!IsValidHideRelocationPoint(candidate, hideSpot, minHideDistance, minHideableDistance))
-                        continue;
-
-                    point = candidate;
-                    return true;
-                }
-
-                if (NavMesh.SamplePosition(center, out var sampledCenter, Mathf.Max(2.5f, radius * 0.35f), NavMesh.AllAreas) &&
-                    IsValidHideRelocationPoint(sampledCenter.position, hideSpot, minHideDistance, minHideableDistance))
-                {
-                    point = sampledCenter.position;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
-        bool IsValidHideRelocationPoint(Vector3 candidate, Vector3 hideSpot, float minHideDistance, float minHideableDistance)
-        {
-            if (GetFlatDistance(candidate, hideSpot) < minHideDistance)
-                return false;
-
-            if (!IsDestinationAllowed(candidate))
-                return false;
-
-            if (!IsFarFromHideableAreas(candidate, minHideableDistance))
-                return false;
-
-            if (agent == null)
-                return true;
-
-            NavMeshPath path = new NavMeshPath();
-            if (!NavMesh.CalculatePath(transform.position, candidate, NavMesh.AllAreas, path) ||
-                path.status != NavMeshPathStatus.PathComplete)
-                return false;
-
-            return IsPathAllowed(path);
-        }
-
-        bool IsFarFromHideableAreas(Vector3 point, float minimumDistance)
-        {
-            if (cachedHideables == null || cachedHideables.Length == 0)
-                return true;
-
-            for (int i = 0; i < cachedHideables.Length; i++)
-            {
-                HideableObject hideable = cachedHideables[i];
-                if (hideable == null || !hideable.gameObject.activeInHierarchy)
+                if (!ResolveReachableDestination(navHit.position, out var resolved))
                     continue;
 
-                Vector3 reference = hideable.transform.position;
-                Collider hideCollider = hideable.GetComponentInChildren<Collider>();
-                if (hideCollider != null)
-                    reference = hideCollider.ClosestPoint(point);
-
-                if (GetFlatDistance(point, reference) < minimumDistance)
-                    return false;
+                point = resolved;
+                return true;
             }
 
-            return true;
+            return false;
         }
 
         float GetFlatDistance(Vector3 a, Vector3 b)
@@ -2122,7 +1959,7 @@ namespace Sushil.AI
 
         bool IsBodyIntersectingClosedDoor(Vector3 worldPos)
         {
-            CapsuleCollider residentCapsule = GetComponent<CapsuleCollider>();
+            CapsuleCollider residentCapsule = residentCapsuleCollider;
             if (residentCapsule == null)
                 return false;
 
@@ -2184,7 +2021,7 @@ namespace Sushil.AI
             if (SegmentCrossesClosedDoor(from, to))
                 return false;
 
-            NavMeshPath warpPath = new NavMeshPath();
+            NavMeshPath warpPath = GetTraversePathBuf();
             if (!NavMesh.CalculatePath(from, to, NavMesh.AllAreas, warpPath) ||
                 warpPath.status != NavMeshPathStatus.PathComplete)
                 return false;
@@ -2463,6 +2300,8 @@ namespace Sushil.AI
             generalStuckTimer   = 0f;
             generalStuckLastPos = pos;
 
+            // agent.path can be null during path recomputation even when hasPath is true.
+            if (agent.path == null) return;
             Vector3[] corners = agent.path.corners;
             if (corners == null || corners.Length < 2) return;
 
@@ -2486,14 +2325,11 @@ namespace Sushil.AI
                 if (!CanTraverseWarpSegment(pos, hit.position))
                     continue;
 
-                // Warp, seed safe-pos, suppress anti-clip for 1.5 s, restore destination.
-                agent.Warp(hit.position);
-                transform.position   = hit.position;
-                agent.nextPosition   = hit.position;
+                // Move through the normal agent update path so recovery remains visible.
                 lastSafePosition     = hit.position;
                 hasSafePosition      = true;
                 ignoreAntiClipUntilTime = Time.time + 1.5f;
-                ReissuePrimaryDestination(savedDest);
+                QueueShortAdvanceAndReissueDestination(hit.position, savedDest, 0.25f);
                 return;
             }
         }
@@ -2615,12 +2451,10 @@ namespace Sushil.AI
             if (NavMesh.SamplePosition(transform.position, out var hit, navSnapSearchRadius, NavMesh.AllAreas))
             {
                 float d = Vector3.Distance(transform.position, hit.position);
-                if (d >= navSnapWarpDistance &&
-                    IsDestinationAllowed(hit.position) &&
-                    CanTraverseWarpSegment(transform.position, hit.position))
+                if (d >= navSnapWarpDistance && IsDestinationAllowed(hit.position))
                 {
-                    agent.Warp(hit.position);
-                    transform.position = hit.position;
+                    agent.ResetPath();
+                    agent.SetDestination(hit.position);
                 }
             }
         }
@@ -2775,12 +2609,6 @@ namespace Sushil.AI
                     return;
                 }
 
-                if (!ShouldAllowValidatedStairWarp(stairFocus))
-                {
-                    QueueShortAdvanceAndReissueDestination(progressiveTarget, originalDestination, 0.2f);
-                    return;
-                }
-
                 if (NavMesh.SamplePosition(progressiveTarget, out var progressiveHit, 1.0f, NavMesh.AllAreas))
                 {
                     float advanceDistance = Vector3.Distance(current, progressiveHit.position);
@@ -2792,13 +2620,10 @@ namespace Sushil.AI
                             return;
                         }
 
-                        agent.Warp(progressiveHit.position);
-                        transform.position = progressiveHit.position;
-                        agent.nextPosition = progressiveHit.position;
                         lastSafePosition = progressiveHit.position;
                         hasSafePosition = true;
                         ignoreAntiClipUntilTime = Time.time + 0.35f;
-                        ReissuePrimaryDestination(originalDestination);
+                        QueueShortAdvanceAndReissueDestination(progressiveHit.position, originalDestination, 0.2f);
                         return;
                     }
                 }
@@ -2816,21 +2641,13 @@ namespace Sushil.AI
 
             float desiredVerticalDelta = originalDestination.y - current.y;
 
-            // Warp the agent one short validated step on the stair, then immediately
-            // re-issue the original destination so pathfinding continues from the
-            // un-stuck position. Never accept a recovery point that moves downward
-            // while the active target is above the Resident.
+            // Advance the agent one short validated step on the stair, then immediately
+            // re-issue the original destination so pathfinding continues from there.
             if (NavMesh.SamplePosition(nudgeTarget, out var warpHit, 1.2f, NavMesh.AllAreas))
             {
                 if (squareFuseTraverse)
                 {
                     TrySetDestination(nudgeTarget);
-                    return;
-                }
-
-                if (!ShouldAllowValidatedStairWarp(stairFocus))
-                {
-                    QueueShortAdvanceAndReissueDestination(nudgeTarget, originalDestination, 0.18f);
                     return;
                 }
 
@@ -2856,39 +2673,14 @@ namespace Sushil.AI
                     return;
                 }
 
-                agent.Warp(warpHit.position);
-                transform.position = warpHit.position;
-                agent.nextPosition = warpHit.position;
                 // Ignore anti-clip for 1.2 s so the agent can walk several stair steps
                 // before the boundary check re-arms.  lastSafePosition is kept fresh
                 // throughout this window (see EnforceRuntimeNoClip early-return path).
                 ignoreAntiClipUntilTime = Time.time + 1.6f;
                 lastSafePosition = warpHit.position;
                 hasSafePosition  = true;
-                ReissuePrimaryDestination(originalDestination);
+                QueueShortAdvanceAndReissueDestination(warpHit.position, originalDestination, 0.18f);
             }
-        }
-
-        bool ShouldAllowValidatedStairWarp(Vector3 stairFocus)
-        {
-            if (!allowRuntimeRecoveryWarps)
-                return false;
-
-            if (!IsAgentReady())
-                return false;
-
-            if (GetStairBlend() >= 0.16f || IsCurrentlyOnElevatedPath())
-                return true;
-
-            if (Mathf.Abs(stairFocus.y - transform.position.y) > 0.4f)
-                return true;
-
-            if (Mathf.Abs(agent.destination.y - transform.position.y) > 0.28f)
-                return true;
-
-            return IsStairLikePosition(transform.position) ||
-                   IsStairLikePosition(stairFocus) ||
-                   IsStairLikePosition(agent.destination);
         }
 
         bool TryFindStairPathCornerRecoveryTarget(Vector3 current, out Vector3 recoveryTarget)
@@ -3082,17 +2874,7 @@ namespace Sushil.AI
             }
 
             fallback = safeHitPos;
-            if (!allowRuntimeRecoveryWarps)
-            {
-                SoftRecoverFromNoClipViolation(current, fallback);
-                return;
-            }
-
-            agent.Warp(fallback);
-            transform.position = fallback;
-            agent.nextPosition = fallback;
-            agent.ResetPath();
-            lastSafePosition = fallback;
+            SoftRecoverFromNoClipViolation(current, fallback);
         }
 
         void SoftRecoverFromNoClipViolation(Vector3 current, Vector3 fallback)
@@ -3510,7 +3292,7 @@ namespace Sushil.AI
             if (IsDirectKillLineBlocked(GetResidentThreatPoint(0.5f), targetPoint))
                 return false;
 
-            NavMeshPath closePath = new NavMeshPath();
+            NavMeshPath closePath = GetKillReachPathBuf();
             if (!NavMesh.CalculatePath(selfHit.position, targetHit.position, NavMesh.AllAreas, closePath) ||
                 closePath.status != NavMeshPathStatus.PathComplete)
                 return false;

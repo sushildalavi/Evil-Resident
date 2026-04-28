@@ -21,6 +21,20 @@ namespace Sushil.Systems
         bool ownsPromptText;
         string ownedMessage;
 
+        public static void QueueResidentHint(string msg)
+        {
+            if (string.IsNullOrWhiteSpace(msg))
+                return;
+
+            if (instance == null)
+            {
+                GameObject go = new GameObject("GameplayHintOverlay");
+                instance = go.AddComponent<GameplayHintOverlay>();
+            }
+
+            instance.QueueHint(msg);
+        }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Bootstrap()
         {

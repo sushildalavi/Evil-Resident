@@ -129,10 +129,9 @@ namespace Sushil.AI
             if (!agent.enabled)
                 agent.enabled = true;
 
-            if (!NavMesh.SamplePosition(resident.transform.position, out var hit, 6f, NavMesh.AllAreas))
+            if (!agent.isOnNavMesh || !NavMesh.SamplePosition(resident.transform.position, out _, 6f, NavMesh.AllAreas))
                 return;
 
-            agent.Warp(hit.position);
             agent.ResetPath();
             agent.isStopped = false;
         }

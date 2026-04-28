@@ -7,7 +7,7 @@ namespace Sushil.AI
 {
     public class ResidentKillZone : MonoBehaviour
     {
-        const float MaxRuntimeWorldKillRadius = 0.96f;
+        const float MaxRuntimeWorldKillRadius = 0.9f;
         const string TriggerKillReason = "Resident one-shot (trigger)";
 
         [Header("Safety")]
@@ -100,6 +100,9 @@ namespace Sushil.AI
             if (!CanKillTargetAtContact(killCenter, targetContact))
                 return;
 
+            if (residentAI != null)
+                residentAI.NotifyImmediateResidentThreat(seen: true);
+
             if (!TryExecuteKill(targetObject, fallbackKill))
                 return;
 
@@ -112,7 +115,14 @@ namespace Sushil.AI
                 return false;
 
             if (residentAI == null)
-                return true;
+                return Vector3.Distance(killCenter, targetContact) <= MaxRuntimeWorldKillRadius;
+
+            float contactDistance = Vector3.Distance(killCenter, targetContact);
+            float allowedDistance = Mathf.Min(
+                GetEffectiveWorldKillRadius(),
+                Mathf.Max(0.35f, residentAI.killDistance + 0.02f));
+            if (contactDistance > allowedDistance)
+                return false;
 
             if (residentAI.IsSquareFuseKillBlocked(killCenter, targetContact))
                 return false;
@@ -121,7 +131,7 @@ namespace Sushil.AI
             if (!residentAI.IsKillContactPathStrictlyClear(targetContact))
                 return false;
 
-            return residentAI.IsCloseKillReachable(targetContact, Vector3.Distance(killCenter, targetContact));
+            return residentAI.IsCloseKillReachable(targetContact, contactDistance);
         }
 
         bool TryExecuteKill(GameObject targetObject, Action fallbackKill)
@@ -146,7 +156,7 @@ namespace Sushil.AI
                 Mathf.Abs(transform.lossyScale.z));
 
             float colliderWorldRadius = killTrigger.radius * Mathf.Max(0.01f, maxScale);
-            float maxKillRadius = IsSahilTestNewLevel() ? 0.88f : MaxRuntimeWorldKillRadius;
+            float maxKillRadius = IsSahilTestNewLevel() ? 0.84f : MaxRuntimeWorldKillRadius;
             return Mathf.Min(colliderWorldRadius, maxKillRadius);
         }
 

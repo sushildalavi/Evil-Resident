@@ -2567,10 +2567,6 @@ PrefabInstance:
       propertyPath: destinationHideableClearance
       value: 0.4
       objectReference: {fileID: 0}
-    - target: {fileID: 8855339063735690731, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
-      propertyPath: hidingInspectPoints.Array.size
-      value: 0
-      objectReference: {fileID: 0}
     - target: {fileID: 9018658122524379117, guid: 0b443537b6c549808c328af759f11a6d, type: 3}
       propertyPath: m_Height
       value: 2.3
@@ -7644,7 +7640,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Sushil.Demo.NoiseTester
   noiseKey: 110
   intensity: 20
-  emitFromThrowPoint: 1
 --- !u!114 &7668826344385707397
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7658,7 +7653,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Sushil.AI.ResidentRohitNoiseBridge
   playerController: {fileID: 0}
-  throwRock: {fileID: 0}
   playerCharacterController: {fileID: 0}
   autoFindPlayer: 1
   emitMovementNoise: 0
@@ -7673,18 +7667,10 @@ MonoBehaviour:
   landingNoiseIntensity: 12
   jumpNoiseType: jump
   landingNoiseType: land
-  enableThrowIntegration: 0
-  throwKey: 103
-  emitThrowReleaseNoise: 0
-  throwReleaseNoiseIntensity: 6
-  throwNoiseType: throw
-  autoConfigureThrownRockImpactNoise: 1
   impactNoiseIntensity: 18
   impactMinSpeed: 0.75
   projectileLifeSeconds: 6
-  impactNoiseType: throwImpact
   projectileTrackWindow: 1.25
-  continuouslyConfigureRocks: 1
 --- !u!114 &7668826344385707404
 MonoBehaviour:
   m_ObjectHideFlags: 0
