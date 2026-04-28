@@ -49,6 +49,9 @@ public class WeepingAngelAI : MonoBehaviour
     [Header("Kill")]
     public bool killPlayerOnReach = true;
     [Min(0.1f)] public float killDistance = 0.8f;
+    [Min(0.1f)] public float killVerticalTolerance = 1.1f;
+    [Tooltip("If true, kills require direct line of contact (e.g. floors/walls block kill).")]
+    public bool requireLineOfSightToKill = true;
     public string killReason = "The Weeping Angel Reached you.";
 
     [Header("Audio")]
@@ -105,6 +108,7 @@ public class WeepingAngelAI : MonoBehaviour
         turnSpeedDegrees = Mathf.Max(30f, turnSpeedDegrees);
         maxRelativeToPlayerWalkSpeed = Mathf.Clamp(maxRelativeToPlayerWalkSpeed, 0.1f, 1f);
         killDistance = Mathf.Max(0.1f, killDistance);
+        killVerticalTolerance = Mathf.Max(0.1f, killVerticalTolerance);
         movementMinDistance = Mathf.Max(0.1f, movementMinDistance);
         movementMaxDistance = Mathf.Max(movementMinDistance + 0.1f, movementMaxDistance);
         movementPitch = Mathf.Clamp(movementPitch, 0.5f, 2f);
@@ -386,8 +390,13 @@ public class WeepingAngelAI : MonoBehaviour
         selfFlat.y = 0f;
         Vector3 playerFlat = playerTransform.position;
         playerFlat.y = 0f;
+        if (Mathf.Abs(playerTransform.position.y - transform.position.y) > killVerticalTolerance)
+            return false;
+
         float effectiveKillDistance = Mathf.Max(killDistance, GetHorizontalTouchDistance() + 0.05f);
         if ((playerFlat - selfFlat).sqrMagnitude > effectiveKillDistance * effectiveKillDistance)
+            return false;
+        if (requireLineOfSightToKill && IsKillContactBlocked())
             return false;
 
         PlayerDeath death = playerTransform.GetComponent<PlayerDeath>() ?? playerTransform.GetComponentInParent<PlayerDeath>();
@@ -410,6 +419,20 @@ public class WeepingAngelAI : MonoBehaviour
         }
 
         return false;
+    }
+
+    private bool IsKillContactBlocked()
+    {
+        Vector3 start = transform.position + Vector3.up * Mathf.Max(0.35f, visibilityPointHeight * 0.65f);
+        Vector3 end = GetPlayerAimPoint();
+
+        bool blocked = Physics.Linecast(start, end, out RaycastHit hit, lineOfSightObstructionMask, QueryTriggerInteraction.Ignore)
+                       && hit.transform != null
+                       && hit.transform != transform
+                       && !hit.transform.IsChildOf(transform)
+                       && !IsPlayerOrChild(hit.transform)
+                       && !IsCameraOrChild(hit.transform);
+        return blocked;
     }
 
     private float GetHorizontalTouchDistance()

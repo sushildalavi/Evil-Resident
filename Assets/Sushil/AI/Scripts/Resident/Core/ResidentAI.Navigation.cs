@@ -2926,7 +2926,9 @@ namespace Sushil.AI
 
             bool crossedClosedDoor = SegmentCrossesClosedDoor(lastSafePosition, current);
             bool bodyInsideClosedDoor = IsBodyIntersectingClosedDoor(current);
-            bool bodyInsideAnyDoor = IsBodyIntersectingAnyDoor(current);
+            // Open doors are traversable by design; only closed door intersection
+            // should trigger anti-clip recovery.
+            bool bodyInsideAnyDoor = false;
             if (Time.time < ignoreAntiClipUntilTime)
             {
                 if (!crossedClosedDoor && !bodyInsideClosedDoor && !bodyInsideAnyDoor)
@@ -2975,7 +2977,7 @@ namespace Sushil.AI
                 ? bodyInsideBlocking || bodyInsideClosedDoor || bodyInsideAnyDoor || hardNavViolation
                 : bodyInsideBlocking || bodyInsideClosedDoor || bodyInsideAnyDoor || (insideBlocking && moved > hardWallMoveThreshold) || (crossedClosedDoor && moved > 0.06f);
 
-            if (!hardWallViolation && !insideHideable && !hardNavViolation && !crossedClosedDoor && !bodyInsideClosedDoor && !bodyInsideAnyDoor)
+            if (!hardWallViolation && !insideHideable && !hardNavViolation && !crossedClosedDoor && !bodyInsideClosedDoor)
             {
                 lastSafePosition = current;
                 return;
@@ -3050,7 +3052,6 @@ namespace Sushil.AI
                 !IsInsideBlockingGeometry(hit.position, antiClipProbeRadius) &&
                 !IsBodyIntersectingBlocking(hit.position) &&
                 !IsBodyIntersectingClosedDoor(hit.position) &&
-                !IsBodyIntersectingAnyDoor(hit.position) &&
                 !SegmentCrossesClosedDoor(current, hit.position))
             {
                 safePos = hit.position;
@@ -3071,8 +3072,6 @@ namespace Sushil.AI
                 if (IsBodyIntersectingBlocking(pHit.position))
                     continue;
                 if (IsBodyIntersectingClosedDoor(pHit.position))
-                    continue;
-                if (IsBodyIntersectingAnyDoor(pHit.position))
                     continue;
                 if (SegmentCrossesClosedDoor(current, pHit.position))
                     continue;

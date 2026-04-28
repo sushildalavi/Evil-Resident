@@ -1043,7 +1043,7 @@ NavMeshAgent:
   m_AutoBraking: 1
   m_AutoRepath: 1
   m_Height: 2
-  m_BaseOffset: 0
+  m_BaseOffset: 0.08
   m_WalkableMask: 4294967295
   m_ObstacleAvoidanceType: 4
 --- !u!114 &9188172450237373923
@@ -1082,6 +1082,8 @@ MonoBehaviour:
   debugLookLogInterval: 0.5
   killPlayerOnReach: 1
   killDistance: 1.5
+  killVerticalTolerance: 1.1
+  requireLineOfSightToKill: 1
   killReason: The Weeping Angel Reached you.
   enableAngelAudio: 1
   movementAudioSource: {fileID: 872679564421661731}

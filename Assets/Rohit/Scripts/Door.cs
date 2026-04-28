@@ -103,6 +103,7 @@ public class Door : MonoBehaviour, IInteractable
     private Quaternion rotatingClosedLocalRotation;
     private Vector3 resolvedHingeLocalOffset;
     private Collider[] temporarilyDisabledNearbyColliders;
+    private float nextNearbyClearTime;
 
     void Awake()
     {
@@ -199,6 +200,15 @@ public class Door : MonoBehaviour, IInteractable
         ApplyHingePose(currentOpenAngle);
         SyncDoorBlockingForCurrentAngle();
         SyncRuntimeNavLink();
+
+        // Some doorway blockers (frame/wall helper colliders) are not always in
+        // range on the exact frame OpenDoor() runs. Keep clearing while open so
+        // movers don't get snagged by late-overlap blockers.
+        if (isOpen && clearNearbyBlockingCollidersOnOpen && Time.time >= nextNearbyClearTime)
+        {
+            DisableNearbyBlockingColliders();
+            nextNearbyClearTime = Time.time + 0.2f;
+        }
     }
 
     public KeyCode GetInteractKey() => KeyCode.E;
@@ -257,7 +267,10 @@ public class Door : MonoBehaviour, IInteractable
         // Clear blockers immediately at the moment door starts opening.
         SetDoorBlocking(false);
         if (clearNearbyBlockingCollidersOnOpen)
+        {
             DisableNearbyBlockingColliders();
+            nextNearbyClearTime = Time.time + 0.2f;
+        }
         if (navLinkForwardBack != null) navLinkForwardBack.activated = true;
         if (navLinkLeftRight != null) navLinkLeftRight.activated = true;
     }
@@ -326,16 +339,18 @@ public class Door : MonoBehaviour, IInteractable
         if (isBlockingNow == block) return;
         isBlockingNow = block;
 
-        if (cachedColliders != null)
+        // Always toggle all solid colliders owned by this door hierarchy.
+        // Some prefabs keep extra colliders outside cachedColliders, which can
+        // remain active after open and block AI traversal.
+        Collider[] allDoorColliders = GetComponentsInChildren<Collider>(true);
+        if (allDoorColliders != null)
         {
-            // Once the doorway is unblocked, disable the moving panel colliders
-            // so the player can pass through the opened door cleanly.
-            bool keepPanelCollidersActive = block;
-            for (int i = 0; i < cachedColliders.Length; i++)
+            for (int i = 0; i < allDoorColliders.Length; i++)
             {
-                var c = cachedColliders[i];
-                if (c == null) continue;
-                c.enabled = keepPanelCollidersActive;
+                Collider c = allDoorColliders[i];
+                if (c == null || c.isTrigger)
+                    continue;
+                c.enabled = block;
             }
         }
 
