@@ -61,7 +61,11 @@ namespace Sushil.AI
             squareFuseCorridorNavLink.bidirectional  = true;
             squareFuseCorridorNavLink.autoUpdate     = true;
             squareFuseCorridorNavLink.activated      = true;
-            squareFuseCorridorNavLink.costModifier   = -1f;
+            // costModifier 0 (was -1): a negative modifier tells the pathfinder
+            // this link is "free" and to prefer it over regular NavMesh, which
+            // funnelled all roaming through this single corridor. Neutral cost
+            // keeps it as a fallback bridge without making it a magnet.
+            squareFuseCorridorNavLink.costModifier   = 0f;
             squareFuseCorridorNavLink.agentTypeID    = agent.agentTypeID;
             Debug.Log($"[ResidentAI] SquareFuse runtime link active: {approachPoint} -> {roomPoint} (width {squareFuseCorridorNavLink.width:F2}).");
         }
@@ -116,7 +120,11 @@ namespace Sushil.AI
             link.bidirectional = true;
             link.autoUpdate = true;
             link.activated = true;
-            link.costModifier = -1f;
+            // costModifier 0 (was -1): a negative cost made these stair-step
+            // links the cheapest path in the level, so the resident kept
+            // routing every random patrol target through the stair entrance
+            // and visibly loitered at the bottom of the stairs.
+            link.costModifier = 0f;
             link.agentTypeID = agent.agentTypeID;
             basementStairNavLinks.Add(link);
         }
@@ -127,8 +135,12 @@ namespace Sushil.AI
                 return true;
 
             float moved = Vector3.Distance(transform.position, lastPosition);
-            bool stalled = !agent.pathPending &&
-                           (!agent.hasPath || (moved < 0.03f && agent.velocity.sqrMagnitude < 0.08f * 0.08f));
+            // STRICTER stall detection — also catches:
+            //   • Slow oscillation (moves a tiny amount every frame, never triggering the
+            //     0.03m threshold but still effectively stuck on a doorway frame).
+            //   • Long-running pathPending (NavMesh keeps re-pathing without ever moving).
+            bool veryLowMovement = moved < 0.06f && agent.velocity.sqrMagnitude < 0.18f * 0.18f;
+            bool stalled = !agent.hasPath || veryLowMovement;
             stallTimer = stalled ? stallTimer + Time.deltaTime : 0f;
             lastPosition = transform.position;
 
@@ -145,6 +157,8 @@ namespace Sushil.AI
 
             // Hard fallback: if doorway-specific recovery fails, force a fresh random
             // target so the resident does not pinwheel against one door forever.
+            // Clear the existing path first so old pathfinding state can't interfere.
+            SafeResetPath();
             if (TryGetRandomRoamPoint(transform.position, Mathf.Max(8f, localPatrolRadius), out var fallbackRoam))
             {
                 if (TrySetDestination(fallbackRoam))
@@ -155,6 +169,8 @@ namespace Sushil.AI
                 }
             }
 
+            // Even if the random pick failed, signal "stalled" so the outer patrol loop
+            // moves on to its next iteration and picks a fresh target.
             return true;
         }
 
@@ -965,7 +981,10 @@ namespace Sushil.AI
 
         void UpdateDoorwayAssist(bool hasChaseTrackNow, bool setDestinationOk, Vector3 assistTarget)
         {
-            if (!enableDoorwayAssist || !hasChaseTrackNow || player == null || !IsAgentReady())
+            // Now runs in all states (patrol/search/chase) — doorway stuck recovery is
+            // not chase-exclusive. The "hasChaseTrackNow" arg is preserved for back-compat
+            // but no longer gates the assist (player presence is the only hard requirement).
+            if (!enableDoorwayAssist || !IsAgentReady())
             {
                 chaseStuckTimer = 0f;
                 return;
@@ -1748,11 +1767,70 @@ namespace Sushil.AI
                     Vector3.Distance(transform.position, navHit.position) < minTravel)
                     continue;
 
+                // Reject candidates that land right at a door threshold — they
+                // were causing the resident to repeatedly stop and loiter at
+                // door entrances. Interior room destinations are preferred.
+                if (state == State.Patrol && IsCandidateNearDoorThreshold(navHit.position, 2.4f))
+                    continue;
+
                 if (!ResolveReachableDestination(navHit.position, out var resolved))
                     continue;
 
                 point = resolved;
                 return true;
+            }
+
+            return false;
+        }
+
+        bool IsCandidateNearDoorThreshold(Vector3 candidate, float horizontalRadius)
+        {
+            if (cachedDoors == null) cachedDoors = FindObjectsByType<Door>(FindObjectsSortMode.None);
+            if (cachedFuseDoors == null) cachedFuseDoors = FindObjectsByType<FuseDoor>(FindObjectsSortMode.None);
+            if (cachedMainDoors == null) cachedMainDoors = FindObjectsByType<MainDoor>(FindObjectsSortMode.None);
+
+            float radiusSqr = horizontalRadius * horizontalRadius;
+
+            if (cachedDoors != null)
+            {
+                for (int i = 0; i < cachedDoors.Length; i++)
+                {
+                    Door d = cachedDoors[i];
+                    if (d == null || !d.gameObject.activeInHierarchy) continue;
+                    Vector3 c = d.GetDoorwayCenter();
+                    float dx = candidate.x - c.x;
+                    float dz = candidate.z - c.z;
+                    if (Mathf.Abs(candidate.y - c.y) > 1.6f) continue;
+                    if (dx * dx + dz * dz < radiusSqr) return true;
+                }
+            }
+
+            if (cachedFuseDoors != null)
+            {
+                for (int i = 0; i < cachedFuseDoors.Length; i++)
+                {
+                    FuseDoor d = cachedFuseDoors[i];
+                    if (d == null || !d.gameObject.activeInHierarchy) continue;
+                    Vector3 c = d.transform.position;
+                    float dx = candidate.x - c.x;
+                    float dz = candidate.z - c.z;
+                    if (Mathf.Abs(candidate.y - c.y) > 1.6f) continue;
+                    if (dx * dx + dz * dz < radiusSqr) return true;
+                }
+            }
+
+            if (cachedMainDoors != null)
+            {
+                for (int i = 0; i < cachedMainDoors.Length; i++)
+                {
+                    MainDoor d = cachedMainDoors[i];
+                    if (d == null || !d.gameObject.activeInHierarchy) continue;
+                    Vector3 c = d.transform.position;
+                    float dx = candidate.x - c.x;
+                    float dz = candidate.z - c.z;
+                    if (Mathf.Abs(candidate.y - c.y) > 1.6f) continue;
+                    if (dx * dx + dz * dz < radiusSqr) return true;
+                }
             }
 
             return false;
@@ -2542,7 +2620,9 @@ namespace Sushil.AI
             }
 
             openDoorStuckTimer += Time.deltaTime;
-            if (openDoorStuckTimer < 0.22f || Time.time < nextOpenDoorHardAssistAt)
+            // Raised from 0.22s → 0.40s so brief overlap noise while a door is
+            // mid-swing doesn't trigger a hard repath (which read as a jump).
+            if (openDoorStuckTimer < 0.40f || Time.time < nextOpenDoorHardAssistAt)
                 return;
 
             openDoorStuckTimer = 0f;
@@ -2555,15 +2635,15 @@ namespace Sushil.AI
             if (!TryGetOpenDoorRecoveryPoint(openDoor, primaryDestination, out Vector3 recoveryPoint))
                 return;
 
+            // Non-teleport recovery: re-issue the path to the other side of the door.
+            // The Resident walks through naturally via the door's runtime NavMeshLink
+            // instead of being instantly warped (which looked broken to the player).
             SafeResetPath();
-            if (!agent.Warp(recoveryPoint))
+            if (!TrySetDestination(recoveryPoint))
                 return;
 
-            lastSafePosition = recoveryPoint;
-            hasSafePosition = true;
             ignoreAntiClipUntilTime = Mathf.Max(ignoreAntiClipUntilTime, Time.time + 1.0f);
-            openDoorStuckLastPos = recoveryPoint;
-            Debug.Log($"[ResidentAI] Open-door hard assist crossed {openDoor.name} to {recoveryPoint}.");
+            openDoorStuckLastPos = transform.position;
             ReissuePrimaryDestination(primaryDestination);
         }
 
@@ -2575,17 +2655,15 @@ namespace Sushil.AI
 
         bool TryCompleteOpenDoorOffMeshLink(Vector3 primaryDestination)
         {
+            // PREVIOUSLY: called agent.CompleteOffMeshLink() which snap-teleports the agent
+            // from link start → end. Caused the visible "abrupt jump" near bronze/silver
+            // doors when the resident stalled mid-link.
+            //
+            // NEW: just re-issue the destination so the agent finishes traversing the link
+            // naturally via Unity's auto-traverse path. No teleport.
             if (agent == null || !agent.isOnOffMeshLink || !IsOpenDoorOffMeshLinkContext())
                 return false;
 
-            OffMeshLinkData data = agent.currentOffMeshLinkData;
-            Vector3 end = data.endPos;
-            if (NavMesh.SamplePosition(end, out var hit, 1.2f, NavMesh.AllAreas))
-                end = hit.position;
-
-            agent.CompleteOffMeshLink();
-            lastSafePosition = end;
-            hasSafePosition = true;
             ignoreAntiClipUntilTime = Mathf.Max(ignoreAntiClipUntilTime, Time.time + 0.75f);
             ReissuePrimaryDestination(primaryDestination);
             return true;
@@ -3185,11 +3263,20 @@ namespace Sushil.AI
             bool crossedNavBoundary = enforceNavMeshBoundaryAntiClip &&
                                       CrossedNavBoundary(lastSafePosition, current);
             float moved = Vector3.Distance(lastSafePosition, current);
-            bool hardNavViolation = crossedNavBoundary && moved > 0.28f;
+            // Force-disable navmesh-boundary recovery while traversing stairs — the Y
+            // change between floors falsely reads as crossing an unconnected region,
+            // which would warp the resident back to the upstairs lastSafePosition.
+            // Door thresholds can briefly read as boundary crossings while a door
+            // panel is mid-swing. Bumped 0.28 → 0.40 so transient noise at the
+            // doorway doesn't trigger a recovery repath that looks like a jump.
+            bool hardNavViolation = !stairTraversal && crossedNavBoundary && moved > 0.40f;
             float hardWallMoveThreshold = stairTraversal ? 0.16f : 0.3f;
             hardWallMoveThreshold = Mathf.Min(hardWallMoveThreshold, 0.18f);
             bool hardWallViolation = stairTraversal
-                ? bodyInsideBlocking || bodyInsideClosedDoor || bodyInsideAnyDoor || hardNavViolation
+                // While traversing stairs, the Y-delta between lastSafePosition and current
+                // can read as a navmesh-boundary violation (different floor regions). Skip
+                // hardNavViolation here so the resident doesn't get warped back upstairs.
+                ? bodyInsideBlocking || bodyInsideClosedDoor || bodyInsideAnyDoor
                 : bodyInsideBlocking || bodyInsideClosedDoor || bodyInsideAnyDoor || (insideBlocking && moved > hardWallMoveThreshold) || (crossedClosedDoor && moved > 0.06f);
 
             if (!hardWallViolation && !insideHideable && !hardNavViolation && !crossedClosedDoor && !bodyInsideClosedDoor)
@@ -3213,6 +3300,17 @@ namespace Sushil.AI
         {
             if (!IsAgentReady())
                 return;
+
+            // Don't recover to a position significantly above (or far below) current —
+            // it usually indicates a stale lastSafePosition from a different floor.
+            // Snapping there would teleport the resident upstairs/downstairs visibly.
+            if (Mathf.Abs(fallback.y - current.y) > 1.2f)
+            {
+                ignoreAntiClipUntilTime = Mathf.Max(ignoreAntiClipUntilTime, Time.time + 0.5f);
+                lastSafePosition = current;
+                hasSafePosition = true;
+                return;
+            }
 
             // Door thresholds can produce transient overlap noise while a door is
             // rotating. Avoid aggressive recovery there to prevent visible "hops."

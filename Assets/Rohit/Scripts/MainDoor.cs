@@ -62,7 +62,11 @@ public class MainDoor : MonoBehaviour, IInteractable
         // Hard safety defaults so old scene/prefab serialized values cannot regress doorway traversal.
         unblockWhenOpen = true;
         immediateUnblockOnOpen = true;
-        autoAddRuntimeNavLink = true;
+        // Disable the runtime NavMeshLink for the MainDoor — the player walks through
+        // physically (not via NavMesh), and enabling the link would let the Resident
+        // (a NavMeshAgent) follow the player OUTSIDE the level.
+        autoAddRuntimeNavLink = false;
+        if (navLink != null) navLink.activated = false;
 
         closedLocalPosition = transform.localPosition;
         closedLocalRotation = transform.localRotation;
@@ -147,7 +151,8 @@ public class MainDoor : MonoBehaviour, IInteractable
         {
             isOpen = true;
             SetDoorBlocking(false);
-            if (navLink != null) navLink.activated = true;
+            // Do NOT activate the nav link — would let the Resident follow the player outside.
+            if (autoAddRuntimeNavLink && navLink != null) navLink.activated = true;
             PlaySound(unlockSound);
             Debug.Log("The main door opens! You escaped!");
 

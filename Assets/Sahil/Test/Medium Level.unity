@@ -1134,6 +1134,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Gold_key
       objectReference: {fileID: 0}
+    - target: {fileID: 537714497737909546, guid: cea825a94aedf46769bcea5b8f388f32, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1294955791780035607, guid: cea825a94aedf46769bcea5b8f388f32, type: 3}
       propertyPath: m_LocalPosition.x
       value: -4.2175803
@@ -1838,6 +1842,10 @@ PrefabInstance:
     - target: {fileID: 8512023151259529044, guid: 559913cba1c9845069ffa6cc25199e4b, type: 3}
       propertyPath: m_Name
       value: Silver_key
+      objectReference: {fileID: 0}
+    - target: {fileID: 8512023151259529044, guid: 559913cba1c9845069ffa6cc25199e4b, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -2762,6 +2770,10 @@ PrefabInstance:
     - target: {fileID: 7424082653570224223, guid: d594f616a536f4d399933cd973acef16, type: 3}
       propertyPath: m_Name
       value: SilverDoor
+      objectReference: {fileID: 0}
+    - target: {fileID: 7424082653570224223, guid: d594f616a536f4d399933cd973acef16, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
@@ -4068,6 +4080,10 @@ PrefabInstance:
     - target: {fileID: 3160420816594285972, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_Name
       value: BronzeDoor
+      objectReference: {fileID: 0}
+    - target: {fileID: 3160420816594285972, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalPosition.x
@@ -6326,6 +6342,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: GoldDoor
       objectReference: {fileID: 0}
+    - target: {fileID: 3779373368436385424, guid: 7686822bf0d904a0da5d3473b7327d1e, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7037668713496714790, guid: 7686822bf0d904a0da5d3473b7327d1e, type: 3}
       propertyPath: m_LocalPosition.x
       value: 8.35553
@@ -7058,6 +7078,10 @@ PrefabInstance:
     - target: {fileID: 5410199557937626272, guid: 6921a95d2a2d24bcf8419ab74feef1f0, type: 3}
       propertyPath: m_Name
       value: Bronze_key
+      objectReference: {fileID: 0}
+    - target: {fileID: 5410199557937626272, guid: 6921a95d2a2d24bcf8419ab74feef1f0, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6744739432118887837, guid: 6921a95d2a2d24bcf8419ab74feef1f0, type: 3}
       propertyPath: m_LocalPosition.x
@@ -8215,6 +8239,10 @@ PrefabInstance:
     - target: {fileID: 3160420816594285972, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_Name
       value: BronzeDoor (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 3160420816594285972, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalPosition.x

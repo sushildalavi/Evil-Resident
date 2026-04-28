@@ -123,7 +123,11 @@ public class Door : MonoBehaviour, IInteractable
         // Hard safety defaults so old scene/prefab serialized values cannot regress doorway traversal.
         unblockWhenOpen = true;
         immediateUnblockOnOpen = true;
-        autoAddRuntimeNavLink = true;
+        // Off-mesh link traversal across a door span was causing a visible "jump"
+        // for the Resident at bronze doors. Force it off everywhere — the carved
+        // NavMesh fills the doorway as soon as the obstacle is disabled, so the
+        // agent walks through naturally without an interpolated link traversal.
+        autoAddRuntimeNavLink = false;
         autoComputeHingeFromBounds = true;
 
         closedLocalPosition = transform.localPosition;
@@ -259,8 +263,10 @@ public class Door : MonoBehaviour, IInteractable
     {
         isOpen = true;
         SetDoorBlocking(false);
-        if (navLinkForwardBack != null) navLinkForwardBack.activated = true;
-        if (navLinkLeftRight != null) navLinkLeftRight.activated = true;
+        // Keep any pre-existing runtime nav links inert so the agent doesn't
+        // teleport-interpolate across the door span. NavMesh carve handles it.
+        if (navLinkForwardBack != null) { navLinkForwardBack.activated = false; navLinkForwardBack.enabled = false; }
+        if (navLinkLeftRight != null) { navLinkLeftRight.activated = false; navLinkLeftRight.enabled = false; }
     }
 
     public bool TryOpenForAI()
@@ -408,15 +414,19 @@ public class Door : MonoBehaviour, IInteractable
 
     void SyncRuntimeNavLink()
     {
-        if (!autoAddRuntimeNavLink) return;
-        SyncRuntimeNavLinkRootPose();
-
-        // Keep traversal available anywhere the door is non-blocking.
-        bool shouldEnable = !isLocked || isOpen;
-        if (navLinkForwardBack != null && navLinkForwardBack.enabled)
-            navLinkForwardBack.activated = shouldEnable;
-        if (navLinkLeftRight != null && navLinkLeftRight.enabled)
-            navLinkLeftRight.activated = shouldEnable;
+        // Runtime nav links across doors caused a visible "jump" when the
+        // agent traversed them. Force any existing link off — the carved
+        // NavMesh handles open-door traversal without interpolation.
+        if (navLinkForwardBack != null && (navLinkForwardBack.enabled || navLinkForwardBack.activated))
+        {
+            navLinkForwardBack.activated = false;
+            navLinkForwardBack.enabled = false;
+        }
+        if (navLinkLeftRight != null && (navLinkLeftRight.enabled || navLinkLeftRight.activated))
+        {
+            navLinkLeftRight.activated = false;
+            navLinkLeftRight.enabled = false;
+        }
     }
 
     void ApplyHingePose(float angleY)

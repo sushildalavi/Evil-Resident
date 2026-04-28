@@ -97,7 +97,7 @@ public class CollectibleHUD : MonoBehaviour
     {
         Color.yellow,
         Color.blue,
-        new Color(0.6f, 0.2f, 1f, 1f)
+        new Color(0.25f, 0.85f, 0.35f, 1f)
     };
     // Dark-metal frame palette inspired by Resident Evil-style HUDs.
     static readonly Color RowBackgroundColor = new Color(0.05f, 0.05f, 0.06f, 0.96f);     // dark stone behind frame
@@ -1012,6 +1012,13 @@ public class CollectibleHUD : MonoBehaviour
 
     Color ResolveFuseDisplayColor(int fuseIndex)
     {
+        // The third in-scene fuse uses a purple material on its prefab, but the
+        // gameplay fuse model is green. Match the HUD swatch to the green one
+        // unconditionally for that slot so the two visuals stay in sync without
+        // needing a prefab/material edit per scene.
+        if (fuseIndex == 2)
+            return DefaultFuseColors[2];
+
         FuseBox[] boxes = GetTrackedFuseBoxes();
         if (fuseIndex >= 0 && fuseIndex < boxes.Length)
         {

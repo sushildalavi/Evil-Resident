@@ -408,8 +408,10 @@ namespace Sushil.AI
             unlockedKeyDoorBiasChance = 0f;
             // Allow patrol-point visits when authored — adds variety beyond pure free-roam.
             patrolPointVisitChance = Mathf.Max(patrolPointVisitChance, 0.45f);
-            // Shorter required travel = more frequent re-routing = more "wandering" feel.
-            minPatrolTravelDistance = Mathf.Min(minPatrolTravelDistance, 4f);
+            // Each patrol leg must cover real ground — short legs caused visible
+            // pacing/circling inside the same small room. Floor at 10 m so the
+            // resident leaves the room he just finished checking.
+            minPatrolTravelDistance = Mathf.Max(minPatrolTravelDistance, 10f);
             // Wider local roam radius gives the resident more random destinations to pick.
             localPatrolRadius = Mathf.Max(localPatrolRadius, 18f);
             // Bump patrol pause so the resident occasionally stops + looks around — feels alive.
@@ -452,7 +454,11 @@ namespace Sushil.AI
             allowMultiFloorRoam = true;
             roamSampleAttempts = Mathf.Max(roamSampleAttempts, 28);
             freeRoamRadius = Mathf.Max(freeRoamRadius, 60f);
-            unlockedKeyDoorBiasChance = Mathf.Max(unlockedKeyDoorBiasChance, 0.58f);
+            // Lowered from 0.58 → 0.12: the old value made the resident pick a
+            // point a couple metres past an unlocked door 58% of the time, which
+            // looked exactly like loitering at door entrances. Keep the bias but
+            // make it the exception, not the rule.
+            unlockedKeyDoorBiasChance = Mathf.Clamp(unlockedKeyDoorBiasChance, 0f, 0.12f);
             unlockedKeyDoorBiasRadius = Mathf.Max(unlockedKeyDoorBiasRadius, 5.5f);
             unlockedKeyDoorTraverseRange = Mathf.Max(unlockedKeyDoorTraverseRange, 3.6f);
             searchRadius = Mathf.Max(searchRadius, 6.5f);
@@ -489,7 +495,10 @@ namespace Sushil.AI
                 patrolPointVisitChance = Mathf.Min(patrolPointVisitChance, 0.18f);
                 lastNoiseRoomBiasChance = Mathf.Max(lastNoiseRoomBiasChance, 0.82f);
                 lastNoiseRoomRadius = Mathf.Max(lastNoiseRoomRadius, 12f);
-                unlockedKeyDoorBiasChance = Mathf.Max(unlockedKeyDoorBiasChance, 0.9f);
+                // Was 0.9 — caused the Hard/Medium resident to camp doorways.
+                // Cap at 0.18 so he occasionally wanders behind keyed doors but
+                // doesn't make it his default behaviour.
+                unlockedKeyDoorBiasChance = Mathf.Clamp(unlockedKeyDoorBiasChance, 0f, 0.18f);
                 unlockedKeyDoorBiasRadius = Mathf.Max(unlockedKeyDoorBiasRadius, 7f);
                 unlockedKeyDoorTraverseRange = Mathf.Max(unlockedKeyDoorTraverseRange, 4.2f);
                 multiFloorRoamChance = Mathf.Clamp(multiFloorRoamChance, 0.35f, 0.55f);
@@ -1033,6 +1042,11 @@ namespace Sushil.AI
                 {
                     if (UpdateRoamStallState(ref lastPatrolPos, ref patrolStallTimer))
                         break;
+                    // Doorway assist was nudging the resident *toward* nearby
+                    // doors every frame during free-roam, which made him loiter
+                    // around door entrances. The general stall recovery already
+                    // handles a real doorway snag, so leave this off during
+                    // patrol and only apply it in chase/investigate contexts.
                     yield return null;
                 }
 
@@ -1064,6 +1078,8 @@ namespace Sushil.AI
                     ChangeState(State.Chase);
                     yield break;
                 }
+                // Doorway-frame stuck recovery during investigate too.
+                UpdateDoorwayAssist(true, true, target);
                 yield return null;
             }
 
@@ -1102,6 +1118,8 @@ namespace Sushil.AI
                         approachTime += Time.deltaTime;
                         if (UpdateRoamStallState(ref lastApproachPos, ref approachStallTimer))
                             break;
+                        // Doorway-frame stuck recovery during search-approach.
+                        UpdateDoorwayAssist(true, true, wholeHouseSearchLastKnownPos);
                         yield return null;
                     }
                 }

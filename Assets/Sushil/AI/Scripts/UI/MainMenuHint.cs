@@ -90,6 +90,9 @@ namespace Sushil.Systems
 
         void GoToMainMenu()
         {
+            // Remember the level so Tab on the menu resumes it (undoes accidental Q-press).
+            PauseOverlay.RememberLastGameplayScene(SceneManager.GetActiveScene().name);
+
             // Make sure time/cursor are restored before scene swap.
             Time.timeScale = 1f;
             AudioListener.pause = false;

@@ -17,6 +17,24 @@ namespace Sushil.Systems
         static PauseOverlay instance;
         public static bool IsPaused => instance != null && instance.isPaused;
 
+        // Scene the player was on when they last opened the main menu via Q (or pause's
+        // MAIN MENU button). Pressing Tab in the main menu reloads this scene — letting
+        // the player undo an accidental Q-press. Cleared once consumed.
+        static string lastGameplayScene;
+        // Set when a Q-mistake is being undone: reload the gameplay scene and
+        // immediately drop the player onto the pause/resume screen so they know
+        // they're back in the level and can confirm before unpausing.
+        static bool showPauseAfterNextLoad;
+
+        public static void RememberLastGameplayScene(string sceneName)
+        {
+            if (string.IsNullOrEmpty(sceneName)) return;
+            if (IsMenuSceneName(sceneName)) return;
+            lastGameplayScene = sceneName;
+        }
+
+        public static bool HasRememberedGameplayScene => !string.IsNullOrEmpty(lastGameplayScene);
+
         // External entry point so other UI/triggers can open the pause overlay.
         public static void RequestShow()
         {
@@ -29,6 +47,14 @@ namespace Sushil.Systems
         {
             if (instance == null) return;
             if (instance.isPaused) instance.TogglePause();
+        }
+
+        static bool IsMenuSceneName(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            string n = name.ToLowerInvariant();
+            return n == "level select" || n == "difficulty select" ||
+                   n == "main menu" || n.Contains("mainmenu");
         }
 
         Canvas canvas;
@@ -59,6 +85,31 @@ namespace Sushil.Systems
             DontDestroyOnLoad(gameObject);
             BuildUI();
             SetVisible(false);
+            SceneManager.sceneLoaded += OnSceneLoaded;
+        }
+
+        void OnDestroy()
+        {
+            if (instance == this)
+                SceneManager.sceneLoaded -= OnSceneLoaded;
+        }
+
+        void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            if (!showPauseAfterNextLoad) return;
+            showPauseAfterNextLoad = false;
+            if (IsMenuSceneName(scene.name)) return; // safety: never auto-pause inside a menu
+            // Defer one frame so any per-scene RuntimeInitializeOnLoad bootstraps
+            // (HUD, EventSystem, etc.) finish before the pause overlay opens.
+            StartCoroutine(ShowPauseNextFrame());
+        }
+
+        System.Collections.IEnumerator ShowPauseNextFrame()
+        {
+            yield return null;
+            if (StartScreenOverlay.IsShowing || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing)
+                yield break;
+            if (!isPaused) TogglePause();
         }
 
         void Update()
@@ -66,6 +117,30 @@ namespace Sushil.Systems
             if (WasPausePressed())
             {
                 if (StartScreenOverlay.IsShowing || GameOverOverlay.IsShowing || EscapeOverlay.IsShowing) return;
+
+                // If the player landed in the main menu via Q (or pause's MAIN MENU
+                // button), Tab here resumes the level they came from — undoes the
+                // accidental Q-press without showing a pause panel in the menu.
+                Scene active = SceneManager.GetActiveScene();
+                if (IsMenuSceneName(active.name))
+                {
+                    if (!string.IsNullOrEmpty(lastGameplayScene))
+                    {
+                        string toLoad = lastGameplayScene;
+                        lastGameplayScene = null; // consume — only resumes once
+                        Time.timeScale = 1f;
+                        AudioListener.pause = false;
+                        // Show the pause/resume screen as soon as the gameplay
+                        // scene comes back, so an accidental Q-press lands the
+                        // player on the pause overlay rather than mid-level
+                        // with no signal that input was reattached.
+                        showPauseAfterNextLoad = true;
+                        SceneManager.LoadScene(toLoad);
+                    }
+                    // Either way: don't open the pause overlay in a menu scene.
+                    return;
+                }
+
                 TogglePause();
             }
 
@@ -125,6 +200,9 @@ namespace Sushil.Systems
 
         void GoToMainMenu()
         {
+            // Remember the current level so Tab in the menu can resume it.
+            RememberLastGameplayScene(SceneManager.GetActiveScene().name);
+
             isPaused = false;
             SetVisible(false);
             Time.timeScale = 1f;
