@@ -40,6 +40,23 @@ public class MainDoor : MonoBehaviour, IInteractable
     private NavMeshLink navLink;
     private bool isBlockingNow;
 
+    void Awake()
+    {
+        // Enforce closed-door blocking before Start() to avoid early-frame AI pass-through.
+        if (!isOpen)
+        {
+            ForceClosedBlockingStateEarly();
+        }
+    }
+
+    void OnEnable()
+    {
+        if (!isOpen)
+        {
+            ForceClosedBlockingStateEarly();
+        }
+    }
+
     void Start()
     {
         // Hard safety defaults so old scene/prefab serialized values cannot regress doorway traversal.
@@ -69,6 +86,30 @@ public class MainDoor : MonoBehaviour, IInteractable
 
         if (winUI != null)
             winUI.SetActive(false);
+    }
+
+    void ForceClosedBlockingStateEarly()
+    {
+        Collider[] cols = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
+        {
+            Collider c = cols[i];
+            if (c == null || c.isTrigger) continue;
+            c.enabled = true;
+        }
+
+        if (blockWhenClosed)
+        {
+            NavMeshObstacle obstacle = GetComponent<NavMeshObstacle>();
+            if (obstacle == null && autoAddNavObstacle)
+            {
+                obstacle = gameObject.AddComponent<NavMeshObstacle>();
+                obstacle.carving = true;
+                obstacle.carveOnlyStationary = true;
+            }
+            if (obstacle != null)
+                obstacle.enabled = true;
+        }
     }
 
     void Update()

@@ -96,6 +96,14 @@ public class RohitFPSController : MonoBehaviour
 
     void Start()
     {
+        // Keep movement parity across tutorial and all levels.
+        walkSpeed = 3f;
+        sprintSpeed = 3f;
+        jumpHeight = 1f;
+        acceleration = 15f;
+        deceleration = 10f;
+        airControl = 0.2f;
+
         NormalizeInteractionSettings();
 
         CollectibleHUD.EnsureExists();

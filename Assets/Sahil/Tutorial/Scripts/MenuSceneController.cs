@@ -17,7 +17,10 @@ public class MenuSceneController : MonoBehaviour
     const string TutorialSceneName = "New Tutorial 1";
     const string EasySceneName = "Easy Level";
     const string MediumSceneName = "Medium Level";
+    // The Hard scene was renamed to "Old Hard" in build settings. Try the new name
+    // first (in case it ships) then fall back to the one that's actually in the build.
     const string HardSceneName = "Hard Level";
+    const string HardSceneNameFallback = "Old Hard";
 
     static MenuSceneController instance;
 
@@ -82,7 +85,11 @@ public class MenuSceneController : MonoBehaviour
 
     public void LoadHard()
     {
-        LoadScene(HardSceneName);
+        // Prefer the canonical name; fall back to whichever Hard scene is in build.
+        if (SceneUtility.GetBuildIndexByScenePath($"Assets/Sahil/Test/{HardSceneName}.unity") >= 0)
+            LoadScene(HardSceneName);
+        else
+            LoadScene(HardSceneNameFallback);
     }
 
     public void LoadMainMenu()

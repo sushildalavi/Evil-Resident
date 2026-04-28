@@ -16,7 +16,7 @@ public class RohitGoogleSheetsUploader : MonoBehaviour
 
     static readonly HashSet<string> TrackedScenes = new HashSet<string>
     {
-        "Easy Level", "Medium Level", "Hard Level"
+        "Easy Level", "Medium Level", "Hard Level", "Old Hard"
     };
 
     static RohitGoogleSheetsUploader instance;

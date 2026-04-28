@@ -55,8 +55,8 @@ namespace Sushil.AI
 
             if (IsAgentReady())
             {
-                agent.isStopped = true;
-                agent.ResetPath();
+                SafeSetStopped(true);
+                SafeResetPath();
             }
 
             yield return AdvanceKillAttackUntil(targetTransform, killAttackImpactAt);

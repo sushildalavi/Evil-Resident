@@ -143,6 +143,18 @@ namespace Sushil.AI
                 return false;
             }
 
+            // Hard fallback: if doorway-specific recovery fails, force a fresh random
+            // target so the resident does not pinwheel against one door forever.
+            if (TryGetRandomRoamPoint(transform.position, Mathf.Max(8f, localPatrolRadius), out var fallbackRoam))
+            {
+                if (TrySetDestination(fallbackRoam))
+                {
+                    stallTimer = 0f;
+                    lastPosition = transform.position;
+                    return false;
+                }
+            }
+
             return true;
         }
 
@@ -286,7 +298,7 @@ namespace Sushil.AI
                 return;
             }
 
-            agent.ResetPath();
+            SafeResetPath();
         }
 
         void QueueShortAdvanceAndReissueDestination(Vector3 shortAdvanceTarget, Vector3 primaryDestination, float delay = 0.18f)
@@ -1496,8 +1508,51 @@ namespace Sushil.AI
 
         void TryAutoOpenDoorInFront()
         {
-            // Resident must never open player doors on its own.
-            return;
+            if (!autoOpenNearbyDoors) return;
+            if (Time.time < nextDoorOpenTime) return;
+            if (cachedDoors == null || cachedDoors.Length == 0)
+                cachedDoors = FindObjectsByType<Door>(FindObjectsSortMode.None);
+            if (cachedDoors == null || cachedDoors.Length == 0) return;
+
+            Vector3 selfPos = transform.position;
+            Vector3 forward = transform.forward;
+            forward.y = 0f;
+            if (forward.sqrMagnitude < 0.001f) forward = Vector3.forward;
+            forward.Normalize();
+
+            float bestDistSqr = float.MaxValue;
+            Door bestDoor = null;
+            float rangeSqr = Mathf.Max(0.6f, autoDoorOpenRange);
+            rangeSqr *= rangeSqr;
+
+            for (int i = 0; i < cachedDoors.Length; i++)
+            {
+                Door d = cachedDoors[i];
+                if (d == null || !d.gameObject.activeInHierarchy) continue;
+                if (d.IsOpen) continue;
+                if (!d.aiCanOpenDoor) continue;
+                // Locked doors are deliberately impassable unless aiBypassLock is on.
+                if (d.IsLocked && !d.aiBypassLock) continue;
+
+                Vector3 doorCenter = d.GetDoorwayCenter();
+                Vector3 toDoor = doorCenter - selfPos;
+                toDoor.y = 0f;
+                float distSqr = toDoor.sqrMagnitude;
+                if (distSqr > rangeSqr) continue;
+
+                // Only consider doors more or less in front (not behind).
+                if (toDoor.sqrMagnitude > 0.001f &&
+                    Vector3.Dot(toDoor.normalized, forward) < 0.2f) continue;
+
+                if (distSqr < bestDistSqr)
+                {
+                    bestDistSqr = distSqr;
+                    bestDoor = d;
+                }
+            }
+
+            if (bestDoor != null && bestDoor.TryOpenForAI())
+                nextDoorOpenTime = Time.time + Mathf.Max(0.05f, autoDoorOpenCooldown);
         }
 
         bool ShouldBiasToUnlockedKeyDoorRoom()
@@ -1824,8 +1879,31 @@ namespace Sushil.AI
             return false;
         }
 
+        static bool IsAIDeniedDoor(MonoBehaviour door)
+        {
+            if (door is FuseDoor fuseDoor)
+            {
+                // Transition / escape doors should remain a hard world boundary for AI.
+                if (fuseDoor.loadSceneOnOpen)
+                    return true;
+
+                string target = fuseDoor.targetSceneName;
+                if (!string.IsNullOrWhiteSpace(target))
+                {
+                    string normalized = target.Trim().ToLowerInvariant();
+                    if (normalized.Contains("level select"))
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
         static bool IsDoorClosed(MonoBehaviour door)
         {
+            if (IsAIDeniedDoor(door))
+                return true;
+
             return (door is Door standardDoor && !standardDoor.IsOpen) ||
                    (door is FuseDoor fuseDoor && !fuseDoor.IsOpen) ||
                    (door is MainDoor mainDoor && !mainDoor.IsOpen);
@@ -1959,6 +2037,16 @@ namespace Sushil.AI
 
         bool IsBodyIntersectingClosedDoor(Vector3 worldPos)
         {
+            return IsBodyIntersectingDoorGeometry(worldPos, onlyClosedDoors: true);
+        }
+
+        bool IsBodyIntersectingAnyDoor(Vector3 worldPos)
+        {
+            return IsBodyIntersectingDoorGeometry(worldPos, onlyClosedDoors: false);
+        }
+
+        bool IsBodyIntersectingDoorGeometry(Vector3 worldPos, bool onlyClosedDoors)
+        {
             CapsuleCollider residentCapsule = residentCapsuleCollider;
             if (residentCapsule == null)
                 return false;
@@ -1967,12 +2055,12 @@ namespace Sushil.AI
             if (cachedFuseDoors == null) cachedFuseDoors = FindObjectsByType<FuseDoor>(FindObjectsSortMode.None);
             if (cachedMainDoors == null) cachedMainDoors = FindObjectsByType<MainDoor>(FindObjectsSortMode.None);
 
-            return IsBodyIntersectingClosedDoor(worldPos, residentCapsule, cachedDoors) ||
-                   IsBodyIntersectingClosedDoor(worldPos, residentCapsule, cachedFuseDoors) ||
-                   IsBodyIntersectingClosedDoor(worldPos, residentCapsule, cachedMainDoors);
+            return IsBodyIntersectingDoorGeometry(worldPos, residentCapsule, cachedDoors, onlyClosedDoors) ||
+                   IsBodyIntersectingDoorGeometry(worldPos, residentCapsule, cachedFuseDoors, onlyClosedDoors) ||
+                   IsBodyIntersectingDoorGeometry(worldPos, residentCapsule, cachedMainDoors, onlyClosedDoors);
         }
 
-        bool IsBodyIntersectingClosedDoor<TDoor>(Vector3 worldPos, CapsuleCollider residentCapsule, TDoor[] doors) where TDoor : MonoBehaviour
+        bool IsBodyIntersectingDoorGeometry<TDoor>(Vector3 worldPos, CapsuleCollider residentCapsule, TDoor[] doors, bool onlyClosedDoors) where TDoor : MonoBehaviour
         {
             if (residentCapsule == null || doors == null || doors.Length == 0)
                 return false;
@@ -1981,7 +2069,10 @@ namespace Sushil.AI
             for (int d = 0; d < doors.Length; d++)
             {
                 TDoor door = doors[d];
-                if (door == null || !door.gameObject.activeInHierarchy || !IsDoorClosed(door))
+                if (door == null || !door.gameObject.activeInHierarchy)
+                    continue;
+
+                if (onlyClosedDoors && !IsDoorClosed(door))
                     continue;
 
                 Collider[] cols = door.GetComponentsInChildren<Collider>(false);
@@ -2236,6 +2327,20 @@ namespace Sushil.AI
                    agent.isOnNavMesh;
         }
 
+        void SafeResetPath()
+        {
+            if (agent == null || !agent.enabled || !agent.gameObject.activeInHierarchy || !agent.isOnNavMesh)
+                return;
+            agent.ResetPath();
+        }
+
+        void SafeSetStopped(bool stopped)
+        {
+            if (agent == null || !agent.enabled || !agent.gameObject.activeInHierarchy || !agent.isOnNavMesh)
+                return;
+            agent.isStopped = stopped;
+        }
+
         // Returns true when the agent's current NavMesh path contains any segment
         // with a vertical change > 0.14 m — i.e. it is on a staircase or ramp.
         // Used as a fallback when GetStairBlend() returns < 0.24 mid-staircase
@@ -2453,7 +2558,7 @@ namespace Sushil.AI
                 float d = Vector3.Distance(transform.position, hit.position);
                 if (d >= navSnapWarpDistance && IsDestinationAllowed(hit.position))
                 {
-                    agent.ResetPath();
+                    SafeResetPath();
                     agent.SetDestination(hit.position);
                 }
             }
@@ -2544,6 +2649,15 @@ namespace Sushil.AI
                                     Mathf.Abs(steeringFocus.y - transform.position.y)
                 ? destinationFocus
                 : steeringFocus;
+            // Door threshold + stair assist recovery can produce visible "jump" behavior.
+            // Let normal navigation handle these frames instead of forced nudges.
+            if (IsOpenDoorwayContext(transform.position) ||
+                IsOpenDoorwayContext(steeringFocus) ||
+                IsOpenDoorwayContext(destinationFocus))
+            {
+                stairTraverseStuckTimer = 0f;
+                return;
+            }
             float primaryVerticalDelta = Mathf.Abs(GetPrimaryVerticalTraversalDelta());
             bool  onStairs        = stairBlend >= 0.18f ||
                                     elevatedPath ||
@@ -2812,9 +2926,10 @@ namespace Sushil.AI
 
             bool crossedClosedDoor = SegmentCrossesClosedDoor(lastSafePosition, current);
             bool bodyInsideClosedDoor = IsBodyIntersectingClosedDoor(current);
+            bool bodyInsideAnyDoor = IsBodyIntersectingAnyDoor(current);
             if (Time.time < ignoreAntiClipUntilTime)
             {
-                if (!crossedClosedDoor && !bodyInsideClosedDoor)
+                if (!crossedClosedDoor && !bodyInsideClosedDoor && !bodyInsideAnyDoor)
                 {
                     // Keep lastSafePosition fresh during the ignore window so that when the
                     // window expires the stale floor position is not used as the reference
@@ -2857,10 +2972,10 @@ namespace Sushil.AI
             float hardWallMoveThreshold = stairTraversal ? 0.16f : 0.3f;
             hardWallMoveThreshold = Mathf.Min(hardWallMoveThreshold, 0.18f);
             bool hardWallViolation = stairTraversal
-                ? bodyInsideBlocking || bodyInsideClosedDoor || hardNavViolation
-                : bodyInsideBlocking || bodyInsideClosedDoor || (insideBlocking && moved > hardWallMoveThreshold) || (crossedClosedDoor && moved > 0.06f);
+                ? bodyInsideBlocking || bodyInsideClosedDoor || bodyInsideAnyDoor || hardNavViolation
+                : bodyInsideBlocking || bodyInsideClosedDoor || bodyInsideAnyDoor || (insideBlocking && moved > hardWallMoveThreshold) || (crossedClosedDoor && moved > 0.06f);
 
-            if (!hardWallViolation && !insideHideable && !hardNavViolation && !crossedClosedDoor && !bodyInsideClosedDoor)
+            if (!hardWallViolation && !insideHideable && !hardNavViolation && !crossedClosedDoor && !bodyInsideClosedDoor && !bodyInsideAnyDoor)
             {
                 lastSafePosition = current;
                 return;
@@ -2869,7 +2984,7 @@ namespace Sushil.AI
             Vector3 fallback = lastSafePosition;
             if (!TryFindSafeRecoveryPoint(current, fallback, out var safeHitPos))
             {
-                agent.ResetPath();
+                SafeResetPath();
                 return;
             }
 
@@ -2882,16 +2997,26 @@ namespace Sushil.AI
             if (!IsAgentReady())
                 return;
 
+            // Door thresholds can produce transient overlap noise while a door is
+            // rotating. Avoid aggressive recovery there to prevent visible "hops."
+            if (IsOpenDoorwayContext(current) || IsOpenDoorwayContext(fallback))
+            {
+                ignoreAntiClipUntilTime = Mathf.Max(ignoreAntiClipUntilTime, Time.time + 0.2f);
+                lastSafePosition = current;
+                hasSafePosition = true;
+                return;
+            }
+
             if (Time.time < nextSoftNoClipRecoveryAt)
                 return;
 
-            nextSoftNoClipRecoveryAt = Time.time + 0.2f;
+            nextSoftNoClipRecoveryAt = Time.time + 0.45f;
 
             // Prefer a short repath out of the bad position instead of a visible teleport.
-            agent.ResetPath();
+            SafeResetPath();
             bool hasFallbackMove = Vector3.Distance(current, fallback) > 0.08f && TrySetDestination(fallback);
-            if (!hasFallbackMove && state == State.Chase && player != null)
-                TrySetDestination(player.position);
+            if (!hasFallbackMove)
+                return;
 
             ignoreAntiClipUntilTime = Mathf.Max(ignoreAntiClipUntilTime, Time.time + 0.25f);
             lastSafePosition = current;
@@ -2925,6 +3050,7 @@ namespace Sushil.AI
                 !IsInsideBlockingGeometry(hit.position, antiClipProbeRadius) &&
                 !IsBodyIntersectingBlocking(hit.position) &&
                 !IsBodyIntersectingClosedDoor(hit.position) &&
+                !IsBodyIntersectingAnyDoor(hit.position) &&
                 !SegmentCrossesClosedDoor(current, hit.position))
             {
                 safePos = hit.position;
@@ -2945,6 +3071,8 @@ namespace Sushil.AI
                 if (IsBodyIntersectingBlocking(pHit.position))
                     continue;
                 if (IsBodyIntersectingClosedDoor(pHit.position))
+                    continue;
+                if (IsBodyIntersectingAnyDoor(pHit.position))
                     continue;
                 if (SegmentCrossesClosedDoor(current, pHit.position))
                     continue;
@@ -3463,7 +3591,7 @@ namespace Sushil.AI
 
             FuseDoor fuseDoor = t.GetComponentInParent<FuseDoor>();
             if (fuseDoor != null)
-                return !fuseDoor.IsOpen;
+                return !fuseDoor.IsOpen || IsAIDeniedDoor(fuseDoor);
 
             MainDoor mainDoor = t.GetComponentInParent<MainDoor>();
             if (mainDoor != null)

@@ -36,10 +36,17 @@ public class Door : MonoBehaviour, IInteractable
     public Transform rotatingPart;
     [Tooltip("If true and rotatingPart is empty, tries to find a child named like 'door' (excluding 'doorway' and 'frame').")]
     public bool autoDetectRotatingPartByName = true;
-    [Tooltip("Derive hinge offset from rotating-part renderer bounds so doors with center pivots can swing from an edge.")]
-    public bool autoComputeHingeFromBounds = false;
+    [Tooltip("Derive hinge offset from rotating-part renderer bounds so doors with center pivots swing from a real edge.")]
+    public bool autoComputeHingeFromBounds = true;
+    [Tooltip("Auto-pick hinge edge axis from door bounds (recommended).")]
+    public bool autoSelectHingeBoundsAxis = true;
     public HingeBoundsAxis hingeBoundsAxis = HingeBoundsAxis.X;
     public bool hingeAtPositiveEdge = false;
+    [Tooltip("Deprecated: unstable with tight level geometry. Keep off.")]
+    public bool autoResolveSwingAgainstGeometry = false;
+    [Tooltip("Reduce visual door-leaf thickness once at startup for all doors using this script.")]
+    public bool reduceDoorThicknessOnStart = false;
+    [Range(0.5f, 1f)] public float doorThicknessScale = 0.82f;
 
     [Header("Audio (Optional)")]
     public AudioClip unlockSound;
@@ -63,7 +70,9 @@ public class Door : MonoBehaviour, IInteractable
     public float navLinkDepth = 1.2f;
     public float navLinkWidth = 1.3f;
     public int navLinkAgentTypeID = -1;
+    [Tooltip("If true, the Resident AI may push open this door when it's closed and unlocked. Off by default — only enable per-door when intended.")]
     public bool aiCanOpenDoor = false;
+    [Tooltip("Lets the AI bypass locks. Leave OFF — locked doors should remain a player obstacle.")]
     public bool aiBypassLock = false;
 
     [Header("Fallback Collider")]
@@ -71,7 +80,7 @@ public class Door : MonoBehaviour, IInteractable
     public bool autoAddColliderIfMissing = true;
     [Tooltip("Also treat colliders on this root GameObject as door blockers to disable when opened.")]
     public bool includeRootCollidersInBlocking = false;
-    [Tooltip("Disable non-door colliders overlapping the doorway when this door opens (useful for custom doorway meshes inside existing wall colliders).")]
+    [Tooltip("Disable non-door colliders overlapping the doorway when this door opens. Off by default — turning it on can break wall colliders adjacent to the doorway. Only enable for doors where the doorway frame physically blocks the AI.")]
     public bool clearNearbyBlockingCollidersOnOpen = false;
     public Vector3 doorwayClearHalfExtents = new Vector3(0.7f, 1f, 0.7f);
 
@@ -95,12 +104,31 @@ public class Door : MonoBehaviour, IInteractable
     private Vector3 resolvedHingeLocalOffset;
     private Collider[] temporarilyDisabledNearbyColliders;
 
+    void Awake()
+    {
+        // Ensure closed doors block immediately, even before Start() ordering settles.
+        if (!isOpen)
+        {
+            ForceClosedBlockingStateEarly();
+        }
+    }
+
+    void OnEnable()
+    {
+        // Scene reloads / object re-enables should never leave closed doors pass-through.
+        if (!isOpen)
+        {
+            ForceClosedBlockingStateEarly();
+        }
+    }
+
     void Start()
     {
         // Hard safety defaults so old scene/prefab serialized values cannot regress doorway traversal.
         unblockWhenOpen = true;
         immediateUnblockOnOpen = true;
         autoAddRuntimeNavLink = true;
+        autoComputeHingeFromBounds = true;
 
         closedLocalPosition = transform.localPosition;
         closedLocalRotation = transform.localRotation;
@@ -112,6 +140,8 @@ public class Door : MonoBehaviour, IInteractable
         rotatingClosedLocalPosition = rotatingTarget.localPosition;
         rotatingClosedLocalRotation = rotatingTarget.localRotation;
         resolvedHingeLocalOffset = hingeLocalOffset;
+        if (autoSelectHingeBoundsAxis)
+            AutoSelectHingeAxis(rotatingTarget);
         if (autoComputeHingeFromBounds && TryComputeHingeOffsetFromBounds(rotatingTarget, out Vector3 autoHinge))
             resolvedHingeLocalOffset += autoHinge;
 
@@ -131,6 +161,32 @@ public class Door : MonoBehaviour, IInteractable
 
         if (winUI != null)
             winUI.SetActive(false);
+    }
+
+    void ForceClosedBlockingStateEarly()
+    {
+        Collider[] cols = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
+        {
+            Collider c = cols[i];
+            if (c == null || c.isTrigger) continue;
+            c.enabled = true;
+        }
+
+        if (blockWhenClosed)
+        {
+            NavMeshObstacle obstacle = GetComponent<NavMeshObstacle>();
+            if (obstacle == null && autoAddNavObstacle)
+            {
+                obstacle = gameObject.AddComponent<NavMeshObstacle>();
+                obstacle.carving = true;
+                obstacle.carveOnlyStationary = true;
+            }
+            if (obstacle != null)
+            {
+                obstacle.enabled = true;
+            }
+        }
     }
 
     void Update()
@@ -377,6 +433,208 @@ public class Door : MonoBehaviour, IInteractable
         rotatingTarget.localRotation = localRot;
     }
 
+    void AutoSelectHingeAxis(Transform target)
+    {
+        if (target == null)
+            return;
+
+        if (!TryGetLocalBoundsMinMax(target, out Vector3 min, out Vector3 max))
+            return;
+
+        Vector3 size = max - min;
+        if (rotationAxis == DoorRotationAxis.Y)
+        {
+            hingeBoundsAxis = size.x >= size.z ? HingeBoundsAxis.X : HingeBoundsAxis.Z;
+        }
+        else if (rotationAxis == DoorRotationAxis.X)
+        {
+            hingeBoundsAxis = size.y >= size.z ? HingeBoundsAxis.Y : HingeBoundsAxis.Z;
+        }
+        else
+        {
+            hingeBoundsAxis = size.x >= size.y ? HingeBoundsAxis.X : HingeBoundsAxis.Y;
+        }
+    }
+
+    void ReduceDoorLeafThickness()
+    {
+        if (rotatingTarget == null)
+            return;
+
+        float scaleFactor = Mathf.Clamp(doorThicknessScale, 0.5f, 1f);
+        if (scaleFactor >= 0.999f)
+            return;
+
+        if (!TryGetLocalBoundsMinMax(rotatingTarget, out Vector3 min, out Vector3 max))
+            return;
+
+        Vector3 size = max - min;
+        Vector3 localScale = rotatingTarget.localScale;
+
+        // Reduce the thinnest axis to avoid changing door height/width.
+        if (size.x <= size.y && size.x <= size.z)
+            localScale.x *= scaleFactor;
+        else if (size.y <= size.x && size.y <= size.z)
+            localScale.y *= scaleFactor;
+        else
+            localScale.z *= scaleFactor;
+
+        rotatingTarget.localScale = localScale;
+    }
+
+    bool TryGetLocalBoundsMinMax(Transform target, out Vector3 min, out Vector3 max)
+    {
+        min = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
+        max = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
+
+        Renderer[] renderers = target.GetComponentsInChildren<Renderer>(true);
+        if (renderers == null || renderers.Length == 0)
+            return false;
+
+        bool hasBounds = false;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer r = renderers[i];
+            if (r == null)
+                continue;
+
+            Bounds b = r.bounds;
+            Vector3 ext = b.extents;
+            Vector3 center = b.center;
+            for (int ix = -1; ix <= 1; ix += 2)
+            {
+                for (int iy = -1; iy <= 1; iy += 2)
+                {
+                    for (int iz = -1; iz <= 1; iz += 2)
+                    {
+                        Vector3 worldCorner = center + new Vector3(ext.x * ix, ext.y * iy, ext.z * iz);
+                        Vector3 local = target.InverseTransformPoint(worldCorner);
+                        min = Vector3.Min(min, local);
+                        max = Vector3.Max(max, local);
+                        hasBounds = true;
+                    }
+                }
+            }
+        }
+
+        return hasBounds;
+    }
+
+    void ResolveSwingAgainstGeometry()
+    {
+        if (rotatingTarget == null || openAngle <= 1f)
+            return;
+
+        bool originalOpenClockwise = openClockwise;
+        bool originalHingePositive = hingeAtPositiveEdge;
+        Vector3 originalResolved = resolvedHingeLocalOffset;
+
+        float bestPenalty = float.PositiveInfinity;
+        bool bestClockwise = openClockwise;
+        bool bestHingePositive = hingeAtPositiveEdge;
+        Vector3 bestResolved = resolvedHingeLocalOffset;
+
+        for (int hingeVariant = 0; hingeVariant < 2; hingeVariant++)
+        {
+            bool hingePositive = hingeVariant == 1;
+            hingeAtPositiveEdge = hingePositive;
+
+            Vector3 candidateResolved = hingeLocalOffset;
+            if (autoComputeHingeFromBounds && TryComputeHingeOffsetFromBounds(rotatingTarget, out Vector3 autoHinge))
+                candidateResolved += autoHinge;
+
+            resolvedHingeLocalOffset = candidateResolved;
+
+            for (int directionVariant = 0; directionVariant < 2; directionVariant++)
+            {
+                bool clockwise = directionVariant == 0;
+                openClockwise = clockwise;
+                float direction = openClockwise ? -1f : 1f;
+                float testAngle = openAngle * direction;
+
+                float penalty = EvaluateOpenPosePenalty(testAngle);
+                if (penalty < bestPenalty)
+                {
+                    bestPenalty = penalty;
+                    bestClockwise = openClockwise;
+                    bestHingePositive = hingeAtPositiveEdge;
+                    bestResolved = resolvedHingeLocalOffset;
+                }
+            }
+        }
+
+        openClockwise = bestClockwise;
+        hingeAtPositiveEdge = bestHingePositive;
+        resolvedHingeLocalOffset = bestResolved;
+
+        rotatingTarget.localPosition = rotatingClosedLocalPosition;
+        rotatingTarget.localRotation = rotatingClosedLocalRotation;
+
+        // If every variant tied (no meaningful geometry data), keep serialized authoring.
+        if (!float.IsFinite(bestPenalty))
+        {
+            openClockwise = originalOpenClockwise;
+            hingeAtPositiveEdge = originalHingePositive;
+            resolvedHingeLocalOffset = originalResolved;
+        }
+    }
+
+    float EvaluateOpenPosePenalty(float angle)
+    {
+        rotatingTarget.localPosition = rotatingClosedLocalPosition;
+        rotatingTarget.localRotation = rotatingClosedLocalRotation;
+        ApplyHingePose(angle);
+
+        Collider[] ownColliders = rotatingTarget.GetComponentsInChildren<Collider>(true);
+        if (ownColliders == null || ownColliders.Length == 0)
+            return 0f;
+
+        float penalty = 0f;
+        for (int i = 0; i < ownColliders.Length; i++)
+        {
+            Collider own = ownColliders[i];
+            if (own == null || !own.enabled || own.isTrigger)
+                continue;
+
+            Bounds b = own.bounds;
+            if (b.extents.sqrMagnitude <= 0.00001f)
+                continue;
+
+            Collider[] hits = Physics.OverlapBox(
+                b.center,
+                b.extents,
+                own.transform.rotation,
+                ~0,
+                QueryTriggerInteraction.Ignore);
+
+            if (hits == null || hits.Length == 0)
+                continue;
+
+            for (int h = 0; h < hits.Length; h++)
+            {
+                Collider other = hits[h];
+                if (other == null || other == own || other.isTrigger)
+                    continue;
+
+                Transform t = other.transform;
+                if (t == transform || t.IsChildOf(transform))
+                    continue;
+
+                if (Physics.ComputePenetration(
+                    own, own.transform.position, own.transform.rotation,
+                    other, other.transform.position, other.transform.rotation,
+                    out _, out float distance))
+                {
+                    penalty += distance;
+                }
+            }
+        }
+
+        rotatingTarget.localPosition = rotatingClosedLocalPosition;
+        rotatingTarget.localRotation = rotatingClosedLocalRotation;
+        return penalty;
+    }
+
     private void PlaySound(AudioClip clip)
     {
         if (clip != null && audioSource != null)
@@ -514,7 +772,7 @@ public class Door : MonoBehaviour, IInteractable
             return namedPanel;
 
         if (!autoDetectRotatingPartByName)
-            return null;
+            return ResolveBestLeafCandidateByCollider();
 
         Transform[] allChildren = transform.GetComponentsInChildren<Transform>(true);
         Transform fallback = null;
@@ -537,7 +795,67 @@ public class Door : MonoBehaviour, IInteractable
                 fallback = candidate;
         }
 
-        return fallback;
+        return fallback != null ? fallback : ResolveBestLeafCandidateByCollider();
+    }
+
+    Transform ResolveBestLeafCandidateByCollider()
+    {
+        Transform[] allChildren = transform.GetComponentsInChildren<Transform>(true);
+        Transform best = null;
+        float bestScore = float.NegativeInfinity;
+
+        for (int i = 0; i < allChildren.Length; i++)
+        {
+            Transform candidate = allChildren[i];
+            if (candidate == null || candidate == transform)
+                continue;
+
+            string n = candidate.name.ToLowerInvariant();
+            if (n.Contains("frame") || n.Contains("doorway") || n.Contains("wall"))
+                continue;
+
+            Collider[] cols = candidate.GetComponentsInChildren<Collider>(true);
+            if (cols == null || cols.Length == 0)
+                continue;
+
+            float volume = 0f;
+            bool hasSolidCollider = false;
+            for (int c = 0; c < cols.Length; c++)
+            {
+                Collider col = cols[c];
+                if (col == null || col.isTrigger)
+                    continue;
+
+                Vector3 size = col.bounds.size;
+                float v = Mathf.Abs(size.x * size.y * size.z);
+                if (v <= 0.00001f)
+                    continue;
+
+                hasSolidCollider = true;
+                volume += v;
+            }
+
+            if (!hasSolidCollider)
+                continue;
+
+            // Prefer substantial leaf colliders but penalize deep hierarchy noise.
+            int depth = 0;
+            Transform t = candidate;
+            while (t != null && t != transform)
+            {
+                depth++;
+                t = t.parent;
+            }
+
+            float score = volume - (depth * 0.01f);
+            if (score > bestScore)
+            {
+                bestScore = score;
+                best = candidate;
+            }
+        }
+
+        return best;
     }
 
     bool TryComputeHingeOffsetFromBounds(Transform target, out Vector3 hingeOffset)
@@ -694,13 +1012,50 @@ public class Door : MonoBehaviour, IInteractable
 
     void DisableNearbyBlockingColliders()
     {
+        // Center the clear-zone over the doorway, but constrain the Y range to the door
+        // panel's actual vertical extent — never reach below the doorway's bottom edge.
+        // This prevents disabling the floor collider underneath the door (which used to
+        // make the player fall through when a door opened).
         Vector3 center = GetDoorwayCenter();
-        Vector3 half = new Vector3(
+        float panelBottomY = center.y - 1f;
+        float panelTopY = center.y + 1f;
+
+        if (rotatingTarget != null)
+        {
+            Renderer[] renderers = rotatingTarget.GetComponentsInChildren<Renderer>(true);
+            if (renderers != null && renderers.Length > 0)
+            {
+                bool hasBounds = false;
+                Bounds b = default;
+                for (int i = 0; i < renderers.Length; i++)
+                {
+                    if (renderers[i] == null) continue;
+                    if (!hasBounds) { b = renderers[i].bounds; hasBounds = true; }
+                    else b.Encapsulate(renderers[i].bounds);
+                }
+                if (hasBounds)
+                {
+                    // Lift the bottom of the clear-box ~25 cm above the door panel's
+                    // base — keeps any floor collider at door foot safely OUT of scope.
+                    panelBottomY = b.min.y + 0.25f;
+                    panelTopY = b.max.y;
+                }
+            }
+        }
+
+        // Always keep the bottom strictly above the doorway's lowest 5 cm — extra
+        // belt-and-suspenders against accidentally touching a floor flush with the door.
+        panelBottomY = Mathf.Max(panelBottomY, center.y - doorwayClearHalfExtents.y + 0.10f);
+
+        Vector3 boxCenter = new Vector3(center.x, (panelBottomY + panelTopY) * 0.5f, center.z);
+        Vector3 boxHalf = new Vector3(
             Mathf.Max(0.05f, doorwayClearHalfExtents.x),
-            Mathf.Max(0.05f, doorwayClearHalfExtents.y),
+            Mathf.Max(0.05f, (panelTopY - panelBottomY) * 0.5f),
             Mathf.Max(0.05f, doorwayClearHalfExtents.z));
 
-        Collider[] overlaps = Physics.OverlapBox(center, half, Quaternion.identity, ~0, QueryTriggerInteraction.Ignore);
+        float doorwayFloorY = panelBottomY; // colliders sitting entirely below this are floors
+
+        Collider[] overlaps = Physics.OverlapBox(boxCenter, boxHalf, Quaternion.identity, ~0, QueryTriggerInteraction.Ignore);
         if (overlaps == null || overlaps.Length == 0)
         {
             temporarilyDisabledNearbyColliders = null;
@@ -721,6 +1076,39 @@ public class Door : MonoBehaviour, IInteractable
                 continue;
 
             if (t == transform || t.IsChildOf(transform))
+                continue;
+
+            // Skip TerrainColliders — never want to disable the ground.
+            if (c is TerrainCollider)
+                continue;
+
+            // CRITICAL: never disable CharacterControllers — that breaks the player
+            // movement loop ("Move called on inactive controller" error spam).
+            if (c is CharacterController)
+                continue;
+
+            // Skip the player and the resident — disabling their capsule collider
+            // would let them clip through walls and (for the player) lose physics.
+            if (c.GetComponentInParent<RohitFPSController>() != null) continue;
+            if (c.GetComponentInParent<Sushil.Systems.PlayerDeath>() != null) continue;
+            if (c.GetComponentInParent<Sushil.Systems.PlayerHide>() != null) continue;
+            if (c.GetComponentInParent<Sushil.AI.ResidentAI>() != null) continue;
+            // Anything with a NavMeshAgent (resident, NPCs) — leave its collider alone.
+            if (c.GetComponentInParent<UnityEngine.AI.NavMeshAgent>() != null) continue;
+            // Player tag fallback (covers any custom player setup).
+            if (t.CompareTag("Player")) continue;
+
+            // Skip anything whose bounds top is at or below the doorway floor — that's
+            // a floor / ground / lip collider that would drop the player.
+            if (c.bounds.max.y <= doorwayFloorY + 0.05f)
+                continue;
+
+            // Skip name-based "floor" / "ground" / "ramp" hits as a final safety net.
+            string nameLower = t.name.ToLowerInvariant();
+            if (nameLower.Contains("floor") || nameLower.Contains("ground") ||
+                nameLower.Contains("terrain") || nameLower.Contains("ramp") ||
+                nameLower.Contains("stair") || nameLower.Contains("ceiling") ||
+                nameLower.Contains("player") || nameLower.Contains("resident"))
                 continue;
 
             bool alreadyManaged = false;

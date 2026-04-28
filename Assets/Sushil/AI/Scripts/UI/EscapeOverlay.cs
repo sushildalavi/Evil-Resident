@@ -185,6 +185,7 @@ namespace Sushil.Systems
             return path == "Assets/Sahil/Test/Easy Level.unity" ||
                    path == "Assets/Sahil/Test/Medium Level.unity" ||
                    path == "Assets/Sahil/Test/Hard Level.unity" ||
+                   path == "Assets/Sahil/Test/Old Hard.unity" ||
                    path == "Assets/Sahil/Test/Difficult Level.unity" ||
                    path == "Assets/Sushil/Easy Level.unity";
         }

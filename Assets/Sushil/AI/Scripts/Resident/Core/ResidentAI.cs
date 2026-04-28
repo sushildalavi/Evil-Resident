@@ -377,6 +377,10 @@ namespace Sushil.AI
             // by keepAgentSnappedToNavMesh so no visible snap-teleport occurs.
             allowRuntimeRecoveryWarps = true;
             keepAgentSnappedToNavMesh = false;
+            // Runtime scale/collider normalization causes visible "growing/shrinking"
+            // artifacts near door collisions in this project setup.
+            autoSyncAgentAndColliderToScale = false;
+            normalizeColliderWorldSize = false;
             minWallClearance = 0.45f;
             destinationRetrySamples = 16;
             destinationRetryRadius = 4.0f;
@@ -388,15 +392,21 @@ namespace Sushil.AI
             doorwayAssistRange = Mathf.Max(doorwayAssistRange, 20f);
             doorwayAssistSampleRadius = Mathf.Max(doorwayAssistSampleRadius, 1.25f);
             requireClearPathForWarp = true;
+            // Resident does NOT open doors on its own — that's a player-only mechanic.
+            // The AI navigates only through doors that are already open.
             autoOpenNearbyDoors = false;
             autoDoorOpenRange = Mathf.Max(autoDoorOpenRange, 2.6f);
             autoDoorOpenCooldown = Mathf.Min(autoDoorOpenCooldown, 0.15f);
             destinationWallClearance = Mathf.Max(destinationWallClearance, 0.34f);
             antiClipProbeRadius = Mathf.Max(antiClipProbeRadius, 0.28f);
+            // Remove bait-like behavior: no bias to noise rooms or unlocked key doors.
+            lastNoiseRoomBiasChance = 0f;
+            unlockedKeyDoorBiasChance = 0f;
+            patrolPointVisitChance = 0f;
             // Use hard difficulty as baseline and scale down easy/medium slightly so
             // they stay tense but fair.
-            const float hardPatrolSpeed = 1.5f;
-            const float hardChaseSpeed = 1.7f;
+            const float hardPatrolSpeed = 1.6f;
+            const float hardChaseSpeed = 1.85f;
             patrolMoveSpeed = hardPatrolSpeed;
             chaseMoveSpeed = hardChaseSpeed;
             omnidirectionalVision = false;
@@ -499,8 +509,8 @@ namespace Sushil.AI
             }
             if (IsMediumLevelScene())
             {
-                patrolMoveSpeed = hardPatrolSpeed * 0.82f;
-                chaseMoveSpeed = hardChaseSpeed * 0.82f;
+                patrolMoveSpeed = hardPatrolSpeed * 0.85f;
+                chaseMoveSpeed = hardChaseSpeed * 0.85f;
                 sightRange = Mathf.Min(sightRange, 26f);                  // was 19 — now nearly hard's 28
                 proximityChaseDistance = Mathf.Min(proximityChaseDistance, 5.5f);  // was 4.1
                 closeAwarenessDistance = Mathf.Min(closeAwarenessDistance, 5.0f);  // was 4.0
@@ -610,6 +620,7 @@ namespace Sushil.AI
                    path == "Assets/Sahil/Test/Easy Level.unity" ||
                    path == "Assets/Sahil/Test/Medium Level.unity" ||
                    path == "Assets/Sahil/Test/Hard Level.unity" ||
+                   path == "Assets/Sahil/Test/Old Hard.unity" ||
                    path == "Assets/Sahil/Test/Difficult Level.unity";
         }
 
@@ -631,6 +642,7 @@ namespace Sushil.AI
             string path = SceneManager.GetActiveScene().path;
             return path == "Assets/Sahil/Test/Medium Level.unity" ||
                    path == "Assets/Sahil/Test/Hard Level.unity" ||
+                   path == "Assets/Sahil/Test/Old Hard.unity" ||
                    path == "Assets/Sahil/Test/Difficult Level.unity";
         }
 
@@ -648,7 +660,8 @@ namespace Sushil.AI
             return path == "Assets/Sushil/Easy Level.unity" ||
                    path == "Assets/Sahil/Test/Easy Level.unity" ||
                    path == "Assets/Sahil/Test/Medium Level.unity" ||
-                   path == "Assets/Sahil/Test/Hard Level.unity";
+                   path == "Assets/Sahil/Test/Hard Level.unity" ||
+                   path == "Assets/Sahil/Test/Old Hard.unity";
         }
 
         void Update()
@@ -661,6 +674,10 @@ namespace Sushil.AI
 
             ApplyDynamicNavigationProfile();
             ApplyStairTraverseAssist();
+            // Push open any closed-but-unlocked door we're walking into. This is the
+            // primary defence against the resident getting permanently stuck at a door
+            // the player closed (or never opened).
+            TryAutoOpenDoorInFront();
             if (allowRuntimeRecoveryWarps)
             {
                 StabilizeAgentOnNavMesh();
@@ -677,7 +694,7 @@ namespace Sushil.AI
             // If player is dead/disabled, stop AI cleanly
             if (!player.gameObject.activeInHierarchy)
             {
-                if (IsAgentReady()) agent.isStopped = true;
+                SafeSetStopped(true);
                 return;
             }
 
@@ -686,10 +703,11 @@ namespace Sushil.AI
             // If player hides during chase, immediately lose them and resume a normal search.
             if (state == State.Chase && isHiddenNow)
             {
-                float hideSearchDuration = hideTriggeredSearchDuration + lastSeenSearchDurationBoost;
-                BeginSearchAfterPlayerHides(hideSearchDuration);
-                forcedNextSearchDuration = Mathf.Max(forcedNextSearchDuration, hideSearchDuration);
-                ChangeState(State.Search);
+                // No lingering near hiding spots: immediately drop to patrol.
+                hasNoise = false;
+                hasInvestigateTarget = false;
+                wholeHouseSearchMode = false;
+                ChangeState(State.Patrol);
                 wasPlayerHiddenLastFrame = isHiddenNow;
                 return;
             }
@@ -969,8 +987,8 @@ namespace Sushil.AI
                         {
                             if (IsAgentReady())
                             {
-                                agent.isStopped = false;
-                                agent.ResetPath();
+                                SafeSetStopped(false);
+                                SafeResetPath();
                             }
                             yield return new WaitForSeconds(0.15f);
                             continue;
@@ -983,7 +1001,7 @@ namespace Sushil.AI
                     targetPos = target.position;
                 }
 
-                agent.isStopped = false;
+                SafeSetStopped(false);
                 if (!TrySetDestination(targetPos)) { yield return null; continue; }
 
                 while (state == State.Patrol && IsAgentReady() && agent.pathPending) yield return null;
@@ -1007,7 +1025,7 @@ namespace Sushil.AI
             if (!IsAgentReady()) { ChangeState(State.Patrol); yield break; }
 
             Vector3 target = hasInvestigateTarget ? investigateTargetPos : lastNoisePos;
-            agent.isStopped = false;
+            SafeSetStopped(false);
             if (!TrySetDestination(target)) { ChangeState(State.Patrol); yield break; }
 
             while (state == State.Investigate && IsAgentReady() && agent.pathPending) yield return null;
@@ -1052,7 +1070,7 @@ namespace Sushil.AI
 
             if (searchingWholeHouse && wholeHouseSearchLastKnownPos != Vector3.zero && IsAgentReady())
             {
-                agent.isStopped = false;
+                SafeSetStopped(false);
                 if (TrySetDestination(wholeHouseSearchLastKnownPos))
                 {
                     float approachTime = 0f;
@@ -1117,15 +1135,17 @@ namespace Sushil.AI
                 // If player is dead/disabled, stop chasing
                 if (player == null || !player.gameObject.activeInHierarchy)
                 {
-                    if (IsAgentReady()) agent.isStopped = true;
+                    SafeSetStopped(true);
                     yield break;
                 }
 
                 // Hiding is the only hard stop when persistent chase is enabled.
                 if (IsPlayerHidden())
                 {
-                    BeginSearchAfterPlayerHides(hideTriggeredSearchDuration + lastSeenSearchDurationBoost);
-                    ChangeState(State.Search);
+                    hasNoise = false;
+                    hasInvestigateTarget = false;
+                    wholeHouseSearchMode = false;
+                    ChangeState(State.Patrol);
                     yield break;
                 }
 
@@ -1163,7 +1183,7 @@ namespace Sushil.AI
 
                 if (IsAgentReady())
                 {
-                    agent.isStopped = false;
+                    SafeSetStopped(false);
                     Vector3 chaseTarget = canSee ? player.position : lastSeenPlayerPos;
                     // Throttle expensive re-pathing to ~10 Hz; UpdateDoorwayAssist still
                     // runs every frame so doorway nudges remain responsive.

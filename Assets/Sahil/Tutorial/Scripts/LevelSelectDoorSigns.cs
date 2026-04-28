@@ -153,6 +153,7 @@ public class LevelSelectDoorSigns : MonoBehaviour
             "Easy Level" => "Child's Play",
             "Medium Level" => "Think You're Ready?",
             "Hard Level" => "Prove It",
+            "Old Hard"   => "Prove It",
             _ => "Start Here"
         };
     }

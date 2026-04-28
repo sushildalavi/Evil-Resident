@@ -54,6 +54,23 @@ public class FuseDoor : MonoBehaviour, IInteractable
     private bool isBlockingNow;
     private bool loadingScene;
 
+    void Awake()
+    {
+        // Enforce closed-door blocking before Start() to avoid early-frame AI pass-through.
+        if (!isOpen)
+        {
+            ForceClosedBlockingStateEarly();
+        }
+    }
+
+    void OnEnable()
+    {
+        if (!isOpen)
+        {
+            ForceClosedBlockingStateEarly();
+        }
+    }
+
     void Start()
     {
         closedLocalPosition = transform.localPosition;
@@ -78,6 +95,30 @@ public class FuseDoor : MonoBehaviour, IInteractable
             EnsureRuntimeNavLink();
 
         SetDoorBlocking(true);
+    }
+
+    void ForceClosedBlockingStateEarly()
+    {
+        Collider[] cols = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < cols.Length; i++)
+        {
+            Collider c = cols[i];
+            if (c == null || c.isTrigger) continue;
+            c.enabled = true;
+        }
+
+        if (blockWhenClosed)
+        {
+            NavMeshObstacle obstacle = GetComponent<NavMeshObstacle>();
+            if (obstacle == null && autoAddNavObstacle)
+            {
+                obstacle = gameObject.AddComponent<NavMeshObstacle>();
+                obstacle.carving = true;
+                obstacle.carveOnlyStationary = true;
+            }
+            if (obstacle != null)
+                obstacle.enabled = true;
+        }
     }
 
     void Update()
