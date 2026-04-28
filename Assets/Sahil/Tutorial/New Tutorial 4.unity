@@ -124,76 +124,6 @@ Camera:
   m_CorrespondingSourceObject: {fileID: 176727858406763202, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
   m_PrefabInstance: {fileID: 775983329}
   m_PrefabAsset: {fileID: 0}
---- !u!1001 &42169029
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 1938441145}
-    m_Modifications:
-    - target: {fileID: 1761465121292843518, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_Name
-      value: BG_Music
-      objectReference: {fileID: 0}
-    - target: {fileID: 1761465121292843518, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_IsActive
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 3127435310939133123, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_Volume
-      value: 0.3
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: -5.9737306
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: -1.82446
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: -11.85
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
---- !u!4 &42169030 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-  m_PrefabInstance: {fileID: 42169029}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1001 &191478390
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -287,6 +217,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialStepUI
   movementHint: Use WASD to move around.
+  jumpHint: Press Space to jump.
   interactionHint: Try interacting with something that stands out.
   hidingHint: You can hide in some objects, try finding a few around
   doorHint: Great, let's move on to the next level by interacting with the door.
@@ -294,7 +225,9 @@ MonoBehaviour:
   textColor: {r: 1, g: 0.94, b: 0.72, a: 1}
   completedTextColor: {r: 0.4, g: 1, b: 0.45, a: 1}
   backgroundColor: {r: 0, g: 0, b: 0, a: 0.42}
-  completedFlashDuration: 0.5
+  completedGlowDuration: 0.45
+  fadeOutDuration: 0.35
+  fadeInDuration: 0.3
 --- !u!4 &217996027
 Transform:
   m_ObjectHideFlags: 0
@@ -1257,7 +1190,6 @@ Transform:
   - {fileID: 1183877776}
   - {fileID: 1742466732}
   - {fileID: 680985554}
-  - {fileID: 42169030}
   m_Father: {fileID: 217996027}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1973616820

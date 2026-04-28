@@ -360,6 +360,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::TutorialStepUI
   movementHint: Use WASD to move around.
+  jumpHint: Press Space to jump.
   interactionHint: Try interacting with something that stands out.
   hidingHint: You can hide in some objects, try finding a few around
   doorHint: Great, let's move on to the next level by interacting with the door.
@@ -367,7 +368,9 @@ MonoBehaviour:
   textColor: {r: 1, g: 0.94, b: 0.72, a: 1}
   completedTextColor: {r: 0.4, g: 1, b: 0.45, a: 1}
   backgroundColor: {r: 0, g: 0, b: 0, a: 0.42}
-  completedFlashDuration: 0.5
+  completedGlowDuration: 0.45
+  fadeOutDuration: 0.35
+  fadeInDuration: 0.3
 --- !u!4 &217996027
 Transform:
   m_ObjectHideFlags: 0
@@ -591,6 +594,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: BronzeDoor
       objectReference: {fileID: 0}
+    - target: {fileID: 7801265171581000806, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
+      propertyPath: m_Enabled
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalPosition.x
       value: -5.89
@@ -631,11 +638,48 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents: []
+    m_RemovedComponents:
+    - {fileID: 7801265171581000806, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 7053333362799215050, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1000441806}
   m_SourcePrefab: {fileID: 100100000, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
+--- !u!1 &1000441805 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7053333362799215050, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
+  m_PrefabInstance: {fileID: 1000441804}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1000441806
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000441805}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b66eb2112854f24ad6fd32f830f9cfd, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::TutorialDoorSceneTransition
+  requiredKey: 1
+  allowAnyCollectedKey: 0
+  mainGameSceneName: New Tutorial 2
+  interactDistance: 3
+  openPrompt: Press E to open the door.
+  lockedPrompt: The way forward is locked
+  unlockSound: {fileID: 0}
+  lockedSound: {fileID: 0}
+  audioSource: {fileID: 0}
+  openAngle: 90
+  openSpeed: 2
+  openClockwise: 1
+  hingeOnRightEdge: 0
+  transitionDelay: 0
+  transitionMessage: 'Tutorial 2: Stalker'
+  requiredHideSpots: []
 --- !u!1 &1183877772
 GameObject:
   m_ObjectHideFlags: 0
@@ -1043,11 +1087,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6065899364038724208, guid: 6c1703af002e149168e3283228577a01, type: 3}
   m_PrefabInstance: {fileID: 1471662317}
   m_PrefabAsset: {fileID: 0}
---- !u!4 &1724833971 stripped
-Transform:
-  m_CorrespondingSourceObject: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-  m_PrefabInstance: {fileID: 7343516678845369737}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1742466728
 GameObject:
   m_ObjectHideFlags: 0
@@ -1390,7 +1429,6 @@ Transform:
   - {fileID: 1742466732}
   - {fileID: 1864840089}
   - {fileID: 476325103}
-  - {fileID: 1724833971}
   m_Father: {fileID: 217996027}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1973616820
@@ -1619,63 +1657,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2a48693b3e85742e9a594fc58a99f3a7, type: 3}
---- !u!1001 &7343516678845369737
-PrefabInstance:
-  m_ObjectHideFlags: 0
-  serializedVersion: 2
-  m_Modification:
-    serializedVersion: 3
-    m_TransformParent: {fileID: 1938441145}
-    m_Modifications:
-    - target: {fileID: 1761465121292843518, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_Name
-      value: BG_Music
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalPosition.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalRotation.w
-      value: 1
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalRotation.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalRotation.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalRotation.z
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.x
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.y
-      value: 0
-      objectReference: {fileID: 0}
-    - target: {fileID: 6407975553921002753, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
-      propertyPath: m_LocalEulerAnglesHint.z
-      value: 0
-      objectReference: {fileID: 0}
-    m_RemovedComponents: []
-    m_RemovedGameObjects: []
-    m_AddedGameObjects: []
-    m_AddedComponents: []
-  m_SourcePrefab: {fileID: 100100000, guid: 647ea74e62040494d886476a8c75c8cc, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
