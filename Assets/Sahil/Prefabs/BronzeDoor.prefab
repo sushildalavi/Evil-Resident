@@ -243,5 +243,3 @@ MonoBehaviour:
   aiBypassLock: 0
   autoAddColliderIfMissing: 1
   includeRootCollidersInBlocking: 0
-  clearNearbyBlockingCollidersOnOpen: 1
-  doorwayClearHalfExtents: {x: 0.7, y: 1, z: 0.7}

@@ -2759,10 +2759,6 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 3752278692100194145, guid: d594f616a536f4d399933cd973acef16, type: 3}
-      propertyPath: clearNearbyBlockingCollidersOnOpen
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 7424082653570224223, guid: d594f616a536f4d399933cd973acef16, type: 3}
       propertyPath: m_Name
       value: SilverDoor
@@ -4133,10 +4129,6 @@ PrefabInstance:
     - target: {fileID: 3160420816594285972, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_Name
       value: BronzeDoor
-      objectReference: {fileID: 0}
-    - target: {fileID: 7801265171581000806, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
-      propertyPath: clearNearbyBlockingCollidersOnOpen
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalPosition.x
@@ -6395,10 +6387,6 @@ PrefabInstance:
       propertyPath: m_Name
       value: GoldDoor
       objectReference: {fileID: 0}
-    - target: {fileID: 6995652594373109850, guid: 7686822bf0d904a0da5d3473b7327d1e, type: 3}
-      propertyPath: clearNearbyBlockingCollidersOnOpen
-      value: 1
-      objectReference: {fileID: 0}
     - target: {fileID: 7037668713496714790, guid: 7686822bf0d904a0da5d3473b7327d1e, type: 3}
       propertyPath: m_LocalPosition.x
       value: 8.35553
@@ -8288,10 +8276,6 @@ PrefabInstance:
     - target: {fileID: 3160420816594285972, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_Name
       value: BronzeDoor (1)
-      objectReference: {fileID: 0}
-    - target: {fileID: 7801265171581000806, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
-      propertyPath: clearNearbyBlockingCollidersOnOpen
-      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalPosition.x

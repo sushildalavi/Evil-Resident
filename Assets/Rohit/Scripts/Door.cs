@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
 using System.Collections.Generic;
-using System.Collections;
 using Sushil.Systems;
 
 public class Door : MonoBehaviour, IInteractable
@@ -81,9 +80,6 @@ public class Door : MonoBehaviour, IInteractable
     public bool autoAddColliderIfMissing = true;
     [Tooltip("Also treat colliders on this root GameObject as door blockers to disable when opened.")]
     public bool includeRootCollidersInBlocking = false;
-    [Tooltip("Disable non-door colliders overlapping the doorway when this door opens. This keeps tight door frames and wall lips from catching AI after the door is unlocked.")]
-    public bool clearNearbyBlockingCollidersOnOpen = true;
-    public Vector3 doorwayClearHalfExtents = new Vector3(0.7f, 1f, 0.7f);
 
     private bool isOpen = false;
     private bool wasUnlockedByKey = false;
@@ -103,9 +99,6 @@ public class Door : MonoBehaviour, IInteractable
     private Vector3 rotatingClosedLocalPosition;
     private Quaternion rotatingClosedLocalRotation;
     private Vector3 resolvedHingeLocalOffset;
-    private Collider[] temporarilyDisabledNearbyColliders;
-    private float nextNearbyClearTime;
-    private Coroutine postOpenClearRoutine;
 
     void Awake()
     {
@@ -132,7 +125,6 @@ public class Door : MonoBehaviour, IInteractable
         immediateUnblockOnOpen = true;
         autoAddRuntimeNavLink = true;
         autoComputeHingeFromBounds = true;
-        clearNearbyBlockingCollidersOnOpen = true;
 
         closedLocalPosition = transform.localPosition;
         closedLocalRotation = transform.localRotation;
@@ -163,8 +155,6 @@ public class Door : MonoBehaviour, IInteractable
         if (autoAddRuntimeNavLink)
             EnsureRuntimeNavLink();
         SetDoorBlocking(isLocked && !isOpen);
-        if (isOpen && clearNearbyBlockingCollidersOnOpen)
-            DisableNearbyBlockingColliders();
 
         if (winUI != null)
             winUI.SetActive(false);
@@ -203,15 +193,6 @@ public class Door : MonoBehaviour, IInteractable
         ApplyHingePose(currentOpenAngle);
         SyncDoorBlockingForCurrentAngle();
         SyncRuntimeNavLink();
-
-        // Some doorway blockers (frame/wall helper colliders) are not always in
-        // range on the exact frame OpenDoor() runs. Keep clearing while open so
-        // movers don't get snagged by late-overlap blockers.
-        if (isOpen && clearNearbyBlockingCollidersOnOpen && Time.time >= nextNearbyClearTime)
-        {
-            DisableNearbyBlockingColliders();
-            nextNearbyClearTime = Time.time + 0.2f;
-        }
     }
 
     void LateUpdate()
@@ -277,14 +258,7 @@ public class Door : MonoBehaviour, IInteractable
     public void OpenDoor()
     {
         isOpen = true;
-        // Clear blockers immediately at the moment door starts opening.
         SetDoorBlocking(false);
-        StartPostOpenClearRetries();
-        if (clearNearbyBlockingCollidersOnOpen)
-        {
-            DisableNearbyBlockingColliders();
-            nextNearbyClearTime = Time.time + 0.2f;
-        }
         if (navLinkForwardBack != null) navLinkForwardBack.activated = true;
         if (navLinkLeftRight != null) navLinkLeftRight.activated = true;
     }
@@ -371,9 +345,6 @@ public class Door : MonoBehaviour, IInteractable
                 obstacle.enabled = block;
             }
         }
-
-        if (block)
-            RestoreNearbyBlockingColliders();
     }
 
     void EnsureRuntimeNavLink()
@@ -1039,185 +1010,6 @@ public class Door : MonoBehaviour, IInteractable
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
         EscapeOverlay.Show();
-    }
-
-    void DisableNearbyBlockingColliders()
-    {
-        // Center the clear-zone over the doorway, but constrain the Y range to the door
-        // panel's actual vertical extent — never reach below the doorway's bottom edge.
-        // This prevents disabling the floor collider underneath the door (which used to
-        // make the player fall through when a door opened).
-        Vector3 center = GetDoorwayCenter();
-        float panelBottomY = center.y - 1f;
-        float panelTopY = center.y + 1f;
-
-        if (rotatingTarget != null)
-        {
-            Renderer[] renderers = rotatingTarget.GetComponentsInChildren<Renderer>(true);
-            if (renderers != null && renderers.Length > 0)
-            {
-                bool hasBounds = false;
-                Bounds b = default;
-                for (int i = 0; i < renderers.Length; i++)
-                {
-                    if (renderers[i] == null) continue;
-                    if (!hasBounds) { b = renderers[i].bounds; hasBounds = true; }
-                    else b.Encapsulate(renderers[i].bounds);
-                }
-                if (hasBounds)
-                {
-                    // Lift the bottom of the clear-box ~25 cm above the door panel's
-                    // base — keeps any floor collider at door foot safely OUT of scope.
-                    panelBottomY = b.min.y + 0.25f;
-                    panelTopY = b.max.y;
-                }
-            }
-        }
-
-        // Always keep the bottom strictly above the doorway's lowest 5 cm — extra
-        // belt-and-suspenders against accidentally touching a floor flush with the door.
-        panelBottomY = Mathf.Max(panelBottomY, center.y - doorwayClearHalfExtents.y + 0.10f);
-
-        Vector3 boxCenter = new Vector3(center.x, (panelBottomY + panelTopY) * 0.5f, center.z);
-        Vector3 boxHalf = new Vector3(
-            Mathf.Max(0.05f, doorwayClearHalfExtents.x),
-            Mathf.Max(0.05f, (panelTopY - panelBottomY) * 0.5f),
-            Mathf.Max(0.05f, doorwayClearHalfExtents.z));
-
-        float doorwayFloorY = panelBottomY; // colliders sitting entirely below this are floors
-
-        Collider[] overlaps = Physics.OverlapBox(boxCenter, boxHalf, Quaternion.identity, ~0, QueryTriggerInteraction.Ignore);
-        if (overlaps == null || overlaps.Length == 0)
-        {
-            temporarilyDisabledNearbyColliders = null;
-            return;
-        }
-
-        Collider[] disabled = new Collider[overlaps.Length];
-        int count = 0;
-
-        for (int i = 0; i < overlaps.Length; i++)
-        {
-            Collider c = overlaps[i];
-            if (c == null || !c.enabled || c.isTrigger)
-                continue;
-
-            Transform t = c.transform;
-            if (t == null)
-                continue;
-
-            if (t == transform || t.IsChildOf(transform))
-                continue;
-
-            // Skip TerrainColliders — never want to disable the ground.
-            if (c is TerrainCollider)
-                continue;
-
-            // Other door scripts own their own collision state. Do not silently
-            // unlock/disable a neighboring closed door while clearing this doorway.
-            if (c.GetComponentInParent<Door>() != null) continue;
-            if (c.GetComponentInParent<FuseDoor>() != null) continue;
-            if (c.GetComponentInParent<MainDoor>() != null) continue;
-
-            // CRITICAL: never disable CharacterControllers — that breaks the player
-            // movement loop ("Move called on inactive controller" error spam).
-            if (c is CharacterController)
-                continue;
-
-            // Skip the player and the resident — disabling their capsule collider
-            // would let them clip through walls and (for the player) lose physics.
-            if (c.GetComponentInParent<RohitFPSController>() != null) continue;
-            if (c.GetComponentInParent<Sushil.Systems.PlayerDeath>() != null) continue;
-            if (c.GetComponentInParent<Sushil.Systems.PlayerHide>() != null) continue;
-            if (c.GetComponentInParent<Sushil.AI.ResidentAI>() != null) continue;
-            // Anything with a NavMeshAgent (resident, NPCs) — leave its collider alone.
-            if (c.GetComponentInParent<UnityEngine.AI.NavMeshAgent>() != null) continue;
-            // Player tag fallback (covers any custom player setup).
-            if (t.CompareTag("Player")) continue;
-
-            // Skip anything whose bounds top is at or below the doorway floor — that's
-            // a floor / ground / lip collider that would drop the player.
-            if (c.bounds.max.y <= doorwayFloorY + 0.05f)
-                continue;
-
-            // Skip name-based "floor" / "ground" / "ramp" hits as a final safety net.
-            string nameLower = t.name.ToLowerInvariant();
-            if (nameLower.Contains("floor") || nameLower.Contains("ground") ||
-                nameLower.Contains("terrain") || nameLower.Contains("ramp") ||
-                nameLower.Contains("stair") || nameLower.Contains("ceiling") ||
-                nameLower.Contains("player") || nameLower.Contains("resident"))
-                continue;
-
-            bool alreadyManaged = false;
-            if (cachedColliders != null)
-            {
-                for (int k = 0; k < cachedColliders.Length; k++)
-                {
-                    if (cachedColliders[k] == c)
-                    {
-                        alreadyManaged = true;
-                        break;
-                    }
-                }
-            }
-            if (alreadyManaged)
-                continue;
-
-            c.enabled = false;
-            disabled[count++] = c;
-        }
-
-        if (count == 0)
-        {
-            temporarilyDisabledNearbyColliders = null;
-            return;
-        }
-
-        temporarilyDisabledNearbyColliders = new Collider[count];
-        for (int i = 0; i < count; i++)
-            temporarilyDisabledNearbyColliders[i] = disabled[i];
-    }
-
-    void StartPostOpenClearRetries()
-    {
-        if (!clearNearbyBlockingCollidersOnOpen)
-            return;
-
-        if (postOpenClearRoutine != null)
-            StopCoroutine(postOpenClearRoutine);
-
-        postOpenClearRoutine = StartCoroutine(PostOpenClearRoutine());
-    }
-
-    IEnumerator PostOpenClearRoutine()
-    {
-        // Clear again after opening in case doorway blockers overlap one frame
-        // later while animation/physics settle.
-        yield return new WaitForSeconds(1f);
-
-        const int passes = 3;
-        for (int i = 0; i < passes; i++)
-        {
-            DisableNearbyBlockingColliders();
-            yield return new WaitForSeconds(0.35f);
-        }
-
-        postOpenClearRoutine = null;
-    }
-
-    void RestoreNearbyBlockingColliders()
-    {
-        if (temporarilyDisabledNearbyColliders == null || temporarilyDisabledNearbyColliders.Length == 0)
-            return;
-
-        for (int i = 0; i < temporarilyDisabledNearbyColliders.Length; i++)
-        {
-            Collider c = temporarilyDisabledNearbyColliders[i];
-            if (c != null)
-                c.enabled = true;
-        }
-
-        temporarilyDisabledNearbyColliders = null;
     }
 
     Collider[] BuildBlockingColliderList()
