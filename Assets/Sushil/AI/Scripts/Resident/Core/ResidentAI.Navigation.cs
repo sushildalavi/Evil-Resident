@@ -315,6 +315,20 @@ namespace Sushil.AI
             stairDestinationReissueRoutine = StartCoroutine(ReissueDestinationAfterDelay(primaryDestination, delay));
         }
 
+        void QueueRawShortAdvanceAndReissueDestination(Vector3 shortAdvanceTarget, Vector3 primaryDestination, float delay = 0.18f)
+        {
+            if (!IsAgentReady())
+                return;
+
+            if (!agent.SetDestination(shortAdvanceTarget))
+                return;
+
+            if (stairDestinationReissueRoutine != null)
+                StopCoroutine(stairDestinationReissueRoutine);
+
+            stairDestinationReissueRoutine = StartCoroutine(ReissueDestinationAfterDelay(primaryDestination, delay));
+        }
+
         IEnumerator ReissueDestinationAfterDelay(Vector3 primaryDestination, float delay)
         {
             float remaining = Mathf.Max(0.05f, delay);
@@ -2369,7 +2383,12 @@ namespace Sushil.AI
         {
             if (!IsAgentReady()) { generalStuckPosInit = false; return; }
             if (killAttackActive)  { generalStuckPosInit = false; return; }
-            if (IsInStairTraversalContext()) { generalStuckPosInit = false; generalStuckTimer = 0f; return; }
+            Vector3 pos = transform.position;
+            bool openDoorwayContext =
+                IsOpenDoorwayContext(pos) ||
+                (agent.hasPath && IsOpenDoorwayContext(agent.steeringTarget)) ||
+                (agent.isOnOffMeshLink && IsOpenDoorOffMeshLinkContext());
+            if (IsInStairTraversalContext() && !openDoorwayContext) { generalStuckPosInit = false; generalStuckTimer = 0f; return; }
             if (IsSquareFusePortalTraversalActive(agent.hasPath ? agent.destination : transform.position))
             {
                 generalStuckPosInit = false;
@@ -2379,8 +2398,6 @@ namespace Sushil.AI
             if (agent.pathPending) return;
             if (!agent.hasPath)    { generalStuckPosInit = false; return; }
             if (agent.remainingDistance < 1.2f) { generalStuckPosInit = false; return; }
-
-            Vector3 pos = transform.position;
 
             if (!generalStuckPosInit)
             {
@@ -2404,14 +2421,15 @@ namespace Sushil.AI
             // --- Stuck confirmed.  Warp to next usable path corner. ---
             generalStuckTimer   = 0f;
             generalStuckLastPos = pos;
+            Vector3 savedDest = agent.destination;
+
+            if (openDoorwayContext && TryRecoverThroughOpenDoorway(savedDest))
+                return;
 
             // agent.path can be null during path recomputation even when hasPath is true.
             if (agent.path == null) return;
             Vector3[] corners = agent.path.corners;
             if (corners == null || corners.Length < 2) return;
-
-            Vector3 savedDest = agent.destination;
-
             for (int i = 1; i < corners.Length; i++)
             {
                 Vector3 target = corners[i];
@@ -2437,6 +2455,203 @@ namespace Sushil.AI
                 QueueShortAdvanceAndReissueDestination(hit.position, savedDest, 0.25f);
                 return;
             }
+        }
+
+        bool IsOpenDoorOffMeshLinkContext()
+        {
+            if (agent == null || !agent.isOnOffMeshLink)
+                return false;
+
+            OffMeshLinkData data = agent.currentOffMeshLinkData;
+            return IsOpenDoorwayContext(data.startPos) ||
+                   IsOpenDoorwayContext(data.endPos) ||
+                   IsOpenDoorwayContext(transform.position);
+        }
+
+        bool TryRecoverThroughOpenDoorway(Vector3 primaryDestination)
+        {
+            if (!TryGetNearbyOpenDoor(out Door openDoor, Mathf.Max(4.8f, unlockedKeyDoorTraverseRange + 0.8f), primaryDestination, preferUnlockedKeyDoors: true))
+                return false;
+
+            if (TryCompleteOpenDoorOffMeshLink(primaryDestination))
+                return true;
+
+            if (!TryGetOpenDoorRecoveryPoint(openDoor, primaryDestination, out Vector3 recoveryPoint))
+                return false;
+
+            lastSafePosition = recoveryPoint;
+            hasSafePosition = true;
+            ignoreAntiClipUntilTime = Mathf.Max(ignoreAntiClipUntilTime, Time.time + 0.75f);
+            QueueRawShortAdvanceAndReissueDestination(recoveryPoint, primaryDestination, 0.25f);
+            return true;
+        }
+
+        void ApplyOpenDoorwayHardAssist()
+        {
+            if (!IsAgentReady() || killAttackActive)
+            {
+                ResetOpenDoorHardAssist();
+                return;
+            }
+
+            Vector3 primaryDestination = agent.hasPath ? agent.destination : transform.position;
+            if (state == State.Chase && player != null)
+                primaryDestination = player.position;
+            else if (lastSeenPlayerTime > -998f)
+                primaryDestination = lastSeenPlayerPos;
+
+            Door openDoor = null;
+            bool inOpenDoorway = TryGetOpenDoorwayContext(transform.position, out openDoor);
+            bool nearOpenDoor = inOpenDoorway ||
+                                TryGetNearbyOpenDoor(out openDoor, Mathf.Max(3.2f, unlockedKeyDoorTraverseRange), primaryDestination, preferUnlockedKeyDoors: true);
+            if (!nearOpenDoor || openDoor == null || !openDoor.IsOpen || openDoor.IsLocked)
+            {
+                ResetOpenDoorHardAssist();
+                return;
+            }
+
+            Vector3 doorCenter = openDoor.GetDoorwayCenter();
+            Vector3 flatSelf = transform.position;
+            flatSelf.y = 0f;
+            Vector3 flatDoor = doorCenter;
+            flatDoor.y = 0f;
+            if (!inOpenDoorway && Vector3.Distance(flatSelf, flatDoor) > Mathf.Max(2.2f, unlockedKeyDoorTraverseRange * 0.55f))
+            {
+                ResetOpenDoorHardAssist();
+                return;
+            }
+
+            Vector3 pos = transform.position;
+            if (!openDoorStuckPosInit)
+            {
+                openDoorStuckLastPos = pos;
+                openDoorStuckPosInit = true;
+                openDoorStuckTimer = 0f;
+                return;
+            }
+
+            float moved = Vector3.Distance(pos, openDoorStuckLastPos);
+            bool nearlyStopped = agent.velocity.sqrMagnitude <= 0.07f * 0.07f;
+            bool linkStall = agent.isOnOffMeshLink && nearlyStopped;
+            bool thresholdStall = moved < 0.08f && nearlyStopped;
+            if (!linkStall && !thresholdStall)
+            {
+                openDoorStuckLastPos = pos;
+                openDoorStuckTimer = 0f;
+                return;
+            }
+
+            openDoorStuckTimer += Time.deltaTime;
+            if (openDoorStuckTimer < 0.22f || Time.time < nextOpenDoorHardAssistAt)
+                return;
+
+            openDoorStuckTimer = 0f;
+            openDoorStuckLastPos = pos;
+            nextOpenDoorHardAssistAt = Time.time + 0.5f;
+
+            if (TryCompleteOpenDoorOffMeshLink(primaryDestination))
+                return;
+
+            if (!TryGetOpenDoorRecoveryPoint(openDoor, primaryDestination, out Vector3 recoveryPoint))
+                return;
+
+            SafeResetPath();
+            if (!agent.Warp(recoveryPoint))
+                return;
+
+            lastSafePosition = recoveryPoint;
+            hasSafePosition = true;
+            ignoreAntiClipUntilTime = Mathf.Max(ignoreAntiClipUntilTime, Time.time + 1.0f);
+            openDoorStuckLastPos = recoveryPoint;
+            Debug.Log($"[ResidentAI] Open-door hard assist crossed {openDoor.name} to {recoveryPoint}.");
+            ReissuePrimaryDestination(primaryDestination);
+        }
+
+        void ResetOpenDoorHardAssist()
+        {
+            openDoorStuckPosInit = false;
+            openDoorStuckTimer = 0f;
+        }
+
+        bool TryCompleteOpenDoorOffMeshLink(Vector3 primaryDestination)
+        {
+            if (agent == null || !agent.isOnOffMeshLink || !IsOpenDoorOffMeshLinkContext())
+                return false;
+
+            OffMeshLinkData data = agent.currentOffMeshLinkData;
+            Vector3 end = data.endPos;
+            if (NavMesh.SamplePosition(end, out var hit, 1.2f, NavMesh.AllAreas))
+                end = hit.position;
+
+            agent.CompleteOffMeshLink();
+            lastSafePosition = end;
+            hasSafePosition = true;
+            ignoreAntiClipUntilTime = Mathf.Max(ignoreAntiClipUntilTime, Time.time + 0.75f);
+            ReissuePrimaryDestination(primaryDestination);
+            return true;
+        }
+
+        bool TryGetOpenDoorRecoveryPoint(Door door, Vector3 primaryDestination, out Vector3 recoveryPoint)
+        {
+            recoveryPoint = transform.position;
+            if (door == null)
+                return false;
+
+            Vector3 center = door.GetDoorwayCenter();
+            Vector3 forward = door.GetDoorwayForward();
+            Vector3 right = door.GetDoorwayRight();
+            if (forward.sqrMagnitude < 0.001f || right.sqrMagnitude < 0.001f)
+                return false;
+
+            Vector3 desiredOffset = primaryDestination - center;
+            desiredOffset.y = 0f;
+            float desiredSideDot = Vector3.Dot(desiredOffset, forward);
+
+            Vector3 selfOffset = transform.position - center;
+            selfOffset.y = 0f;
+            float selfSideDot = Vector3.Dot(selfOffset, forward);
+
+            int side = Mathf.Abs(desiredSideDot) > 0.18f
+                ? desiredSideDot >= 0f ? 1 : -1
+                : selfSideDot >= 0f ? -1 : 1;
+
+            float[] depths = { 1.05f, 1.45f, 2.0f, 2.7f, 3.35f };
+            float[] widths = { 0f, 0.25f, -0.25f, 0.5f, -0.5f };
+            float bestScore = float.MaxValue;
+            bool found = false;
+            Vector3 best = recoveryPoint;
+
+            for (int d = 0; d < depths.Length; d++)
+            {
+                for (int w = 0; w < widths.Length; w++)
+                {
+                    Vector3 probe = center + forward * (depths[d] * side) + right * widths[w];
+                    if (!NavMesh.SamplePosition(probe, out var hit, 1.15f, NavMesh.AllAreas))
+                        continue;
+
+                    if (Vector3.Distance(transform.position, hit.position) < 0.22f)
+                        continue;
+
+                    if (!IsOpenDoorwayContext(hit.position) && IsBodyIntersectingBlocking(hit.position))
+                        continue;
+
+                    float score = Vector3.SqrMagnitude(hit.position - primaryDestination) -
+                                  depths[d] * 0.35f +
+                                  Mathf.Abs(widths[w]) * 0.2f;
+                    if (score < bestScore)
+                    {
+                        bestScore = score;
+                        best = hit.position;
+                        found = true;
+                    }
+                }
+            }
+
+            if (!found)
+                return false;
+
+            recoveryPoint = best;
+            return true;
         }
 
         bool TrySetDestination(Vector3 destination)

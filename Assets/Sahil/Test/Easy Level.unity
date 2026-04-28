@@ -1638,6 +1638,10 @@ PrefabInstance:
       propertyPath: openAngle
       value: 90
       objectReference: {fileID: 0}
+    - target: {fileID: 7801265171581000806, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
+      propertyPath: clearNearbyBlockingCollidersOnOpen
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalScale.x
       value: 4.2
@@ -2330,9 +2334,17 @@ PrefabInstance:
       propertyPath: m_Name
       value: BronzeDoor (1)
       objectReference: {fileID: 0}
+    - target: {fileID: 7053333362799215050, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 7801265171581000806, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: openAngle
       value: 90
+      objectReference: {fileID: 0}
+    - target: {fileID: 7801265171581000806, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
+      propertyPath: clearNearbyBlockingCollidersOnOpen
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalScale.x
@@ -2356,15 +2368,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -3.565
+      value: -5.632
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.7071068
+      value: -0.7071068
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalRotation.x
-      value: -0
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalRotation.y
@@ -2380,7 +2392,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalEulerAnglesHint.y
-      value: 90
+      value: 270
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
@@ -5931,6 +5943,10 @@ PrefabInstance:
       value: Player Variant
       objectReference: {fileID: 0}
     - target: {fileID: 8081526744533084343, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8081526744533084343, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 0
       objectReference: {fileID: 0}
@@ -8134,6 +8150,10 @@ PrefabInstance:
     - target: {fileID: 490104909186292010, guid: 4e7142dcd490d4cdb97846fba80ab795, type: 3}
       propertyPath: m_Name
       value: Homuncul1
+      objectReference: {fileID: 0}
+    - target: {fileID: 490104909186292010, guid: 4e7142dcd490d4cdb97846fba80ab795, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 2435600838208216934, guid: 4e7142dcd490d4cdb97846fba80ab795, type: 3}
       propertyPath: m_LocalPosition.x

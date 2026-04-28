@@ -333,6 +333,10 @@ namespace Sushil.AI
         private float generalStuckTimer;
         private Vector3 generalStuckLastPos;
         private bool generalStuckPosInit;
+        private float openDoorStuckTimer;
+        private Vector3 openDoorStuckLastPos;
+        private bool openDoorStuckPosInit;
+        private float nextOpenDoorHardAssistAt;
         private float currentNavigationRadius = -1f;
         private bool hasInvestigateTarget;
         private Vector3 investigateTargetPos;
@@ -690,6 +694,7 @@ namespace Sushil.AI
 
             ApplyDynamicNavigationProfile();
             ApplyStairTraverseAssist();
+            ApplyOpenDoorwayHardAssist();
             // Push open any closed-but-unlocked door we're walking into. This is the
             // primary defence against the resident getting permanently stuck at a door
             // the player closed (or never opened).

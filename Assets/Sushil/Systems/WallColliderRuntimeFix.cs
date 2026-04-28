@@ -8,17 +8,34 @@ namespace Sushil.Systems
         const float MinAxisScale = 0.001f;
         const float MinColliderThickness = 0.08f;
         static bool hasApplied;
+        static int appliedSceneHandle = int.MinValue;
         static int addedColliderCount;
         static int fixedScaleCount;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         static void Apply()
         {
-            if (hasApplied) return;
-            hasApplied = true;
-
             Scene scene = SceneManager.GetActiveScene();
+            ApplyToScene(scene);
+            if (!hasApplied)
+            {
+                SceneManager.sceneLoaded += OnSceneLoaded;
+                hasApplied = true;
+            }
+        }
+
+        static void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+        {
+            ApplyToScene(scene);
+        }
+
+        static void ApplyToScene(Scene scene)
+        {
             if (!scene.IsValid() || !scene.isLoaded) return;
+            if (appliedSceneHandle == scene.handle) return;
+            appliedSceneHandle = scene.handle;
+            addedColliderCount = 0;
+            fixedScaleCount = 0;
 
             GameObject[] roots = scene.GetRootGameObjects();
             for (int i = 0; i < roots.Length; i++)
@@ -39,7 +56,10 @@ namespace Sushil.Systems
             bool inWalls = underWallsParent || lower == "walls";
             bool looksLikeWall = inWalls || lower.Contains("wall") || lower.Contains("border");
 
-            if (looksLikeWall)
+            // Never treat door/key/fuse objects as static wall blockers. Door scripts
+            // manage these colliders at runtime; forcing them on here causes AI to get
+            // stuck at unlocked/open doors.
+            if (looksLikeWall && !LooksLikeManagedDoorRelatedObject(lower))
                 EnsureSolidWallCollider(t);
 
             for (int i = 0; i < t.childCount; i++)
@@ -127,7 +147,7 @@ namespace Sushil.Systems
             bool inWalls = underWallsParent || lower == "walls";
             bool looksLikeWall = inWalls || lower.Contains("wall") || lower.Contains("border");
 
-            if (looksLikeWall && !lower.Contains("door") && !lower.Contains("key"))
+            if (looksLikeWall && !LooksLikeManagedDoorRelatedObject(lower))
             {
                 Collider c = t.GetComponent<Collider>();
                 MeshRenderer mr = t.GetComponent<MeshRenderer>();
@@ -183,6 +203,13 @@ namespace Sushil.Systems
 
             for (int i = 0; i < t.childCount; i++)
                 AddFallbackBoundsColliders(t.GetChild(i), inWalls);
+        }
+
+        static bool LooksLikeManagedDoorRelatedObject(string lowerName)
+        {
+            return lowerName.Contains("door") ||
+                   lowerName.Contains("key") ||
+                   lowerName.Contains("fuse");
         }
 
         static void ConfigureBoxFromMesh(BoxCollider box, Mesh mesh)

@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.AI;
 using Unity.AI.Navigation;
 using System.Collections.Generic;
+using System.Collections;
 using Sushil.Systems;
 
 public class Door : MonoBehaviour, IInteractable
@@ -65,8 +66,8 @@ public class Door : MonoBehaviour, IInteractable
     [Range(1f, 89f)] public float openUnblockAngle = 65f;
     public bool autoAddNavObstacle = true;
     public bool autoAddRuntimeNavLink = true;
-    [Tooltip("Creates both forward/back and left/right links to handle differently oriented door prefabs.")]
-    public bool useDualAxisRuntimeLinks = true;
+    [Tooltip("Creates both forward/back and left/right links to handle differently oriented door prefabs. Leave off for keyed doors so AI does not pick a sideways link into the frame.")]
+    public bool useDualAxisRuntimeLinks = false;
     public float navLinkDepth = 1.2f;
     public float navLinkWidth = 1.3f;
     public int navLinkAgentTypeID = -1;
@@ -80,8 +81,8 @@ public class Door : MonoBehaviour, IInteractable
     public bool autoAddColliderIfMissing = true;
     [Tooltip("Also treat colliders on this root GameObject as door blockers to disable when opened.")]
     public bool includeRootCollidersInBlocking = false;
-    [Tooltip("Disable non-door colliders overlapping the doorway when this door opens. Off by default — turning it on can break wall colliders adjacent to the doorway. Only enable for doors where the doorway frame physically blocks the AI.")]
-    public bool clearNearbyBlockingCollidersOnOpen = false;
+    [Tooltip("Disable non-door colliders overlapping the doorway when this door opens. This keeps tight door frames and wall lips from catching AI after the door is unlocked.")]
+    public bool clearNearbyBlockingCollidersOnOpen = true;
     public Vector3 doorwayClearHalfExtents = new Vector3(0.7f, 1f, 0.7f);
 
     private bool isOpen = false;
@@ -104,10 +105,11 @@ public class Door : MonoBehaviour, IInteractable
     private Vector3 resolvedHingeLocalOffset;
     private Collider[] temporarilyDisabledNearbyColliders;
     private float nextNearbyClearTime;
+    private Coroutine postOpenClearRoutine;
 
     void Awake()
     {
-        // Ensure closed doors block immediately, even before Start() ordering settles.
+        // Ensure locked closed doors block immediately, even before Start() ordering settles.
         if (!isOpen)
         {
             ForceClosedBlockingStateEarly();
@@ -116,7 +118,7 @@ public class Door : MonoBehaviour, IInteractable
 
     void OnEnable()
     {
-        // Scene reloads / object re-enables should never leave closed doors pass-through.
+        // Scene reloads / object re-enables should never leave locked closed doors pass-through.
         if (!isOpen)
         {
             ForceClosedBlockingStateEarly();
@@ -130,12 +132,14 @@ public class Door : MonoBehaviour, IInteractable
         immediateUnblockOnOpen = true;
         autoAddRuntimeNavLink = true;
         autoComputeHingeFromBounds = true;
+        clearNearbyBlockingCollidersOnOpen = true;
 
         closedLocalPosition = transform.localPosition;
         closedLocalRotation = transform.localRotation;
         audioSource = GetComponent<AudioSource>();
         currentOpenAngle = 0f;
-        // Only toggle the actual moving panel colliders; keep nearby frame/wall colliders untouched.
+        // Resolve the moving leaf for animation; blocking is enforced across the
+        // door hierarchy so stray prefab colliders cannot remain solid after open.
         doorPanel = ResolveRotatingPart();
         rotatingTarget = doorPanel != null ? doorPanel : transform;
         rotatingClosedLocalPosition = rotatingTarget.localPosition;
@@ -158,7 +162,9 @@ public class Door : MonoBehaviour, IInteractable
         }
         if (autoAddRuntimeNavLink)
             EnsureRuntimeNavLink();
-        SetDoorBlocking(true);
+        SetDoorBlocking(isLocked && !isOpen);
+        if (isOpen && clearNearbyBlockingCollidersOnOpen)
+            DisableNearbyBlockingColliders();
 
         if (winUI != null)
             winUI.SetActive(false);
@@ -166,28 +172,25 @@ public class Door : MonoBehaviour, IInteractable
 
     void ForceClosedBlockingStateEarly()
     {
+        bool shouldBlock = isLocked && !isOpen;
+
         Collider[] cols = GetComponentsInChildren<Collider>(true);
         for (int i = 0; i < cols.Length; i++)
         {
             Collider c = cols[i];
             if (c == null || c.isTrigger) continue;
-            c.enabled = true;
+            c.enabled = shouldBlock;
         }
 
-        if (blockWhenClosed)
+        NavMeshObstacle obstacle = GetComponent<NavMeshObstacle>();
+        if (obstacle == null && autoAddNavObstacle)
         {
-            NavMeshObstacle obstacle = GetComponent<NavMeshObstacle>();
-            if (obstacle == null && autoAddNavObstacle)
-            {
-                obstacle = gameObject.AddComponent<NavMeshObstacle>();
-                obstacle.carving = true;
-                obstacle.carveOnlyStationary = true;
-            }
-            if (obstacle != null)
-            {
-                obstacle.enabled = true;
-            }
+            obstacle = gameObject.AddComponent<NavMeshObstacle>();
+            obstacle.carving = true;
+            obstacle.carveOnlyStationary = true;
         }
+        if (obstacle != null)
+            obstacle.enabled = shouldBlock;
     }
 
     void Update()
@@ -208,6 +211,16 @@ public class Door : MonoBehaviour, IInteractable
         {
             DisableNearbyBlockingColliders();
             nextNearbyClearTime = Time.time + 0.2f;
+        }
+    }
+
+    void LateUpdate()
+    {
+        // Final authority pass: after all other scripts run this frame, ensure
+        // unlocked doors are never left blocking by external collider-fix scripts.
+        if (!isLocked)
+        {
+            SetDoorBlocking(false);
         }
     }
 
@@ -266,6 +279,7 @@ public class Door : MonoBehaviour, IInteractable
         isOpen = true;
         // Clear blockers immediately at the moment door starts opening.
         SetDoorBlocking(false);
+        StartPostOpenClearRetries();
         if (clearNearbyBlockingCollidersOnOpen)
         {
             DisableNearbyBlockingColliders();
@@ -318,25 +332,15 @@ public class Door : MonoBehaviour, IInteractable
 
     void SyncDoorBlockingForCurrentAngle()
     {
-        bool shouldBlock;
-        if (!blockWhenClosed && !unblockWhenOpen) return;
-
-        if (!isOpen)
-        {
-            shouldBlock = blockWhenClosed;
-        }
-        else
-        {
-            // For this project: once opening starts, never block traversal at this doorway.
-            shouldBlock = false;
-        }
-
+        // Project rule: ONLY locked doors should block.
+        bool shouldBlock = isLocked && !isOpen;
         SetDoorBlocking(shouldBlock);
     }
 
     void SetDoorBlocking(bool block)
     {
-        if (isBlockingNow == block) return;
+        // Never early-return here: inspector/runtime state can desync (for example,
+        // collider left enabled while this flag says non-blocking). Always enforce.
         isBlockingNow = block;
 
         // Always toggle all solid colliders owned by this door hierarchy.
@@ -348,14 +352,25 @@ public class Door : MonoBehaviour, IInteractable
             for (int i = 0; i < allDoorColliders.Length; i++)
             {
                 Collider c = allDoorColliders[i];
-                if (c == null || c.isTrigger)
+                if (c == null)
                     continue;
-                c.enabled = block;
+                c.enabled = true;
+                c.isTrigger = !block;
             }
         }
 
-        if (navObstacle != null)
-            navObstacle.enabled = block;
+        NavMeshObstacle[] obstacles = GetComponentsInChildren<NavMeshObstacle>(true);
+        if (obstacles != null)
+        {
+            for (int i = 0; i < obstacles.Length; i++)
+            {
+                NavMeshObstacle obstacle = obstacles[i];
+                if (obstacle == null)
+                    continue;
+
+                obstacle.enabled = block;
+            }
+        }
 
         if (block)
             RestoreNearbyBlockingColliders();
@@ -425,7 +440,8 @@ public class Door : MonoBehaviour, IInteractable
         if (!autoAddRuntimeNavLink) return;
         SyncRuntimeNavLinkRootPose();
 
-        bool shouldEnable = isOpen && (!isLocked || aiBypassLock);
+        // Keep traversal available anywhere the door is non-blocking.
+        bool shouldEnable = !isLocked || isOpen;
         if (navLinkForwardBack != null && navLinkForwardBack.enabled)
             navLinkForwardBack.activated = shouldEnable;
         if (navLinkLeftRight != null && navLinkLeftRight.enabled)
@@ -1097,6 +1113,12 @@ public class Door : MonoBehaviour, IInteractable
             if (c is TerrainCollider)
                 continue;
 
+            // Other door scripts own their own collision state. Do not silently
+            // unlock/disable a neighboring closed door while clearing this doorway.
+            if (c.GetComponentInParent<Door>() != null) continue;
+            if (c.GetComponentInParent<FuseDoor>() != null) continue;
+            if (c.GetComponentInParent<MainDoor>() != null) continue;
+
             // CRITICAL: never disable CharacterControllers — that breaks the player
             // movement loop ("Move called on inactive controller" error spam).
             if (c is CharacterController)
@@ -1154,6 +1176,33 @@ public class Door : MonoBehaviour, IInteractable
         temporarilyDisabledNearbyColliders = new Collider[count];
         for (int i = 0; i < count; i++)
             temporarilyDisabledNearbyColliders[i] = disabled[i];
+    }
+
+    void StartPostOpenClearRetries()
+    {
+        if (!clearNearbyBlockingCollidersOnOpen)
+            return;
+
+        if (postOpenClearRoutine != null)
+            StopCoroutine(postOpenClearRoutine);
+
+        postOpenClearRoutine = StartCoroutine(PostOpenClearRoutine());
+    }
+
+    IEnumerator PostOpenClearRoutine()
+    {
+        // Clear again after opening in case doorway blockers overlap one frame
+        // later while animation/physics settle.
+        yield return new WaitForSeconds(1f);
+
+        const int passes = 3;
+        for (int i = 0; i < passes; i++)
+        {
+            DisableNearbyBlockingColliders();
+            yield return new WaitForSeconds(0.35f);
+        }
+
+        postOpenClearRoutine = null;
     }
 
     void RestoreNearbyBlockingColliders()

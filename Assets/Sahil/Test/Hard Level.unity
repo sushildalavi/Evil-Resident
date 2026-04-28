@@ -2729,7 +2729,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3665500957989644521, guid: d594f616a536f4d399933cd973acef16, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.039842606
+      value: -0.024
       objectReference: {fileID: 0}
     - target: {fileID: 3665500957989644521, guid: d594f616a536f4d399933cd973acef16, type: 3}
       propertyPath: m_LocalRotation.w
@@ -3584,6 +3584,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: WeepingAngel
       objectReference: {fileID: 0}
+    - target: {fileID: 3979414569065228918, guid: 9ba504c486b8a4cf0b8f87b9309d1c00, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 5219534329903531718, guid: 9ba504c486b8a4cf0b8f87b9309d1c00, type: 3}
       propertyPath: m_LocalPosition.x
       value: 2.427
@@ -4144,7 +4148,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 0.016923904
+      value: -0.018
       objectReference: {fileID: 0}
     - target: {fileID: 9080888083401461026, guid: 158dd07ee2126411dad36bc206bad2e9, type: 3}
       propertyPath: m_LocalRotation.w
@@ -10170,6 +10174,10 @@ PrefabInstance:
     - target: {fileID: 8081526744533084343, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
       propertyPath: m_Name
       value: Player Variant
+      objectReference: {fileID: 0}
+    - target: {fileID: 8081526744533084343, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8081526744533084343, guid: 0c31fe9e6373f4d168e9afa31d776ba2, type: 3}
       propertyPath: m_StaticEditorFlags
