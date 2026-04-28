@@ -15,6 +15,8 @@ public class ActivatedByFuse : MonoBehaviour
     [Header("Controlled Targets")]
     [Tooltip("If empty, this script auto-controls all Light components on this GameObject and its children.")]
     public Light[] controlledLights;
+    [Tooltip("When enabled, child AudioSources are stopped while inactive and started on activation.")]
+    public bool controlChildAudioSources = true;
     [Tooltip("Optional additional objects enabled when activated.")]
     public GameObject[] objectsToEnable;
 
@@ -104,6 +106,29 @@ public class ActivatedByFuse : MonoBehaviour
             Light l = lights[i];
             if (l == null) continue;
             l.enabled = active;
+        }
+
+        if (controlChildAudioSources)
+        {
+            AudioSource[] audioSources = GetComponentsInChildren<AudioSource>(true);
+            for (int i = 0; i < audioSources.Length; i++)
+            {
+                AudioSource source = audioSources[i];
+                if (source == null) continue;
+
+                if (active)
+                {
+                    source.enabled = true;
+                    if (!source.isPlaying)
+                        source.Play();
+                }
+                else
+                {
+                    if (source.isPlaying)
+                        source.Stop();
+                    source.enabled = false;
+                }
+            }
         }
 
         if (objectsToEnable != null)
