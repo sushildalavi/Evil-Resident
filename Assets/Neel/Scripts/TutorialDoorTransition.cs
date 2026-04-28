@@ -149,15 +149,47 @@ public class TutorialDoorTransition : MonoBehaviour, IInteractable
 
     void LoadTargetScene()
     {
-        const string tutorial2Path = "Assets/Sahil/Tutorial/New Tutorial 2.unity";
-        int buildIndex = SceneUtility.GetBuildIndexByScenePath(tutorial2Path);
+        // Resolution order:
+        //   1. Inspector-configured mainGameSceneName (if it resolves to a build scene)
+        //   2. Auto-detect: if current scene is "New Tutorial N", load "New Tutorial N+1"
+        //   3. Fall back to the raw mainGameSceneName string
+        string configured = string.IsNullOrWhiteSpace(mainGameSceneName) ? string.Empty : mainGameSceneName.Trim();
+        if (TryLoadByName(configured))
+            return;
+
+        string autoNext = GetNextTutorialSceneName(SceneManager.GetActiveScene().name);
+        if (TryLoadByName(autoNext))
+            return;
+
+        if (!string.IsNullOrEmpty(configured))
+            SceneManager.LoadScene(configured);
+    }
+
+    static bool TryLoadByName(string sceneName)
+    {
+        if (string.IsNullOrEmpty(sceneName))
+            return false;
+
+        int buildIndex = SceneUtility.GetBuildIndexByScenePath(sceneName);
+        if (buildIndex < 0)
+            buildIndex = SceneUtility.GetBuildIndexByScenePath($"Assets/Sahil/Tutorial/{sceneName}.unity");
         if (buildIndex >= 0)
         {
             SceneManager.LoadScene(buildIndex);
-            return;
+            return true;
         }
+        return false;
+    }
 
-        SceneManager.LoadScene(mainGameSceneName);
+    static string GetNextTutorialSceneName(string currentSceneName)
+    {
+        // Pattern: "New Tutorial N" → "New Tutorial N+1"
+        if (string.IsNullOrEmpty(currentSceneName) || !currentSceneName.StartsWith("New Tutorial "))
+            return null;
+        string tail = currentSceneName.Substring("New Tutorial ".Length).Trim();
+        if (!int.TryParse(tail, out int n))
+            return null;
+        return "New Tutorial " + (n + 1);
     }
 
     void ShowTransitionMessage()

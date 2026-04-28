@@ -76,7 +76,6 @@ public class RohitFPSController : MonoBehaviour
     Vector3 preHidePosition;
     Quaternion preHideRotation;
     bool hasPreHidePosition;
-    bool hasPreHideRotation;
     CharacterController controller;
     PlayerInventory inventory;
 
@@ -820,7 +819,6 @@ public class RohitFPSController : MonoBehaviour
         preHidePosition = transform.position;
         hasPreHidePosition = true;
         preHideRotation = transform.rotation;
-        hasPreHideRotation = true;
         float oppositeYaw = preHideRotation.eulerAngles.y + 180f;
 
         controller.enabled = false;
@@ -895,7 +893,6 @@ public class RohitFPSController : MonoBehaviour
         isHidden = false;
         currentHideObject = null;
         hasPreHidePosition = false;
-        hasPreHideRotation = false;
 
         exiting?.SetExteriorOnlyRenderersVisible(true);
         OnHideExited?.Invoke(this, exiting);

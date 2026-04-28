@@ -5,10 +5,10 @@ using Sushil.AI;
 public class Tutorial2ResidentPrompts : MonoBehaviour
 {
     [Header("Prompt Copy")]
-    [TextArea] public string introPrompt = "This is the resident, Maintain your distance from him";
-    [TextArea] public string spottedPrompt = "If he sees you, then hide";
-    [TextArea] public string hidePrompt = "Make sure he is at a safe distance before getting out";
-    [TextArea] public string finalPrompt = "Now collect the key and get out without getting caught";
+    [TextArea] public string introPrompt = "This is the Resident. Maintain your distance from him.";
+    [TextArea] public string spottedPrompt = "If he sees you, hide.";
+    [TextArea] public string hidePrompt = "Make sure he is at a safe distance before coming out.";
+    [TextArea] public string finalPrompt = "Now collect the key and escape without getting caught.";
 
     [Header("Timing")]
     public float initialDelay = 1.2f;
@@ -41,8 +41,17 @@ public class Tutorial2ResidentPrompts : MonoBehaviour
 
     private void Start()
     {
-        BuildUI();
+        // These prompts only make sense in scenes that actually contain a Resident.
+        // If none is present (e.g. Tutorial 2 is now the fuse tutorial), self-disable
+        // so we don't show misleading "watch out for the Resident" copy.
         ResolveReferences(true);
+        if (resident == null)
+        {
+            enabled = false;
+            return;
+        }
+
+        BuildUI();
         StartCoroutine(ShowInitialPromptSequence());
     }
 

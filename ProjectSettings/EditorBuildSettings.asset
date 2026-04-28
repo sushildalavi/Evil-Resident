@@ -5,15 +5,6 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 0
-    path: Assets/Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
-  - enabled: 0
-    path: Assets/Rohit/Scenes/Rohit_FPS_Main.unity
-    guid: 5363f5da49cd66b4ebe81a1927000b40
-  - enabled: 0
-    path: Assets/Scenes/SahilLevelDesign.unity
-    guid: 27ce0f6984147424da1dd5781b4d86b8
   - enabled: 1
     path: Assets/Sahil/Tutorial/Level Select.unity
     guid: f834dda87dd3b4c7a818cbe0c674cdd1
@@ -21,14 +12,11 @@ EditorBuildSettings:
     path: Assets/Sahil/Tutorial/Difficulty Select.unity
     guid: f206a7c15f634bff8b69bf8423958dcb
   - enabled: 1
-    path: Assets/Sahil/Test/Medium Level.unity
-    guid: 5260f108c387f480fb2f3d05fbc0cbc2
-  - enabled: 0
-    path: Assets/Neel/Tutorial.unity
-    guid: 13f5be0bbbf1d4e57b02e3fe0b1898d8
-  - enabled: 1
     path: Assets/Sahil/Tutorial/New Tutorial 1.unity
     guid: 02c23ebaefb984eac9e3388d268f6c59
+  - enabled: 1
+    path: Assets/Sahil/Tutorial/New Tutorial 2.unity
+    guid: 6bd236f0af84145fd80731479566aa84
   - enabled: 1
     path: Assets/Sahil/Tutorial/New Tutorial 3.unity
     guid: 629c9a8296a174f70acc305beefdb258
@@ -44,9 +32,18 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Sahil/Test/Hard Level.unity
     guid: 1ad53daaae33545ad9b1e861b678b518
-  - enabled: 1
-    path: Assets/Sahil/Tutorial/New Tutorial 2.unity
-    guid: 6bd236f0af84145fd80731479566aa84
+  - enabled: 0
+    path: Assets/Scenes/SampleScene.unity
+    guid: 99c9720ab356a0642a771bea13969a05
+  - enabled: 0
+    path: Assets/Rohit/Scenes/Rohit_FPS_Main.unity
+    guid: 5363f5da49cd66b4ebe81a1927000b40
+  - enabled: 0
+    path: Assets/Scenes/SahilLevelDesign.unity
+    guid: 27ce0f6984147424da1dd5781b4d86b8
+  - enabled: 0
+    path: Assets/Neel/Tutorial.unity
+    guid: 13f5be0bbbf1d4e57b02e3fe0b1898d8
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

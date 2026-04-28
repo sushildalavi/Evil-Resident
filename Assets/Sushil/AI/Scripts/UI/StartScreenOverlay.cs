@@ -17,6 +17,7 @@ namespace Sushil.Systems
         bool showing;
         Text productionText;
         Text titleText;
+        Text difficultyLabel;
         Text taglineText;
         Text riddleText;
         Text startHintText;
@@ -145,39 +146,109 @@ namespace Sushil.Systems
             rootRect.localScale = Vector3.one;
 
             CreateBackground(root.transform);
-            Transform content = CreateContentContainer(root.transform);
+            CreateVignette(root.transform);
+            Transform content = CreateContentCard(root.transform);
+            CreateAccentBar(content, top: true);
+            CreateAccentBar(content, top: false);
 
+            // "5 GUYS AT FREDDY'S presents" — small italic red header
             productionText = CreateText(content, "Production",
-                "5 Guys at Freddy's presents :",
-                24, FontStyle.Normal, TextAnchor.MiddleCenter,
-                new Color(0.88f, 0.90f, 0.94f, 0.96f), new Vector2(0.14f, 0.82f), new Vector2(0.86f, 0.89f));
-            AddTextEffects(productionText.gameObject, new Color(0.03f, 0.05f, 0.08f, 0.95f));
+                "5 GUYS AT FREDDY'S  presents",
+                22, FontStyle.Italic, TextAnchor.MiddleCenter,
+                new Color(0.65f, 0.18f, 0.18f, 0.85f),
+                new Vector2(0.08f, 0.86f), new Vector2(0.92f, 0.92f));
 
-            Text title = CreateText(content, "Title",
-                "IT SAW YOU", 96, FontStyle.Bold, TextAnchor.MiddleCenter,
-                new Color(1f, 0.2f, 0.2f, 1f), new Vector2(0.08f, 0.60f), new Vector2(0.92f, 0.80f));
-            AddTextEffects(title.gameObject, new Color(0.18f, 0f, 0f, 1f));
-            titleText = title;
+            // "EVIL RESIDENT" — huge bleeding-red title with glow + flicker
+            titleText = CreateText(content, "Title",
+                "EVIL  RESIDENT",
+                88, FontStyle.Bold, TextAnchor.MiddleCenter,
+                new Color(0.92f, 0.18f, 0.18f, 1f),
+                new Vector2(0.04f, 0.66f), new Vector2(0.96f, 0.84f));
+            AddBloodGlow(titleText.gameObject);
+            titleText.gameObject.AddComponent<HorrorTitleFlicker>();
+
+            // "— EASY MODE —" / "— MEDIUM —" / "— HARD —" subtitle below title
+            difficultyLabel = CreateText(content, "Difficulty",
+                "— MEDIUM —",
+                28, FontStyle.Bold, TextAnchor.MiddleCenter,
+                new Color(0.95f, 0.92f, 0.85f, 0.95f),
+                new Vector2(0.10f, 0.58f), new Vector2(0.90f, 0.65f));
 
             taglineText = CreateText(content, "Tagline",
-                "Collect 3 keys. Escape. Don't be seen.",
-                34, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.92f, 0.92f, 0.95f, 1f),
-                new Vector2(0.10f, 0.44f), new Vector2(0.90f, 0.53f));
-            AddTextEffects(taglineText.gameObject, new Color(0.04f, 0.05f, 0.08f, 0.95f));
+                "Escape from the main door.",
+                26, FontStyle.Normal, TextAnchor.MiddleCenter,
+                new Color(0.85f, 0.85f, 0.88f, 0.95f),
+                new Vector2(0.10f, 0.46f), new Vector2(0.90f, 0.54f));
 
             riddleText = CreateText(content, "Riddle",
                 string.Empty,
-                28, FontStyle.Normal, TextAnchor.MiddleCenter, new Color(0.82f, 0.84f, 0.90f, 0.95f),
-                new Vector2(0.14f, 0.28f), new Vector2(0.86f, 0.40f), 1.15f);
-            AddTextEffects(riddleText.gameObject, new Color(0.02f, 0.04f, 0.08f, 0.95f));
+                22, FontStyle.Italic, TextAnchor.MiddleCenter,
+                new Color(0.78f, 0.78f, 0.82f, 0.85f),
+                new Vector2(0.10f, 0.30f), new Vector2(0.90f, 0.42f), 1.15f);
 
+            // Bordered "PRESS TO BEGIN" call-to-action with pulsing yellow glow
             startHintText = CreateText(content, "StartHint",
-                "Press ENTER or SPACE to begin",
-                44, FontStyle.Bold, TextAnchor.MiddleCenter, new Color(1f, 0.86f, 0.36f, 1f),
-                new Vector2(0.12f, 0.08f), new Vector2(0.88f, 0.17f));
-            AddTextEffects(startHintText.gameObject, new Color(0.18f, 0.11f, 0.02f, 1f));
+                "[  PRESS  ENTER  OR  SPACE  TO  BEGIN  ]",
+                30, FontStyle.Bold, TextAnchor.MiddleCenter,
+                new Color(1f, 0.86f, 0.36f, 1f),
+                new Vector2(0.05f, 0.08f), new Vector2(0.95f, 0.17f));
+            var startHintOutline = startHintText.gameObject.AddComponent<Outline>();
+            startHintOutline.effectColor = new Color(0.45f, 0.30f, 0.05f, 0.9f);
+            startHintOutline.effectDistance = new Vector2(2f, -2f);
+            startHintText.gameObject.AddComponent<HorrorTitleFlicker>(); // gentle flicker on the call-to-action
 
             ApplySceneText();
+        }
+
+        static void AddBloodGlow(GameObject titleObject)
+        {
+            var a = titleObject.AddComponent<Outline>();
+            a.effectColor = new Color(0.85f, 0.05f, 0.05f, 0.85f);
+            a.effectDistance = new Vector2(2f, -2f);
+            var b = titleObject.AddComponent<Outline>();
+            b.effectColor = new Color(0.50f, 0.02f, 0.02f, 0.7f);
+            b.effectDistance = new Vector2(4f, -4f);
+            var drop = titleObject.AddComponent<Shadow>();
+            drop.effectColor = new Color(0f, 0f, 0f, 0.95f);
+            drop.effectDistance = new Vector2(5f, -5f);
+        }
+
+        static void CreateAccentBar(Transform parent, bool top)
+        {
+            var go = new GameObject(top ? "AccentTop" : "AccentBottom", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            if (top)
+            {
+                rect.anchorMin = new Vector2(0f, 1f);
+                rect.anchorMax = new Vector2(1f, 1f);
+                rect.pivot = new Vector2(0.5f, 1f);
+            }
+            else
+            {
+                rect.anchorMin = new Vector2(0f, 0f);
+                rect.anchorMax = new Vector2(1f, 0f);
+                rect.pivot = new Vector2(0.5f, 0f);
+            }
+            rect.sizeDelta = new Vector2(0f, 3f);
+            rect.anchoredPosition = Vector2.zero;
+            var img = go.AddComponent<Image>();
+            img.color = new Color(0.85f, 0.10f, 0.10f, 0.9f);
+            img.raycastTarget = false;
+        }
+
+        static void CreateVignette(Transform parent)
+        {
+            var go = new GameObject("Vignette", typeof(RectTransform));
+            go.transform.SetParent(parent, false);
+            var rect = go.GetComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            var img = go.AddComponent<Image>();
+            img.color = new Color(0.07f, 0f, 0f, 0.30f);
+            img.raycastTarget = false;
         }
 
         void ApplySceneText()
@@ -190,83 +261,83 @@ namespace Sushil.Systems
             string sceneName = activeScene.name;
             string sceneNameLower = string.IsNullOrWhiteSpace(sceneName) ? string.Empty : sceneName.ToLowerInvariant();
 
+            // Reset visibility — every section is shown by default; specific paths hide what they don't need.
             titleText.gameObject.SetActive(true);
-            startHintText.gameObject.SetActive(true);
+            if (difficultyLabel != null) difficultyLabel.gameObject.SetActive(true);
             taglineText.gameObject.SetActive(true);
             riddleText.gameObject.SetActive(true);
+            startHintText.gameObject.SetActive(true);
+            if (productionText != null) productionText.gameObject.SetActive(true);
 
-            if (productionText != null)
-                productionText.gameObject.SetActive(false);
+            // Title is ALWAYS "EVIL RESIDENT" — what changes is the difficulty label / tagline / riddle.
+            titleText.text = "EVIL  RESIDENT";
 
+            // Menu scenes — usually suppressed by ShouldSuppressOverlayInScene, but defensive copy here too.
             if (sceneName == "Level Select" || sceneName == "Difficulty Select")
             {
-                if (productionText != null)
-                    productionText.gameObject.SetActive(true);
-                titleText.text = "The Evil Resident";
-                taglineText.gameObject.SetActive(true);
+                if (difficultyLabel != null) difficultyLabel.text = "— MAIN MENU —";
                 taglineText.text = sceneName == "Difficulty Select"
                     ? "Choose your challenge."
                     : "Pick where to begin.";
                 riddleText.gameObject.SetActive(false);
-                riddleText.text = string.Empty;
-                startHintText.gameObject.SetActive(true);
-                startHintText.text = "Press SPACE to start";
+                startHintText.text = "[  PRESS  SPACE  TO  START  ]";
                 return;
             }
 
-            taglineText.gameObject.SetActive(true);
-            riddleText.gameObject.SetActive(true);
-            startHintText.gameObject.SetActive(true);
-
+            // Legacy tutorial scene
             if (scenePath == "Assets/Neel/Tutorial.unity")
             {
-                titleText.text = "TUTORIAL";
+                if (difficultyLabel != null) difficultyLabel.text = "— TUTORIAL —";
                 taglineText.text = "Learn the controls step by step.";
                 riddleText.gameObject.SetActive(false);
-                startHintText.text = "Press ENTER or SPACE to begin";
+                startHintText.text = "[  PRESS  ENTER  OR  SPACE  TO  BEGIN  ]";
                 return;
             }
 
+            // Standard gameplay scenes — Easy / Medium / Hard
             if (scenePath.StartsWith("Assets/Sahil/Test/") ||
                 scenePath == "Assets/Sushil/Easy Level.unity")
             {
-                titleText.text = "Evil Resident";
+                string difficulty = "—";
+                string tagline = "Escape from the main door.";
                 if (sceneNameLower.Contains("easy"))
                 {
-                    titleText.text = "Evil Resident - Easy";
-                    taglineText.text = "Escape from the main door. Easy mode.";
+                    difficulty = "EASY";
+                    tagline = "Find the keys. Reach the main door. Don't get caught.";
                 }
                 else if (sceneNameLower.Contains("medium"))
                 {
-                    titleText.text = "Evil Resident - Medium";
-                    taglineText.text = "Escape from the main door. Medium mode.";
+                    difficulty = "MEDIUM";
+                    tagline = "He's faster now. Sees further. Listens harder.";
                 }
                 else if (sceneNameLower.Contains("difficult") || sceneNameLower.Contains("hard"))
                 {
-                    titleText.text = "Evil Resident - Hard";
-                    taglineText.text = "Escape from the main door. Hard mode.";
+                    difficulty = "HARD";
+                    tagline = "Mistakes are fatal. Hide well. Move quietly.";
                 }
-                else
-                    taglineText.text = "Escape from the main door.";
+
+                if (difficultyLabel != null)
+                    difficultyLabel.text = "— " + difficulty + " —";
+                taglineText.text = tagline;
+
                 if (IsEasyScene(scenePath, sceneNameLower))
                 {
                     riddleText.gameObject.SetActive(false);
-                    riddleText.text = string.Empty;
                 }
                 else
                 {
                     riddleText.gameObject.SetActive(true);
-                    riddleText.text = "Walls here do not have ears, but they might show something... ;)";
+                    riddleText.text = "\"Walls here do not have ears... but they might show something.\"";
                 }
-                startHintText.text = "Press ENTER or SPACE to begin";
+                startHintText.text = "[  PRESS  ENTER  OR  SPACE  TO  BEGIN  ]";
                 return;
             }
 
-            titleText.text = "IT SAW YOU";
-            taglineText.text = "Collect 3 keys. Escape. Don't be seen.";
+            // Fallback for unrecognized scenes
+            if (difficultyLabel != null) difficultyLabel.text = "— SURVIVAL —";
+            taglineText.text = "Collect the keys. Escape. Don't be seen.";
             riddleText.gameObject.SetActive(false);
-            riddleText.text = string.Empty;
-            startHintText.text = "Press ENTER or SPACE to begin";
+            startHintText.text = "[  PRESS  ENTER  OR  SPACE  TO  BEGIN  ]";
         }
 
         bool ShouldSuppressOverlayInScene(Scene scene)
@@ -294,7 +365,8 @@ namespace Sushil.Systems
             GameObject bgObj = new GameObject("Background");
             bgObj.transform.SetParent(parent, false);
             var bg = bgObj.AddComponent<Image>();
-            bg.color = new Color(0.01f, 0.01f, 0.03f, 1f);
+            bg.color = Color.black; // fully opaque
+            bg.raycastTarget = false;
             var bgRect = bg.rectTransform;
             bgRect.anchorMin = Vector2.zero;
             bgRect.anchorMax = Vector2.one;
@@ -302,18 +374,28 @@ namespace Sushil.Systems
             bgRect.offsetMax = Vector2.zero;
         }
 
-        Transform CreateContentContainer(Transform parent)
+        Transform CreateContentCard(Transform parent)
         {
-            var obj = new GameObject("ContentContainer");
+            var obj = new GameObject("ContentCard", typeof(RectTransform));
             obj.transform.SetParent(parent, false);
             var image = obj.AddComponent<Image>();
-            image.color = new Color(0.02f, 0.03f, 0.06f, 0f);
+            image.color = new Color(0.03f, 0.03f, 0.04f, 1f);
+            image.raycastTarget = false;
+
+            // Stacked red glow outlines — same horror aesthetic as PauseOverlay/MainMenu
+            var inner = obj.AddComponent<Outline>();
+            inner.effectColor = new Color(0.85f, 0.10f, 0.10f, 0.65f);
+            inner.effectDistance = new Vector2(2f, -2f);
+            var outer = obj.AddComponent<Outline>();
+            outer.effectColor = new Color(0.45f, 0.02f, 0.02f, 0.40f);
+            outer.effectDistance = new Vector2(4f, -4f);
 
             var rect = image.rectTransform;
-            rect.anchorMin = new Vector2(0.06f, 0.03f);
-            rect.anchorMax = new Vector2(0.94f, 0.97f);
-            rect.offsetMin = Vector2.zero;
-            rect.offsetMax = Vector2.zero;
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(900f, 760f);
+            rect.anchoredPosition = Vector2.zero;
             return obj.transform;
         }
 

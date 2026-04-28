@@ -187,7 +187,7 @@ public class WeepingAngelAnimationBridge : MonoBehaviour
         graph = PlayableGraph.Create($"{name}_AngelAnimGraph");
         graph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
 
-        mixer = AnimationMixerPlayable.Create(graph, 2, true);
+        mixer = AnimationMixerPlayable.Create(graph, 2);
         idlePlayable = AnimationClipPlayable.Create(graph, idleClip);
         walkPlayable = AnimationClipPlayable.Create(graph, walkClip);
         idlePlayable.SetApplyFootIK(false);

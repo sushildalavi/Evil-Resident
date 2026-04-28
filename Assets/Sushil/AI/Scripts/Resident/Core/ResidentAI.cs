@@ -412,17 +412,18 @@ namespace Sushil.AI
             keepChaseWhenRecentlySeen = true;
             relentlessVisualChase = false;
             loseChaseWhenFar = true;
-            sightRange = Mathf.Clamp(sightRange, 21f, 24f);
-            fovDegrees = Mathf.Max(fovDegrees, 132f);
+            // Hard-difficulty baseline. Medium and Easy cap these down further below.
+            sightRange = Mathf.Clamp(sightRange, 28f, 32f);
+            fovDegrees = Mathf.Max(fovDegrees, 150f);
             strictWallOcclusionVision = true;
-            proximityChaseDistance = Mathf.Clamp(proximityChaseDistance, 4.6f, 5.4f);
+            proximityChaseDistance = Mathf.Clamp(proximityChaseDistance, 5.5f, 6.5f);
             visionAcquireSeconds = Mathf.Clamp(visionAcquireSeconds, 0.06f, 0.1f);
             visionLoseSeconds = Mathf.Clamp(visionLoseSeconds, 0.2f, 0.28f);
-            chaseMemorySeconds = Mathf.Clamp(chaseMemorySeconds, 3.2f, 3.8f);
-            lostSightPursuitSeconds = Mathf.Clamp(lostSightPursuitSeconds, 3.8f, 4.6f);
+            chaseMemorySeconds = Mathf.Clamp(chaseMemorySeconds, 5.0f, 6.0f);
+            lostSightPursuitSeconds = Mathf.Clamp(lostSightPursuitSeconds, 5.5f, 6.5f);
             lostSightToSearchDelay = Mathf.Clamp(lostSightToSearchDelay, 0.35f, 0.6f);
-            maxChaseDistance = Mathf.Clamp(maxChaseDistance, 12.5f, 14f);
-            farLoseDelay = Mathf.Max(farLoseDelay, 1.1f);
+            maxChaseDistance = Mathf.Clamp(maxChaseDistance, 18f, 22f);
+            farLoseDelay = Mathf.Max(farLoseDelay, 1.5f);
             roamWholeHouse = true;
             allowMultiFloorRoam = true;
             roamSampleAttempts = Mathf.Max(roamSampleAttempts, 28);
@@ -472,19 +473,19 @@ namespace Sushil.AI
             }
             if (IsSahilTestNewLevel())
             {
-                sightRange = Mathf.Clamp(sightRange, 22f, 25f);
+                sightRange = Mathf.Clamp(sightRange, 28f, 32f);
                 visionAcquireSeconds = Mathf.Clamp(visionAcquireSeconds, 0.06f, 0.1f);
                 visionLoseSeconds = Mathf.Clamp(visionLoseSeconds, 0.2f, 0.26f);
                 allowProximityChaseWithoutNoise = true;
-                proximityChaseDistance = Mathf.Clamp(proximityChaseDistance, 4.8f, 5.8f);
-                chaseMemorySeconds = Mathf.Clamp(chaseMemorySeconds, 3.4f, 4.2f);
-                lostSightPursuitSeconds = Mathf.Clamp(lostSightPursuitSeconds, 4.1f, 4.9f);
+                proximityChaseDistance = Mathf.Clamp(proximityChaseDistance, 5.5f, 6.5f);
+                chaseMemorySeconds = Mathf.Clamp(chaseMemorySeconds, 5.0f, 6.0f);
+                lostSightPursuitSeconds = Mathf.Clamp(lostSightPursuitSeconds, 5.5f, 6.5f);
                 lostSightToSearchDelay = Mathf.Clamp(lostSightToSearchDelay, 0.4f, 0.6f);
                 roamWholeHouseWhenPlayerLost = false;
                 wholeHouseSearchDuration = Mathf.Min(wholeHouseSearchDuration, 10f);
                 lostSightLastKnownBias = Mathf.Max(lostSightLastKnownBias, 0.95f);
-                maxChaseDistance = Mathf.Clamp(maxChaseDistance, 12.5f, 14.5f);
-                farLoseDelay = Mathf.Max(farLoseDelay, 1.15f);
+                maxChaseDistance = Mathf.Clamp(maxChaseDistance, 18f, 22f);
+                farLoseDelay = Mathf.Max(farLoseDelay, 1.5f);
                 killDistance = Mathf.Clamp(killDistance, 0.98f, 1.08f);
                 killVerticalTolerance = Mathf.Clamp(killVerticalTolerance, 0.95f, 1.1f);
                 multiFloorRoamChance = Mathf.Clamp(multiFloorRoamChance, 0.3f, 0.52f);
@@ -500,13 +501,13 @@ namespace Sushil.AI
             {
                 patrolMoveSpeed = hardPatrolSpeed * 0.82f;
                 chaseMoveSpeed = hardChaseSpeed * 0.82f;
-                sightRange = Mathf.Min(sightRange, 19f);
-                proximityChaseDistance = Mathf.Min(proximityChaseDistance, 4.1f);
-                closeAwarenessDistance = Mathf.Min(closeAwarenessDistance, 4.0f);
-                chaseMemorySeconds = Mathf.Min(chaseMemorySeconds, 2.8f);
-                lostSightPursuitSeconds = Mathf.Min(lostSightPursuitSeconds, 3.2f);
-                maxChaseDistance = Mathf.Min(maxChaseDistance, 11.5f);
-                farLoseDelay = Mathf.Min(farLoseDelay, 0.9f);
+                sightRange = Mathf.Min(sightRange, 26f);                  // was 19 — now nearly hard's 28
+                proximityChaseDistance = Mathf.Min(proximityChaseDistance, 5.5f);  // was 4.1
+                closeAwarenessDistance = Mathf.Min(closeAwarenessDistance, 5.0f);  // was 4.0
+                chaseMemorySeconds = Mathf.Min(chaseMemorySeconds, 4.5f);          // was 2.8
+                lostSightPursuitSeconds = Mathf.Min(lostSightPursuitSeconds, 5.0f);// was 3.2
+                maxChaseDistance = Mathf.Min(maxChaseDistance, 17f);               // was 11.5
+                farLoseDelay = Mathf.Min(farLoseDelay, 1.3f);                      // was 0.9
             }
             else if (IsEasyLevelScene())
             {
